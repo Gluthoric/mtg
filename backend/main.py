@@ -1,6 +1,5 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_migrate import Migrate
 from config import Config
 from database import db
 from routes import register_routes
@@ -12,7 +11,6 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
-    migrate = Migrate(app, db)
     CORS(app)
 
     # Register routes
