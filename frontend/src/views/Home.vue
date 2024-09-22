@@ -1,58 +1,73 @@
 <template>
   <div class="home">
-    <h1>Welcome to MTG Collection Kiosk</h1>
-    <p>Manage your Magic: The Gathering card collection and kiosk inventory with ease.</p>
+    <h1>MTG Collection Manager</h1>
     <div class="dashboard">
       <div class="stat-card">
-        <h3>Collection Stats</h3>
-        <p>Total Cards: {{ collectionStats.totalCards }}</p>
-        <p>Unique Cards: {{ collectionStats.uniqueCards }}</p>
-        <p>Total Value: ${{ collectionStats.totalValue.toFixed(2) }}</p>
+        <h2>Total Cards</h2>
+        <p>{{ stats.totalCards }}</p>
       </div>
       <div class="stat-card">
-        <h3>Kiosk Stats</h3>
-        <p>Total Cards: {{ kioskStats.totalCards }}</p>
-        <p>Unique Cards: {{ kioskStats.uniqueCards }}</p>
-        <p>Total Value: ${{ kioskStats.totalValue.toFixed(2) }}</p>
+        <h2>Unique Cards</h2>
+        <p>{{ stats.uniqueCards }}</p>
+      </div>
+      <div class="stat-card">
+        <h2>Sets Collected</h2>
+        <p>{{ stats.setsCollected }}</p>
       </div>
     </div>
+    <button @click="refreshStats">Refresh Stats</button>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 
 export default {
   name: 'Home',
   setup() {
-    const collectionStats = ref({ totalCards: 0, uniqueCards: 0, totalValue: 0 })
-    const kioskStats = ref({ totalCards: 0, uniqueCards: 0, totalValue: 0 })
+    const stats = ref({
+      totalCards: 0,
+      uniqueCards: 0,
+      setsCollected: 0
+    })
+    let refreshInterval
 
     const fetchStats = async () => {
       try {
-        const [collectionResponse, kioskResponse] = await Promise.all([
-          axios.get('/api/collection/stats'),
-          axios.get('/api/kiosk/stats')
-        ])
-        collectionStats.value = collectionResponse.data
-        kioskStats.value = kioskResponse.data
+        const response = await axios.get('/api/stats')
+        stats.value = response.data
       } catch (error) {
-        console.error('Error fetching stats:', error)
+        console.error('Failed to fetch stats:', error)
       }
     }
 
-    onMounted(fetchStats)
+    const refreshStats = () => {
+      fetchStats()
+    }
+
+    onMounted(() => {
+      fetchStats()
+      refreshInterval = setInterval(fetchStats, 300000) // Refresh every 5 minutes
+    })
+
+    onUnmounted(() => {
+      clearInterval(refreshInterval)
+    })
 
     return {
-      collectionStats,
-      kioskStats
+      stats,
+      refreshStats
     }
   }
 }
 </script>
 
 <style scoped>
+.home {
+  padding: 1rem;
+}
+
 .dashboard {
   display: flex;
   justify-content: space-around;
@@ -60,9 +75,24 @@ export default {
 }
 
 .stat-card {
-  background-color: #f0f0f0;
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
-  width: 45%;
+  color: var(--text-color);
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: var(--link-color);
 }
 </style>

@@ -1,4 +1,6 @@
 from database import db
+from models.collection import Collection
+from models.card import Card
 
 class Set(db.Model):
     __tablename__ = 'sets'
@@ -17,6 +19,8 @@ class Set(db.Model):
     cards = db.relationship('Card', back_populates='set')
 
     def to_dict(self):
+        collection_count = self.get_collection_count()
+        collection_percentage = (collection_count / self.card_count) * 100 if self.card_count else 0
         return {
             'id': self.id,
             'code': self.code,
@@ -26,5 +30,14 @@ class Set(db.Model):
             'card_count': self.card_count,
             'digital': self.digital,
             'foil_only': self.foil_only,
-            'icon_svg_uri': self.icon_svg_uri
+            'icon_svg_uri': self.icon_svg_uri,
+            'collection_count': collection_count,
+            'collection_percentage': collection_percentage
         }
+
+    def get_collection_count(self):
+        # Count the number of unique cards in the collection for this set
+        return db.session.query(db.func.count(Collection.card_id)) \
+            .join(Card, Card.id == Collection.card_id) \
+            .filter(Card.set_code == self.code) \
+            .scalar() or 0

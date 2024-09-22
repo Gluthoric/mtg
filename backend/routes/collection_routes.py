@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from models.collection import Collection
 from models.card import Card
 from database import db
+from sqlalchemy.sql import func, text
 
 collection_routes = Blueprint('collection_routes', __name__)
 
@@ -51,17 +52,27 @@ def remove_from_collection(card_id):
 
 @collection_routes.route('/collection/stats', methods=['GET'])
 def get_collection_stats():
-    total_cards = db.session.query(db.func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
-    unique_cards = Collection.query.count()
-    total_value = db.session.query(
-        db.func.sum(
-            db.cast(db.func.json_extract(Card.prices, '$.usd'), db.Float) * Collection.quantity_regular +
-            db.cast(db.func.json_extract(Card.prices, '$.usd_foil'), db.Float) * Collection.quantity_foil
-        )
-    ).join(Card).scalar() or 0
+    try:
+        total_cards = db.session.query(func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
+        unique_cards = Collection.query.count()
 
-    return jsonify({
-        'total_cards': total_cards,
-        'unique_cards': unique_cards,
-        'total_value': round(total_value, 2)
-    }), 200
+        # Use a raw SQL query to calculate the total value
+        total_value_query = text("""
+            SELECT SUM(
+                (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * collections.quantity_regular) +
+                (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * collections.quantity_foil)
+            )
+            FROM collections
+            JOIN cards ON cards.id = collections.card_id
+        """)
+        total_value = db.session.execute(total_value_query).scalar() or 0
+
+        return jsonify({
+            'total_cards': int(total_cards),
+            'unique_cards': unique_cards,
+            'total_value': round(total_value, 2)
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Add other collection routes here

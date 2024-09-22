@@ -1,15 +1,141 @@
-/* Add your global styles here */
+/* Define CSS Variables for Dark Mode */
+:root {
+  --background-color: #121212;
+  --text-color: #e0e0e0;
+  --primary-color: #bb86fc;
+  --secondary-color: #1f1f1f;
+  --border-color: #333333;
+  --input-background: #2c2c2c;
+  --button-background: #333333;
+  --button-hover-background: #444444;
+  --link-color: #bb86fc;
+  --error-color: #f44336;
+  --success-color: #4caf50;
+}
+
+/* Apply Global Styles */
 body {
+  background-color: var(--background-color);
+  color: var(--text-color);
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* Link Styles */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Navigation Styles */
+nav {
+  background-color: var(--secondary-color);
+  padding: 20px;
+}
+
+nav a {
+  color: var(--text-color);
+  margin: 0 10px;
+  font-weight: bold;
+}
+
+nav a.router-link-exact-active {
+  color: var(--primary-color);
+}
+
+/* Button Styles */
+button {
+  background-color: var(--button-background);
+  color: var(--text-color);
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: var(--button-hover-background);
+}
+
+button:disabled {
+  background-color: #555555;
+  cursor: not-allowed;
+}
+
+/* Form Elements */
+input, select, textarea {
+  background-color: var(--input-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+input::placeholder {
+  color: #aaaaaa;
+}
+
+/* Card Styles */
+.set-card, .card-item, .stat-card {
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--text-color);
+  transition: transform 0.3s ease;
+}
+
+.set-card:hover, .card-item:hover, .stat-card:hover {
+  transform: scale(1.02);
+}
+
+/* Progress Bars */
+.progress-container {
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 10px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 10px;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Message Styles */
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.message.success {
+  background-color: var(--success-color);
+  color: #ffffff;
+}
+
+.message.error {
+  background-color: var(--error-color);
+  color: #ffffff;
+}
+
+/* Additional Global Styles */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 15px;
 }
 
-/* You can add more global styles as needed */
+/* Ensure all images and icons are compatible with dark mode */
+img {
+  max-width: 100%;
+  height: auto;
+}

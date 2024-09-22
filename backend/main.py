@@ -3,6 +3,7 @@ from flask_cors import CORS
 from config import Config
 from database import db
 from routes import register_routes
+from routes.set_routes import set_routes  # Import the new blueprint
 from sqlalchemy import inspect
 
 def create_app():
@@ -15,6 +16,7 @@ def create_app():
 
     # Register routes
     register_routes(app)
+    app.register_blueprint(set_routes, url_prefix='/api')  # Register with /api prefix
 
     return app
 

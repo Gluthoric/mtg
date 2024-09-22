@@ -1,30 +1,27 @@
 <template>
   <div class="collection">
     <h1>My Collection</h1>
-    <div class="filters">
-      <input v-model="filters.name" placeholder="Search by name" @input="fetchCards">
-      <select v-model="filters.set" @change="fetchCards">
-        <option value="">All Sets</option>
-        <option v-for="set in sets" :key="set.code" :value="set.code">{{ set.name }}</option>
-      </select>
-      <select v-model="filters.rarity" @change="fetchCards">
-        <option value="">All Rarities</option>
-        <option value="common">Common</option>
-        <option value="uncommon">Uncommon</option>
-        <option value="rare">Rare</option>
-        <option value="mythic">Mythic</option>
-      </select>
-    </div>
-    <div class="card-list">
-      <div v-for="card in cards" :key="card.id" class="card-item">
-        <img :src="card.image_uris.small" :alt="card.name">
-        <div class="card-details">
-          <h3>{{ card.name }}</h3>
-          <p>Set: {{ card.set_name }}</p>
-          <p>Rarity: {{ card.rarity }}</p>
-          <p>Quantity: {{ card.quantity.quantity_regular + card.quantity.quantity_foil }}</p>
-          <button @click="openEditModal(card)">Edit</button>
+    <SetListControls
+      :setTypes="setTypes"
+      :totalPages="totalPages"
+      @update-filters="updateFilters"
+      @update-sorting="updateSorting"
+      @update-per-page="updatePerPage"
+    />
+    <div v-if="loading" class="loading">Loading...</div>
+    <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-else class="set-grid">
+      <div v-for="set in sets" :key="set.code" class="set-card">
+        <div class="set-icon">
+          <img :src="set.icon_svg_uri" :alt="set.name" />
+          <div class="completion-circle" :style="{ '--percentage': set.collection_percentage + '%' }"></div>
         </div>
+        <h3>{{ set.name }}</h3>
+        <p>Code: {{ set.code }}</p>
+        <p>Type: {{ set.set_type }}</p>
+        <p>Released: {{ formatDate(set.released_at) }}</p>
+        <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
+        <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
       </div>
     </div>
     <div class="pagination">
@@ -32,99 +29,180 @@
       <span>Page {{ currentPage }} of {{ totalPages }}</span>
       <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
     </div>
-    <!-- Edit Modal (implement later) -->
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import SetListControls from '../components/SetListControls.vue'
 
 export default {
   name: 'Collection',
+  components: {
+    SetListControls
+  },
   setup() {
-    const cards = ref([])
     const sets = ref([])
-    const filters = ref({ name: '', set: '', rarity: '' })
+    const loading = ref(true)
+    const error = ref(null)
+    const filters = ref({ name: '', set_type: '' })
+    const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
+    const perPage = ref(20)
+    const setTypes = ref([
+      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
+      'starter', 'box', 'promo', 'token', 'memorabilia'
+    ])
 
-    const fetchCards = async () => {
+    const fetchSets = async () => {
+      loading.value = true
+      error.value = null
       try {
-        const response = await axios.get('/api/collection', {
+        const response = await axios.get('/api/all-sets', {
           params: {
             ...filters.value,
-            page: currentPage.value
+            ...sorting.value,
+            page: currentPage.value,
+            per_page: perPage.value
           }
         })
-        cards.value = response.data.collection
+        sets.value = response.data.sets
         totalPages.value = response.data.pages
-      } catch (error) {
-        console.error('Error fetching cards:', error)
+        currentPage.value = response.data.current_page
+      } catch (err) {
+        console.error('Error fetching sets:', err)
+        error.value = 'Error fetching sets. Please try again.'
+      } finally {
+        loading.value = false
       }
     }
 
-    const fetchSets = async () => {
-      try {
-        const response = await axios.get('/api/sets')
-        sets.value = response.data.sets
-      } catch (error) {
-        console.error('Error fetching sets:', error)
-      }
+    const updateFilters = (newFilters) => {
+      filters.value = { ...newFilters }
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const updateSorting = (newSorting) => {
+      sorting.value = { ...newSorting }
+      fetchSets()
+    }
+
+    const updatePerPage = (newPerPage) => {
+      perPage.value = newPerPage
+      currentPage.value = 1
+      fetchSets()
     }
 
     const changePage = (delta) => {
-      currentPage.value += delta
-      fetchCards()
+      const newPage = currentPage.value + delta
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage
+        fetchSets()
+      }
     }
 
-    const openEditModal = (card) => {
-      // Implement edit modal logic
-      console.log('Edit card:', card)
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString()
     }
 
     onMounted(() => {
-      fetchCards()
       fetchSets()
     })
 
     return {
-      cards,
       sets,
+      loading,
+      error,
       filters,
+      sorting,
       currentPage,
       totalPages,
-      fetchCards,
+      perPage,
+      setTypes,
+      updateFilters,
+      updateSorting,
+      updatePerPage,
       changePage,
-      openEditModal
+      formatDate
     }
   }
 }
 </script>
 
 <style scoped>
-.filters {
-  margin-bottom: 1rem;
+.collection {
+  padding: 1rem;
 }
 
-.card-list {
+.set-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 1rem;
 }
 
-.card-item {
+.set-card {
   border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 0.5rem;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  background-color: #f9f9f9;
 }
 
-.card-item img {
+.set-icon {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 1rem;
+}
+
+.set-icon img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
+}
+
+.completion-circle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(
+    #4CAF50 calc(var(--percentage) * 1%),
+    #e0e0e0 calc(var(--percentage) * 1%)
+  );
+  opacity: 0.7;
+}
+
+.loading, .error {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 1.2rem;
 }
 
 .pagination {
-  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 2rem;
+}
+
+.pagination button {
+  margin: 0 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 </style>
