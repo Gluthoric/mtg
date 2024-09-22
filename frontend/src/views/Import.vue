@@ -76,7 +76,7 @@ export default {
 
     const importSingleCard = async () => {
       try {
-        const response = await axios.post(`/api/${singleCard.value.destination}`, {
+        const response = await axios.post(`/api/collection`, {
           scryfallid: singleCard.value.scryfallId,
           quantity: singleCard.value.quantity,
           foil: singleCard.value.foil ? 1 : 0
@@ -104,10 +104,11 @@ export default {
 
       const formData = new FormData()
       formData.append('file', csvImport.value.file)
-      formData.append('destination', csvImport.value.destination)
+      // The destination in this context is handled in backend logic, so it's not necessary
+      // unless you want to differentiate between collection and kiosk imports for CSV
 
       try {
-        const response = await axios.post('/api/import_csv', formData, {
+        const response = await axios.post('/api/collection/import_csv', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }

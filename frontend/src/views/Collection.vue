@@ -8,6 +8,13 @@
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
     />
+    <div class="additional-filters">
+      <label for="setFilter">Filter by Set:</label>
+      <select v-model="filters.set_code" @change="updateFilters" id="setFilter" class="select">
+        <option value="">All Sets</option>
+        <option v-for="set in availableSets" :key="set.code" :value="set.code">{{ set.name }}</option>
+      </select>
+    </div>
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else class="set-grid">
@@ -46,7 +53,7 @@ export default {
     const sets = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const filters = ref({ name: '', set_type: '' })
+    const filters = ref({ name: '', set_code: '' })
     const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
@@ -55,12 +62,26 @@ export default {
       'core', 'expansion', 'masters', 'draft_innovation', 'funny',
       'starter', 'box', 'promo', 'token', 'memorabilia'
     ])
+    const availableSets = ref([])
+
+    const fetchAvailableSets = async () => {
+      try {
+        const response = await axios.get('/api/sets', {
+          params: {
+            per_page: 1000 // Assuming you have less than 1000 sets
+          }
+        })
+        availableSets.value = response.data.sets
+      } catch (err) {
+        console.error('Error fetching sets:', err)
+      }
+    }
 
     const fetchSets = async () => {
       loading.value = true
       error.value = null
       try {
-        const response = await axios.get('/api/all-sets', {
+        const response = await axios.get('/api/collection', {
           params: {
             ...filters.value,
             ...sorting.value,
@@ -68,19 +89,19 @@ export default {
             per_page: perPage.value
           }
         })
-        sets.value = response.data.sets
+        sets.value = response.data.collection
         totalPages.value = response.data.pages
         currentPage.value = response.data.current_page
       } catch (err) {
-        console.error('Error fetching sets:', err)
-        error.value = 'Error fetching sets. Please try again.'
+        console.error('Error fetching collection:', err)
+        error.value = 'Failed to load collection'
       } finally {
         loading.value = false
       }
     }
 
     const updateFilters = (newFilters) => {
-      filters.value = { ...newFilters }
+      filters.value = { ...filters.value, ...newFilters }
       currentPage.value = 1
       fetchSets()
     }
@@ -109,6 +130,7 @@ export default {
     }
 
     onMounted(() => {
+      fetchAvailableSets()
       fetchSets()
     })
 
@@ -122,6 +144,7 @@ export default {
       totalPages,
       perPage,
       setTypes,
+      availableSets,
       updateFilters,
       updateSorting,
       updatePerPage,
@@ -204,5 +227,18 @@ export default {
 .pagination button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+}
+
+.additional-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 </style>

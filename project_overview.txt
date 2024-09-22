@@ -267,11 +267,15 @@ def search_cards():
 
 #### backend/routes/collection_routes.py
 ```python
+import pandas as pd
 from flask import Blueprint, jsonify, request
 from models.collection import Collection
 from models.card import Card
+from models.kiosk import Kiosk
+from models.set import Set
 from database import db
 from sqlalchemy.sql import func, text
+from sqlalchemy.exc import SQLAlchemyError
 
 collection_routes = Blueprint('collection_routes', __name__)
 
@@ -279,12 +283,22 @@ collection_routes = Blueprint('collection_routes', __name__)
 def get_collection():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    set_code = request.args.get('set_code', '', type=str)
 
-    collection = Collection.query.join(Card).paginate(page=page, per_page=per_page, error_out=False)
+    query = Collection.query.join(Card).join(Set)
+
+    if set_code:
+        query = query.filter(Set.code == set_code)
+
+    collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
     return jsonify({
         'collection': [
-            {**item.card.to_dict(), 'quantity': item.to_dict()}
+            {
+                **item.card.to_dict(),
+                'quantity_regular': item.quantity_regular,
+                'quantity_foil': item.quantity_foil
+            }
             for item in collection.items
         ],
         'total': collection.total,
@@ -343,6 +357,85 @@ def get_collection_stats():
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@collection_routes.route('/collection/import_csv', methods=['POST'])
+def import_csv():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({"error": "Only CSV files are allowed"}), 400
+
+    try:
+        df = pd.read_csv(file)
+    except Exception as e:
+        return jsonify({"error": f"Failed to parse CSV: {str(e)}"}), 400
+
+    # Expected CSV Columns: card_name, quantity, foil (boolean)
+    required_columns = {'card_name', 'quantity', 'foil'}
+    if not required_columns.issubset(set(df.columns)):
+        return jsonify({"error": f"CSV must contain columns: {', '.join(required_columns)}"}), 400
+
+    # Process each row
+    for index, row in df.iterrows():
+        card_name = row['card_name']
+        quantity = int(row['quantity'])
+        foil = bool(row['foil'])
+
+        # Fetch the card by name
+        card = Card.query.filter_by(name=card_name).first()
+        if not card:
+            return jsonify({"error": f"Card '{card_name}' not found in the database."}), 404
+
+        # Fetch existing collection and kiosk items
+        collection_item = Collection.query.filter_by(card_id=card.id).first()
+        kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
+
+        if foil:
+            # Handle foil cards
+            if collection_item and collection_item.quantity_foil > 0:
+                # Collection already has foil, send all to kiosk
+                if kiosk_item:
+                    kiosk_item.quantity_foil += quantity
+                else:
+                    kiosk_item = Kiosk(card_id=card.id, quantity_foil=quantity)
+                    db.session.add(kiosk_item)
+            else:
+                # Send 1 foil to collection, rest to kiosk
+                to_collection = min(1, quantity)
+                to_kiosk = quantity - to_collection
+
+                if to_collection > 0:
+                    if collection_item:
+                        collection_item.quantity_foil += to_collection
+                    else:
+                        collection_item = Collection(card_id=card.id, quantity_foil=to_collection)
+                        db.session.add(collection_item)
+
+                if to_kiosk > 0:
+                    if kiosk_item:
+                        kiosk_item.quantity_foil += to_kiosk
+                    else:
+                        kiosk_item = Kiosk(card_id=card.id, quantity_foil=to_kiosk)
+                        db.session.add(kiosk_item)
+        else:
+            # Handle non-foil cards: all go to kiosk
+            if kiosk_item:
+                kiosk_item.quantity_regular += quantity
+            else:
+                kiosk_item = Kiosk(card_id=card.id, quantity_regular=quantity)
+                db.session.add(kiosk_item)
+
+    try:
+        db.session.commit()
+        return jsonify({"message": "CSV imported successfully"}), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 # Add other collection routes here```
 
@@ -670,14 +763,27 @@ export default {
 
 .input {
   padding: 0.5rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  background-color: var(--input-background);
+  color: var(--text-color);
 }
 
 .select {
   padding: 0.5rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  background-color: var(--input-background);
+  color: var(--text-color);
+}
+
+button {
+  background-color: var(--primary-color);
+  color: var(--text-color);
+}
+
+button:hover {
+  background-color: var(--link-color);
 }
 </style>```
 
@@ -694,6 +800,13 @@ export default {
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
     />
+    <div class="additional-filters">
+      <label for="setFilter">Filter by Set:</label>
+      <select v-model="filters.set_code" @change="updateFilters" id="setFilter" class="select">
+        <option value="">All Sets</option>
+        <option v-for="set in availableSets" :key="set.code" :value="set.code">{{ set.name }}</option>
+      </select>
+    </div>
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else class="set-grid">
@@ -732,7 +845,7 @@ export default {
     const sets = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const filters = ref({ name: '', set_type: '' })
+    const filters = ref({ name: '', set_code: '' })
     const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
@@ -741,12 +854,26 @@ export default {
       'core', 'expansion', 'masters', 'draft_innovation', 'funny',
       'starter', 'box', 'promo', 'token', 'memorabilia'
     ])
+    const availableSets = ref([])
+
+    const fetchAvailableSets = async () => {
+      try {
+        const response = await axios.get('/api/sets', {
+          params: {
+            per_page: 1000 // Assuming you have less than 1000 sets
+          }
+        })
+        availableSets.value = response.data.sets
+      } catch (err) {
+        console.error('Error fetching sets:', err)
+      }
+    }
 
     const fetchSets = async () => {
       loading.value = true
       error.value = null
       try {
-        const response = await axios.get('/api/all-sets', {
+        const response = await axios.get('/api/collection', {
           params: {
             ...filters.value,
             ...sorting.value,
@@ -754,19 +881,19 @@ export default {
             per_page: perPage.value
           }
         })
-        sets.value = response.data.sets
+        sets.value = response.data.collection
         totalPages.value = response.data.pages
         currentPage.value = response.data.current_page
       } catch (err) {
-        console.error('Error fetching sets:', err)
-        error.value = 'Error fetching sets. Please try again.'
+        console.error('Error fetching collection:', err)
+        error.value = 'Failed to load collection'
       } finally {
         loading.value = false
       }
     }
 
     const updateFilters = (newFilters) => {
-      filters.value = { ...newFilters }
+      filters.value = { ...filters.value, ...newFilters }
       currentPage.value = 1
       fetchSets()
     }
@@ -795,6 +922,7 @@ export default {
     }
 
     onMounted(() => {
+      fetchAvailableSets()
       fetchSets()
     })
 
@@ -808,6 +936,7 @@ export default {
       totalPages,
       perPage,
       setTypes,
+      availableSets,
       updateFilters,
       updateSorting,
       updatePerPage,
@@ -891,29 +1020,41 @@ export default {
   background-color: #ccc;
   cursor: not-allowed;
 }
+
+.additional-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
 </style>```
 
 #### frontend/src/views/Home.vue
 ```vue
 <template>
   <div class="home">
-    <h1>Welcome to MTG Collection Kiosk</h1>
-    <p>Manage your Magic: The Gathering card collection and kiosk inventory with ease.</p>
-    <button @click="fetchStats">Refresh Stats</button>
+    <h1>MTG Collection Manager</h1>
     <div class="dashboard">
       <div class="stat-card">
-        <h3>Collection Stats</h3>
-        <p>Total Cards: {{ collectionStats.total_cards }}</p>
-        <p>Unique Cards: {{ collectionStats.unique_cards }}</p>
-        <p>Total Value: ${{ collectionStats.total_value.toFixed(2) }}</p>
+        <h2>Total Cards</h2>
+        <p>{{ stats.totalCards }}</p>
       </div>
       <div class="stat-card">
-        <h3>Kiosk Stats</h3>
-        <p>Total Cards: {{ kioskStats.total_cards }}</p>
-        <p>Unique Cards: {{ kioskStats.unique_cards }}</p>
-        <p>Total Value: ${{ kioskStats.total_value.toFixed(2) }}</p>
+        <h2>Unique Cards</h2>
+        <p>{{ stats.uniqueCards }}</p>
+      </div>
+      <div class="stat-card">
+        <h2>Sets Collected</h2>
+        <p>{{ stats.setsCollected }}</p>
       </div>
     </div>
+    <button @click="refreshStats">Refresh Stats</button>
   </div>
 </template>
 
@@ -924,48 +1065,48 @@ import axios from 'axios'
 export default {
   name: 'Home',
   setup() {
-    const collectionStats = ref({ total_cards: 0, unique_cards: 0, total_value: 0 })
-    const kioskStats = ref({ total_cards: 0, unique_cards: 0, total_value: 0 })
-    let intervalId = null
+    const stats = ref({
+      totalCards: 0,
+      uniqueCards: 0,
+      setsCollected: 0
+    })
+    let refreshInterval
 
     const fetchStats = async () => {
       try {
-        console.log('Fetching stats...')
-        const [collectionResponse, kioskResponse] = await Promise.all([
-          axios.get('http://localhost:5000/api/collection/stats'),
-          axios.get('http://localhost:5000/api/kiosk/stats')
-        ])
-        console.log('Collection stats response:', collectionResponse.data)
-        console.log('Kiosk stats response:', kioskResponse.data)
-        collectionStats.value = collectionResponse.data
-        kioskStats.value = kioskResponse.data
+        const response = await axios.get('/api/stats')
+        stats.value = response.data
       } catch (error) {
-        console.error('Error fetching stats:', error)
+        console.error('Failed to fetch stats:', error)
       }
+    }
+
+    const refreshStats = () => {
+      fetchStats()
     }
 
     onMounted(() => {
       fetchStats()
-      // Fetch stats every 30 seconds
-      intervalId = setInterval(fetchStats, 30000)
+      refreshInterval = setInterval(fetchStats, 300000) // Refresh every 5 minutes
     })
 
     onUnmounted(() => {
-      if (intervalId) {
-        clearInterval(intervalId)
-      }
+      clearInterval(refreshInterval)
     })
 
     return {
-      collectionStats,
-      kioskStats,
-      fetchStats
+      stats,
+      refreshStats
     }
   }
 }
 </script>
 
 <style scoped>
+.home {
+  padding: 1rem;
+}
+
 .dashboard {
   display: flex;
   justify-content: space-around;
@@ -973,24 +1114,25 @@ export default {
 }
 
 .stat-card {
-  background-color: #f0f0f0;
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
-  width: 45%;
+  color: var(--text-color);
 }
 
 button {
   margin-top: 1rem;
   padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
+  background-color: var(--primary-color);
+  color: var(--text-color);
   border: none;
   border-radius: 4px;
   cursor: pointer;
 }
 
 button:hover {
-  background-color: #45a049;
+  background-color: var(--link-color);
 }
 </style>```
 
@@ -1074,7 +1216,7 @@ export default {
 
     const importSingleCard = async () => {
       try {
-        const response = await axios.post(`/api/${singleCard.value.destination}`, {
+        const response = await axios.post(`/api/collection`, {
           scryfallid: singleCard.value.scryfallId,
           quantity: singleCard.value.quantity,
           foil: singleCard.value.foil ? 1 : 0
@@ -1102,10 +1244,11 @@ export default {
 
       const formData = new FormData()
       formData.append('file', csvImport.value.file)
-      formData.append('destination', csvImport.value.destination)
+      // The destination in this context is handled in backend logic, so it's not necessary
+      // unless you want to differentiate between collection and kiosk imports for CSV
 
       try {
-        const response = await axios.post('/api/import_csv', formData, {
+        const response = await axios.post('/api/collection/import_csv', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -1671,21 +1814,147 @@ export default {
 ### Other Frontend Files
 #### frontend/src/assets/main.css
 ```css
-/* Add your global styles here */
+/* Define CSS Variables for Dark Mode */
+:root {
+  --background-color: #121212;
+  --text-color: #e0e0e0;
+  --primary-color: #bb86fc;
+  --secondary-color: #1f1f1f;
+  --border-color: #333333;
+  --input-background: #2c2c2c;
+  --button-background: #333333;
+  --button-hover-background: #444444;
+  --link-color: #bb86fc;
+  --error-color: #f44336;
+  --success-color: #4caf50;
+}
+
+/* Apply Global Styles */
 body {
+  background-color: var(--background-color);
+  color: var(--text-color);
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* Link Styles */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Navigation Styles */
+nav {
+  background-color: var(--secondary-color);
+  padding: 20px;
+}
+
+nav a {
+  color: var(--text-color);
+  margin: 0 10px;
+  font-weight: bold;
+}
+
+nav a.router-link-exact-active {
+  color: var(--primary-color);
+}
+
+/* Button Styles */
+button {
+  background-color: var(--button-background);
+  color: var(--text-color);
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: var(--button-hover-background);
+}
+
+button:disabled {
+  background-color: #555555;
+  cursor: not-allowed;
+}
+
+/* Form Elements */
+input, select, textarea {
+  background-color: var(--input-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+input::placeholder {
+  color: #aaaaaa;
+}
+
+/* Card Styles */
+.set-card, .card-item, .stat-card {
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--text-color);
+  transition: transform 0.3s ease;
+}
+
+.set-card:hover, .card-item:hover, .stat-card:hover {
+  transform: scale(1.02);
+}
+
+/* Progress Bars */
+.progress-container {
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 10px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 10px;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Message Styles */
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.message.success {
+  background-color: var(--success-color);
+  color: #ffffff;
+}
+
+.message.error {
+  background-color: var(--error-color);
+  color: #ffffff;
+}
+
+/* Additional Global Styles */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 15px;
 }
 
-/* You can add more global styles as needed */```
+/* Ensure all images and icons are compatible with dark mode */
+img {
+  max-width: 100%;
+  height: auto;
+}```
 
 #### frontend/src/router/index.js
 ```javascript
@@ -1753,30 +2022,17 @@ export default router```
   </div>
 </template>
 
-<script setup>
-// Any setup logic can go here
+<script>
+export default {
+  name: 'App'
+}
 </script>
 
 <style>
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   text-align: center;
-  color: #2c3e50;
-}
-
-nav {
-  padding: 30px;
-}
-
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-nav a.router-link-exact-active {
-  color: #42b983;
+  color: inherit; /* Inherit text color from body */
 }
 </style>```
 
