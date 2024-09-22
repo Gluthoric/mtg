@@ -3,7 +3,7 @@ from database import db
 class Collection(db.Model):
     __tablename__ = 'collections'
 
-    id = db.Column(db.BigInteger, primary_key=True)
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     card_id = db.Column(db.Text, db.ForeignKey('cards.id'), nullable=False)
     quantity_regular = db.Column(db.BigInteger, default=0)
     quantity_foil = db.Column(db.BigInteger, default=0)

@@ -15,7 +15,7 @@
     />
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else class="set-grid">
+    <div v-else-if="sets && sets.length > 0" class="set-grid">
       <div v-for="set in sets" :key="set.code" class="set-card">
         <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
           <div class="set-icon">
@@ -30,6 +30,9 @@
           <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
         </router-link>
       </div>
+    </div>
+    <div v-else-if="!loading && sets.length === 0">
+      <p>No sets found in your collection.</p>
     </div>
     <div class="pagination">
       <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
@@ -86,9 +89,11 @@ export default {
             per_page: perPage.value
           }
         })
+        console.log('Response data:', response.data) // Added console.log
         sets.value = response.data.sets
-        totalPages.value = Math.ceil(response.data.sets.length / perPage.value)
-        currentPage.value = 1
+        totalPages.value = response.data.pages
+        currentPage.value = response.data.current_page
+        console.log('Sets value:', sets.value) // Added console.log
       } catch (err) {
         console.error('Error fetching collection sets:', err)
         error.value = 'Failed to load collection sets'

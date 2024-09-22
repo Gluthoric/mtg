@@ -6,9 +6,14 @@ from models.kiosk import Kiosk
 from models.set import Set
 from database import db
 from sqlalchemy.sql import func, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+import logging
 
 collection_routes = Blueprint('collection_routes', __name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @collection_routes.route('/collection', methods=['GET'])
 def get_collection():
@@ -138,8 +143,6 @@ def get_collection_set_cards(set_code):
         'pages': collection.pages,
         'current_page': page
     }), 200
-
-
 @collection_routes.route('/collection/import_csv', methods=['POST'])
 def import_csv():
     if 'file' not in request.files:
@@ -155,116 +158,124 @@ def import_csv():
     try:
         df = pd.read_csv(file)
     except Exception as e:
+        logger.error(f"Failed to parse CSV: {str(e)}")
         return jsonify({"error": f"Failed to parse CSV: {str(e)}"}), 400
 
-    # Define required columns based on the new CSV format
     required_columns = {
-        'Name',
-        'Edition',
-        'Edition code',
-        "Collector's number",
-        'Price',
-        'Foil',
-        'Currency',
-        'Scryfall ID',
-        'Quantity'
+        'Name', 'Edition', 'Edition code', "Collector's number",
+        'Price', 'Foil', 'Currency', 'Scryfall ID', 'Quantity'
     }
     if not required_columns.issubset(set(df.columns)):
         missing = required_columns - set(df.columns)
         return jsonify({"error": f"CSV is missing columns: {', '.join(missing)}"}), 400
 
-    # Process each row
-    for index, row in df.iterrows():
-        scryfall_id = row['Scryfall ID']
-        card_name = row['Name']
-        try:
-            quantity = int(row['Quantity'])
-            if quantity < 1:
-                raise ValueError
-        except ValueError:
-            return jsonify({"error": f"Invalid quantity for card '{card_name}' at row {index + 2}."}), 400
-
-        foil_status = str(row['Foil']).strip().lower()
-        if foil_status in ['true', '1', 'yes', 'foil']:
-            foil = True
-        elif foil_status in ['false', '0', 'no', 'non-foil']:
-            foil = False
-        else:
-            return jsonify({"error": f"Invalid foil value for card '{card_name}' at row {index + 2}."}), 400
-
-        # Fetch the card by Scryfall ID
-        card = Card.query.filter_by(id=scryfall_id).first()
-        if not card:
-            return jsonify({"error": f"Card with Scryfall ID '{scryfall_id}' not found in the database."}), 404
-
-        # Fetch existing collection and kiosk items
-        collection_item = Collection.query.filter_by(card_id=card.id).first()
-        kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
-
-        if foil:
-            # Handle foil cards
-            if collection_item and collection_item.quantity_foil > 0:
-                # Collection already has foil, send all to kiosk
-                if kiosk_item:
-                    kiosk_item.quantity_foil += quantity
-                else:
-                    kiosk_item = Kiosk(card_id=card.id, quantity_foil=quantity)
-                    db.session.add(kiosk_item)
-            else:
-                # Collection does not have foil, add 1 foil to collection and the rest to kiosk
-                to_collection = 1 if quantity >= 1 else 0
-                to_kiosk = quantity - to_collection
-
-                if to_collection > 0:
-                    if collection_item:
-                        collection_item.quantity_foil += to_collection
-                    else:
-                        collection_item = Collection(card_id=card.id, quantity_foil=to_collection)
-                        db.session.add(collection_item)
-
-                if to_kiosk > 0:
-                    if kiosk_item:
-                        kiosk_item.quantity_foil += to_kiosk
-                    else:
-                        kiosk_item = Kiosk(card_id=card.id, quantity_foil=to_kiosk)
-                        db.session.add(kiosk_item)
-        else:
-            # Handle non-foil cards
-            has_collection_copy = False
-            if collection_item:
-                has_collection_copy = collection_item.quantity_regular > 0 or collection_item.quantity_foil > 0
-
-            if not has_collection_copy:
-                # Add 1 non-foil to collection, rest to kiosk
-                to_collection = 1 if quantity >= 1 else 0
-                to_kiosk = quantity - to_collection
-
-                if to_collection > 0:
-                    if collection_item:
-                        collection_item.quantity_regular += to_collection
-                    else:
-                        collection_item = Collection(card_id=card.id, quantity_regular=to_collection)
-                        db.session.add(collection_item)
-
-                if to_kiosk > 0:
-                    if kiosk_item:
-                        kiosk_item.quantity_regular += to_kiosk
-                    else:
-                        kiosk_item = Kiosk(card_id=card.id, quantity_regular=to_kiosk)
-                        db.session.add(kiosk_item)
-            else:
-                # Collection already has a copy, send all to kiosk
-                if kiosk_item:
-                    kiosk_item.quantity_regular += quantity
-                else:
-                    kiosk_item = Kiosk(card_id=card.id, quantity_regular=quantity)
-                    db.session.add(kiosk_item)
-
     try:
+        with db.session.begin_nested():
+            for index, row in df.iterrows():
+                try:
+                    process_csv_row(row, index)
+                except ValueError as e:
+                    logger.error(f"Error processing row {index + 2}: {str(e)}")
+                    return jsonify({"error": str(e)}), 400
+                except IntegrityError as e:
+                    logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
+                    db.session.rollback()
+                    return jsonify({"error": f"Database integrity error at row {index + 2}: {str(e)}"}), 500
+
+                # Flush every 100 rows to catch potential errors earlier
+                if index % 100 == 0:
+                    db.session.flush()
+
         db.session.commit()
+        logger.info("CSV imported successfully")
         return jsonify({"message": "CSV imported successfully"}), 200
+
     except SQLAlchemyError as e:
         db.session.rollback()
+        logger.error(f"Database error during CSV import: {str(e)}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
 
-# Add other collection routes here
+def process_csv_row(row, index):
+    scryfall_id = row['Scryfall ID']
+    card_name = row['Name']
+
+    try:
+        quantity = int(row['Quantity'])
+        if quantity < 1:
+            raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
+    except ValueError:
+        raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
+
+    foil_status = str(row['Foil']).strip().lower()
+    if foil_status in ['true', '1', 'yes', 'foil']:
+        foil = True
+    elif foil_status in ['false', '0', 'no', 'non-foil']:
+        foil = False
+    else:
+        raise ValueError(f"Invalid foil value for card '{card_name}' at row {index + 2}.")
+
+    card = Card.query.filter_by(id=scryfall_id).first()
+    if not card:
+        raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
+
+    collection_item = Collection.query.filter_by(card_id=card.id).first()
+    kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
+
+    if foil:
+        handle_foil_card(card, quantity, collection_item, kiosk_item)
+    else:
+        handle_non_foil_card(card, quantity, collection_item, kiosk_item)
+
+def handle_foil_card(card, quantity, collection_item, kiosk_item):
+    if collection_item and collection_item.quantity_foil > 0:
+        if kiosk_item:
+            kiosk_item.quantity_foil += quantity
+        else:
+            kiosk_item = Kiosk(card_id=card.id, quantity_foil=quantity)
+            db.session.add(kiosk_item)
+    else:
+        to_collection = 1 if quantity >= 1 else 0
+        to_kiosk = quantity - to_collection
+
+        if to_collection > 0:
+            if collection_item:
+                collection_item.quantity_foil += to_collection
+            else:
+                collection_item = Collection(card_id=card.id, quantity_foil=to_collection)
+                db.session.add(collection_item)
+
+        if to_kiosk > 0:
+            if kiosk_item:
+                kiosk_item.quantity_foil += to_kiosk
+            else:
+                kiosk_item = Kiosk(card_id=card.id, quantity_foil=to_kiosk)
+                db.session.add(kiosk_item)
+
+def handle_non_foil_card(card, quantity, collection_item, kiosk_item):
+    has_collection_copy = collection_item and (collection_item.quantity_regular > 0 or collection_item.quantity_foil > 0)
+
+    if not has_collection_copy:
+        to_collection = 1 if quantity >= 1 else 0
+        to_kiosk = quantity - to_collection
+
+        if to_collection > 0:
+            if collection_item:
+                collection_item.quantity_regular += to_collection
+            else:
+                collection_item = Collection(card_id=card.id, quantity_regular=to_collection)
+                db.session.add(collection_item)
+
+        if to_kiosk > 0:
+            if kiosk_item:
+                kiosk_item.quantity_regular += to_kiosk
+            else:
+                kiosk_item = Kiosk(card_id=card.id, quantity_regular=to_kiosk)
+                db.session.add(kiosk_item)
+    else:
+        if kiosk_item:
+            kiosk_item.quantity_regular += quantity
+        else:
+            kiosk_item = Kiosk(card_id=card.id, quantity_regular=quantity)
+            db.session.add(kiosk_item)
+
+# ... (keep all other routes unchanged)
