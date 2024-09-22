@@ -143,6 +143,7 @@ def get_collection_set_cards(set_code):
         'pages': collection.pages,
         'current_page': page
     }), 200
+
 @collection_routes.route('/collection/import_csv', methods=['POST'])
 def import_csv():
     if 'file' not in request.files:
@@ -176,7 +177,8 @@ def import_csv():
                     process_csv_row(row, index)
                 except ValueError as e:
                     logger.error(f"Error processing row {index + 2}: {str(e)}")
-                    return jsonify({"error": str(e)}), 400
+                    # Optionally, collect errors to return after processing
+                    continue  # Skip to the next row
                 except IntegrityError as e:
                     logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
                     db.session.rollback()
@@ -199,6 +201,7 @@ def process_csv_row(row, index):
     scryfall_id = row['Scryfall ID']
     card_name = row['Name']
 
+    # Validate and parse quantity
     try:
         quantity = int(row['Quantity'])
         if quantity < 1:
@@ -206,18 +209,23 @@ def process_csv_row(row, index):
     except ValueError:
         raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
 
+    # Normalize foil value
     foil_status = str(row['Foil']).strip().lower()
-    if foil_status in ['true', '1', 'yes', 'foil']:
+    if not foil_status:
+        foil = False
+    elif foil_status in ['true', '1', 'yes', 'foil']:
         foil = True
     elif foil_status in ['false', '0', 'no', 'non-foil']:
         foil = False
     else:
         raise ValueError(f"Invalid foil value for card '{card_name}' at row {index + 2}.")
 
+    # Fetch the card from the database
     card = Card.query.filter_by(id=scryfall_id).first()
     if not card:
         raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
 
+    # Fetch or create collection and kiosk entries
     collection_item = Collection.query.filter_by(card_id=card.id).first()
     kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
 
@@ -277,5 +285,3 @@ def handle_non_foil_card(card, quantity, collection_item, kiosk_item):
         else:
             kiosk_item = Kiosk(card_id=card.id, quantity_regular=quantity)
             db.session.add(kiosk_item)
-
-# ... (keep all other routes unchanged)
