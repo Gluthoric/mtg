@@ -1,11 +1,12 @@
 from flask import Blueprint, jsonify, request
 from models.set import Set
+from models.card import Card
 from database import db
 from sqlalchemy import asc, desc
 
 set_routes = Blueprint('set_routes', __name__)
 
-@set_routes.route('/all-sets', methods=['GET'])
+@set_routes.route('/sets', methods=['GET'])
 def get_all_sets():
     try:
         # Extract query parameters
@@ -46,4 +47,30 @@ def get_all_sets():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Add more routes for sets if needed
+@set_routes.route('/sets/<string:set_code>', methods=['GET'])
+def get_set(set_code):
+    set = Set.query.filter_by(code=set_code).first_or_404()
+    return jsonify(set.to_dict()), 200
+
+@set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
+def get_set_cards(set_code):
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    name = request.args.get('name', '', type=str)
+    rarity = request.args.get('rarity', '', type=str)
+
+    query = Card.query.filter_by(set_code=set_code)
+
+    if name:
+        query = query.filter(Card.name.ilike(f'%{name}%'))
+    if rarity:
+        query = query.filter(Card.rarity == rarity)
+
+    cards = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'cards': [card.to_dict() for card in cards.items],
+        'total': cards.total,
+        'pages': cards.pages,
+        'current_page': cards.page
+    }), 200

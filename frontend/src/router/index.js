@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import Collection from '../views/Collection.vue'
+import CollectionSetCards from '../views/CollectionSetCards.vue'
 import Kiosk from '../views/Kiosk.vue'
 import Import from '../views/Import.vue'
 import Sets from '../views/Sets.vue'
@@ -16,6 +17,12 @@ const routes = [
     path: '/collection',
     name: 'Collection',
     component: Collection
+  },
+  {
+    path: '/collection/sets/:setCode',
+    name: 'CollectionSetCards',
+    component: CollectionSetCards,
+    props: true
   },
   {
     path: '/kiosk',

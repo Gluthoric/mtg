@@ -29,18 +29,21 @@
     </div>
 
     <div class="import-section">
+      <h2>CSV Import Guidelines</h2>
+      <p>Please ensure your CSV follows the format below:</p>
+      <pre>
+Name,Edition,Edition code,Collector's number,Price,Foil,Currency,Scryfall ID,Quantity
+"Saw","Duskmourn: House of Horror","DSK","254","$0.21","Foil","USD","603c3ef4-4ef1-4db8-9ed2-e2b0926269d5","2"
+      </pre>
+      <a href="/static/csv_template.csv" download="csv_template.csv">Download CSV Template</a>
+    </div>
+
+    <div class="import-section">
       <h2>Import from CSV</h2>
       <form @submit.prevent="importFromCSV">
         <div>
           <label for="csvFile">CSV File:</label>
           <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required>
-        </div>
-        <div>
-          <label for="csvDestination">Destination:</label>
-          <select v-model="csvImport.destination" id="csvDestination" required>
-            <option value="collection">Collection</option>
-            <option value="kiosk">Kiosk</option>
-          </select>
         </div>
         <button type="submit">Import CSV</button>
       </form>
@@ -67,8 +70,7 @@ export default {
     })
 
     const csvImport = ref({
-      file: null,
-      destination: 'collection'
+      file: null
     })
 
     const message = ref('')
@@ -77,7 +79,7 @@ export default {
     const importSingleCard = async () => {
       try {
         const response = await axios.post(`/api/collection`, {
-          scryfallid: singleCard.value.scryfallId,
+          scryfall_id: singleCard.value.scryfallId,
           quantity: singleCard.value.quantity,
           foil: singleCard.value.foil ? 1 : 0
         })
@@ -104,8 +106,6 @@ export default {
 
       const formData = new FormData()
       formData.append('file', csvImport.value.file)
-      // The destination in this context is handled in backend logic, so it's not necessary
-      // unless you want to differentiate between collection and kiosk imports for CSV
 
       try {
         const response = await axios.post('/api/collection/import_csv', formData, {
@@ -116,7 +116,7 @@ export default {
         message.value = `CSV imported successfully: ${response.data.message}`
         messageType.value = 'success'
         // Reset form
-        csvImport.value = { file: null, destination: 'collection' }
+        csvImport.value = { file: null }
       } catch (error) {
         message.value = `Error importing CSV: ${error.response?.data?.error || error.message}`
         messageType.value = 'error'
@@ -186,5 +186,22 @@ button:hover {
 .error {
   background-color: #f2dede;
   color: #a94442;
+}
+
+pre {
+  background-color: #f4f4f4;
+  border: 1px solid #ddd;
+  border-left: 3px solid #4CAF50;
+  color: #666;
+  page-break-inside: avoid;
+  font-family: monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 1.6em;
+  max-width: 100%;
+  overflow: auto;
+  padding: 1em 1.5em;
+  display: block;
+  word-wrap: break-word;
 }
 </style>

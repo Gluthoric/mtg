@@ -1,6 +1,11 @@
 <template>
   <div class="collection">
     <h1>My Collection</h1>
+    <div v-if="stats" class="collection-stats">
+      <p>Total Cards: {{ stats.total_cards }}</p>
+      <p>Unique Cards: {{ stats.unique_cards }}</p>
+      <p>Total Value: ${{ stats.total_value.toFixed(2) }}</p>
+    </div>
     <SetListControls
       :setTypes="setTypes"
       :totalPages="totalPages"
@@ -8,27 +13,22 @@
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
     />
-    <div class="additional-filters">
-      <label for="setFilter">Filter by Set:</label>
-      <select v-model="filters.set_code" @change="updateFilters" id="setFilter" class="select">
-        <option value="">All Sets</option>
-        <option v-for="set in availableSets" :key="set.code" :value="set.code">{{ set.name }}</option>
-      </select>
-    </div>
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else class="set-grid">
       <div v-for="set in sets" :key="set.code" class="set-card">
-        <div class="set-icon">
-          <img :src="set.icon_svg_uri" :alt="set.name" />
-          <div class="completion-circle" :style="{ '--percentage': set.collection_percentage + '%' }"></div>
-        </div>
-        <h3>{{ set.name }}</h3>
-        <p>Code: {{ set.code }}</p>
-        <p>Type: {{ set.set_type }}</p>
-        <p>Released: {{ formatDate(set.released_at) }}</p>
-        <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
-        <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
+        <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
+          <div class="set-icon">
+            <img :src="set.icon_svg_uri" :alt="set.name" />
+            <div class="completion-circle" :style="{ '--percentage': set.collection_percentage + '%' }"></div>
+          </div>
+          <h3>{{ set.name }}</h3>
+          <p>Code: {{ set.code }}</p>
+          <p>Type: {{ set.set_type }}</p>
+          <p>Released: {{ formatDate(set.released_at) }}</p>
+          <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
+          <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
+        </router-link>
       </div>
     </div>
     <div class="pagination">
@@ -51,9 +51,10 @@ export default {
   },
   setup() {
     const sets = ref([])
+    const stats = ref(null)
     const loading = ref(true)
     const error = ref(null)
-    const filters = ref({ name: '', set_code: '' })
+    const filters = ref({})
     const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
@@ -62,18 +63,14 @@ export default {
       'core', 'expansion', 'masters', 'draft_innovation', 'funny',
       'starter', 'box', 'promo', 'token', 'memorabilia'
     ])
-    const availableSets = ref([])
 
-    const fetchAvailableSets = async () => {
+    const fetchStats = async () => {
       try {
-        const response = await axios.get('/api/sets', {
-          params: {
-            per_page: 1000 // Assuming you have less than 1000 sets
-          }
-        })
-        availableSets.value = response.data.sets
+        const response = await axios.get('/api/collection/stats')
+        stats.value = response.data
       } catch (err) {
-        console.error('Error fetching sets:', err)
+        console.error('Error fetching collection stats:', err)
+        error.value = 'Failed to load collection stats'
       }
     }
 
@@ -81,7 +78,7 @@ export default {
       loading.value = true
       error.value = null
       try {
-        const response = await axios.get('/api/collection', {
+        const response = await axios.get('/api/collection/sets', {
           params: {
             ...filters.value,
             ...sorting.value,
@@ -89,12 +86,12 @@ export default {
             per_page: perPage.value
           }
         })
-        sets.value = response.data.collection
-        totalPages.value = response.data.pages
-        currentPage.value = response.data.current_page
+        sets.value = response.data.sets
+        totalPages.value = Math.ceil(response.data.sets.length / perPage.value)
+        currentPage.value = 1
       } catch (err) {
-        console.error('Error fetching collection:', err)
-        error.value = 'Failed to load collection'
+        console.error('Error fetching collection sets:', err)
+        error.value = 'Failed to load collection sets'
       } finally {
         loading.value = false
       }
@@ -130,12 +127,13 @@ export default {
     }
 
     onMounted(() => {
-      fetchAvailableSets()
+      fetchStats()
       fetchSets()
     })
 
     return {
       sets,
+      stats,
       loading,
       error,
       filters,
@@ -144,7 +142,6 @@ export default {
       totalPages,
       perPage,
       setTypes,
-      availableSets,
       updateFilters,
       updateSorting,
       updatePerPage,
@@ -158,6 +155,15 @@ export default {
 <style scoped>
 .collection {
   padding: 1rem;
+}
+
+.collection-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+  background-color: #f0f0f0;
+  padding: 1rem;
+  border-radius: 8px;
 }
 
 .set-grid {
@@ -227,18 +233,5 @@ export default {
 .pagination button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
-}
-
-.additional-filters {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.select {
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
 }
 </style>
