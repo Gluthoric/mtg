@@ -1,3 +1,4 @@
+<!-- CollectionSetCards.vue -->
 <template>
   <div class="collection-set-cards">
     <h1 class="set-title">{{ setName }}</h1>
@@ -39,16 +40,18 @@
             <p class="card-collector-number">Collector Number: {{ card.collector_number }}</p>
             <p class="card-rarity">Rarity: {{ card.rarity }}</p>
             <div class="card-quantities">
-              <div class="quantity-control">
-                <span>Regular: {{ card.quantity_regular }}</span>
-                <button @click="decrementQuantity(card, 'regular')" :disabled="card.quantity_regular === 0">−</button>
-                <button @click="incrementQuantity(card, 'regular')">+</button>
-              </div>
-              <div class="quantity-control">
-                <span>Foil: {{ card.quantity_foil }}</span>
-                <button @click="decrementQuantity(card, 'foil')" :disabled="card.quantity_foil === 0">−</button>
-                <button @click="incrementQuantity(card, 'foil')">+</button>
-              </div>
+              <QuantityControl
+                label="Regular"
+                fieldId="regular-{{ card.id }}"
+                :value="card.quantity_regular"
+                @update="(val) => updateQuantity(card, 'regular', val)"
+              />
+              <QuantityControl
+                label="Foil"
+                fieldId="foil-{{ card.id }}"
+                :value="card.quantity_foil"
+                @update="(val) => updateQuantity(card, 'foil', val)"
+              />
             </div>
           </div>
           <div v-if="isMissing(card)" class="missing-indicator">Missing</div>
@@ -62,9 +65,13 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useRoute } from 'vue-router'
+import QuantityControl from './QuantityControl.vue' // Adjust the path as needed
 
 export default {
   name: 'CollectionSetCards',
+  components: {
+    QuantityControl
+  },
   setup() {
     const route = useRoute()
     const setCode = ref(route.params.setCode)
@@ -155,41 +162,18 @@ export default {
     const handleImageError = (event, card) => {
       console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
       event.target.style.display = 'none';
-      event.target.parentNode.querySelector('.no-image').style.display = 'block';
+      const noImageDiv = event.target.parentNode.querySelector('.no-image');
+      if (noImageDiv) {
+        noImageDiv.style.display = 'block';
+      }
     }
 
-    const incrementQuantity = async (card, type) => {
+    const updateQuantity = async (card, type, newValue) => {
       const updatedCard = { ...card }
       if (type === 'regular') {
-        updatedCard.quantity_regular += 1
+        updatedCard.quantity_regular = newValue
       } else if (type === 'foil') {
-        updatedCard.quantity_foil += 1
-      }
-
-      try {
-        const response = await axios.put(`/api/collection/${card.id}`, {
-          quantity_regular: updatedCard.quantity_regular,
-          quantity_foil: updatedCard.quantity_foil
-        })
-        // Update the local card data
-        const index = cards.value.findIndex(c => c.id === card.id)
-        if (index !== -1) {
-          cards.value[index] = response.data
-        }
-      } catch (err) {
-        console.error('Error updating quantity:', err)
-        alert('Failed to update quantity. Please try again.')
-      }
-    }
-
-    const decrementQuantity = async (card, type) => {
-      const updatedCard = { ...card }
-      if (type === 'regular' && updatedCard.quantity_regular > 0) {
-        updatedCard.quantity_regular -= 1
-      } else if (type === 'foil' && updatedCard.quantity_foil > 0) {
-        updatedCard.quantity_foil -= 1
-      } else {
-        return
+        updatedCard.quantity_foil = newValue
       }
 
       try {
@@ -220,8 +204,7 @@ export default {
       sortedCards,
       getImageUrl,
       handleImageError,
-      incrementQuantity,
-      decrementQuantity
+      updateQuantity
     }
   }
 }
@@ -309,27 +292,27 @@ export default {
   color: #666;
 }
 
-.quantity-control {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.loading,
+.error {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 1.2rem;
+  color: #666;
 }
 
-.quantity-control button {
-  padding: 0.2rem 0.5rem;
-  border: none;
-  background-color: #007bff;
+.missing-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #f44336;
   color: white;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 
-.quantity-control button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
+/* Optional: Adjust filter styles for better integration */
 .filters {
   display: flex;
   gap: 1rem;
@@ -351,25 +334,5 @@ export default {
 
 .filter-select {
   width: 150px;
-}
-
-.loading,
-.error {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 1.2rem;
-  color: #666;
-}
-
-.missing-indicator {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: #f44336;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: bold;
 }
 </style>

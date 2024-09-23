@@ -1,12 +1,14 @@
 import pandas as pd
 from flask import Blueprint, jsonify, request
+from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import func, asc, desc, text
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.collection import Collection
 from models.card import Card
 from models.kiosk import Kiosk
 from models.set import Set
 from database import db
-from sqlalchemy.sql import func, asc, desc, text
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+import time
 import logging
 
 collection_routes = Blueprint('collection_routes', __name__)
@@ -45,6 +47,7 @@ def get_collection():
 @collection_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
+        # Diagnostic info to track query stages
         diagnostic_info = {
             "set_count": Set.query.count(),
             "collection_count": Collection.query.count(),
@@ -56,16 +59,17 @@ def get_collection_sets():
         }
 
         # Extract query parameters
-        name = request.args.get('name', type=str, default='')
-        set_type = request.args.get('set_type', type=str, default='')
-        sort_by = request.args.get('sort_by', type=str, default='released_at')
-        sort_order = request.args.get('sort_order', type=str, default='desc')
-        page = request.args.get('page', type=int, default=1)
-        per_page = request.args.get('per_page', type=int, default=20)
+        name = request.args.get('name', type=str)
+        set_type = request.args.get('set_type', type=str)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        sort_by = request.args.get('sort_by', 'released_at', type=str)
+        sort_order = request.args.get('sort_order', 'desc', type=str)
 
+        # Log received parameters
         logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
-        # Base query with specific columns and collection count using outer joins
+        # Initialize base query with joins and outer joins for collection count
         query = db.session.query(
             Set.id,
             Set.code,
@@ -218,7 +222,6 @@ def get_collection_stats():
         total_cards = db.session.query(func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
         unique_cards = Collection.query.count()
 
-        # Use a raw SQL query to calculate the total value
         total_value_query = text("""
             SELECT SUM(
                 (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * collections.quantity_regular) +
@@ -293,11 +296,8 @@ def import_csv():
         missing = required_columns - set(df.columns)
         return jsonify({"error": f"CSV is missing columns: {', '.join(missing)}"}), 400
 
-    # **New Code Starts Here**
     # Replace blank 'Foil' values with False
-    df['Foil'] = df['Foil'].fillna(False)          # Replace NaN with False
-    df['Foil'] = df['Foil'].replace('', False)    # Replace empty strings with False
-    # **New Code Ends Here**
+    df['Foil'] = df['Foil'].fillna(False).replace('', False)
 
     try:
         with db.session.begin_nested():
@@ -306,7 +306,6 @@ def import_csv():
                     process_csv_row(row, index)
                 except ValueError as e:
                     logger.error(f"Error processing row {index + 2}: {str(e)}")
-                    # Optionally, collect errors to return after processing
                     continue  # Skip to the next row
                 except IntegrityError as e:
                     logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
@@ -330,7 +329,6 @@ def process_csv_row(row, index):
     scryfall_id = row['Scryfall ID']
     card_name = row['Name']
 
-    # Validate and parse quantity
     try:
         quantity = int(row['Quantity'])
         if quantity < 1:
@@ -338,20 +336,16 @@ def process_csv_row(row, index):
     except ValueError:
         raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
 
-    # Normalize foil value
     foil = row['Foil']
     if isinstance(foil, bool):
         foil_status = foil
     else:
-        # This should not happen as we've already replaced blanks with False
         raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
 
-    # Fetch the card from the database
     card = Card.query.filter_by(id=scryfall_id).first()
     if not card:
         raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
 
-    # Fetch or create collection and kiosk entries
     collection_item = Collection.query.filter_by(card_id=card.id).first()
     kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
 
