@@ -39,8 +39,16 @@
             <p class="card-collector-number">Collector Number: {{ card.collector_number }}</p>
             <p class="card-rarity">Rarity: {{ card.rarity }}</p>
             <div class="card-quantities">
-              <p>Regular: {{ card.quantity_regular }}</p>
-              <p>Foil: {{ card.quantity_foil }}</p>
+              <div class="quantity-control">
+                <span>Regular: {{ card.quantity_regular }}</span>
+                <button @click="decrementQuantity(card, 'regular')" :disabled="card.quantity_regular === 0">−</button>
+                <button @click="incrementQuantity(card, 'regular')">+</button>
+              </div>
+              <div class="quantity-control">
+                <span>Foil: {{ card.quantity_foil }}</span>
+                <button @click="decrementQuantity(card, 'foil')" :disabled="card.quantity_foil === 0">−</button>
+                <button @click="incrementQuantity(card, 'foil')">+</button>
+              </div>
             </div>
           </div>
           <div v-if="isMissing(card)" class="missing-indicator">Missing</div>
@@ -150,6 +158,56 @@ export default {
       event.target.parentNode.querySelector('.no-image').style.display = 'block';
     }
 
+    const incrementQuantity = async (card, type) => {
+      const updatedCard = { ...card }
+      if (type === 'regular') {
+        updatedCard.quantity_regular += 1
+      } else if (type === 'foil') {
+        updatedCard.quantity_foil += 1
+      }
+
+      try {
+        const response = await axios.put(`/api/collection/${card.id}`, {
+          quantity_regular: updatedCard.quantity_regular,
+          quantity_foil: updatedCard.quantity_foil
+        })
+        // Update the local card data
+        const index = cards.value.findIndex(c => c.id === card.id)
+        if (index !== -1) {
+          cards.value[index] = response.data
+        }
+      } catch (err) {
+        console.error('Error updating quantity:', err)
+        alert('Failed to update quantity. Please try again.')
+      }
+    }
+
+    const decrementQuantity = async (card, type) => {
+      const updatedCard = { ...card }
+      if (type === 'regular' && updatedCard.quantity_regular > 0) {
+        updatedCard.quantity_regular -= 1
+      } else if (type === 'foil' && updatedCard.quantity_foil > 0) {
+        updatedCard.quantity_foil -= 1
+      } else {
+        return
+      }
+
+      try {
+        const response = await axios.put(`/api/collection/${card.id}`, {
+          quantity_regular: updatedCard.quantity_regular,
+          quantity_foil: updatedCard.quantity_foil
+        })
+        // Update the local card data
+        const index = cards.value.findIndex(c => c.id === card.id)
+        if (index !== -1) {
+          cards.value[index] = response.data
+        }
+      } catch (err) {
+        console.error('Error updating quantity:', err)
+        alert('Failed to update quantity. Please try again.')
+      }
+    }
+
     return {
       setName,
       cards,
@@ -161,7 +219,9 @@ export default {
       isMissing,
       sortedCards,
       getImageUrl,
-      handleImageError
+      handleImageError,
+      incrementQuantity,
+      decrementQuantity
     }
   }
 }
@@ -243,9 +303,31 @@ export default {
 
 .card-quantities {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.5rem;
   font-size: 0.8rem;
   color: #666;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quantity-control button {
+  padding: 0.2rem 0.5rem;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.quantity-control button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 .filters {
