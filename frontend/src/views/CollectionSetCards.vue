@@ -1,12 +1,12 @@
 <template>
   <div class="collection-set-cards">
-    <h1>{{ setName }}</h1>
+    <h1 class="set-title">{{ setName }}</h1>
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
       <div class="filters">
-        <input v-model="nameFilter" @input="applyFilters" placeholder="Filter by name" />
-        <select v-model="rarityFilter" @change="applyFilters">
+        <input v-model="nameFilter" @input="applyFilters" placeholder="Filter by name" class="filter-input" />
+        <select v-model="rarityFilter" @change="applyFilters" class="filter-select">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
           <option value="uncommon">Uncommon</option>
@@ -15,12 +15,22 @@
         </select>
       </div>
       <div class="card-grid">
-        <div v-for="card in cards" :key="card.id" class="card">
-          <img :src="card.image_uris.small" :alt="card.name" />
-          <h3>{{ card.name }}</h3>
-          <p>Rarity: {{ card.rarity }}</p>
-          <p>Regular: {{ card.quantity_regular }}</p>
-          <p>Foil: {{ card.quantity_foil }}</p>
+        <div
+          v-for="card in filteredCards"
+          :key="card.id"
+          class="card"
+          :class="{ missing: isMissing(card) }"
+        >
+          <img :src="card.image_uris.small" :alt="card.name" class="card-image" />
+          <div class="card-info">
+            <h3 class="card-name">{{ card.name }}</h3>
+            <p class="card-rarity">{{ card.rarity }}</p>
+            <div class="card-quantities">
+              <p>Regular: {{ card.quantity_regular }}</p>
+              <p>Foil: {{ card.quantity_foil }}</p>
+            </div>
+          </div>
+          <div v-if="isMissing(card)" class="missing-indicator">Missing</div>
         </div>
       </div>
     </div>
@@ -28,7 +38,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useRoute } from 'vue-router'
 
@@ -43,17 +53,15 @@ export default {
     const error = ref(null)
     const nameFilter = ref('')
     const rarityFilter = ref('')
-    const perPage = ref(1000) // Increased to 100 as requested
 
     const fetchCards = async () => {
       loading.value = true
       error.value = null
       try {
-        const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
+        const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
           params: {
             name: nameFilter.value,
-            rarity: rarityFilter.value,
-            per_page: perPage.value // Added per_page parameter
+            rarity: rarityFilter.value
           }
         })
         cards.value = response.data.cards
@@ -79,6 +87,14 @@ export default {
       fetchCards()
     })
 
+    const isMissing = (card) => {
+      return (card.quantity_regular + card.quantity_foil) === 0
+    }
+
+    const filteredCards = computed(() => {
+      return cards.value
+    })
+
     return {
       setName,
       cards,
@@ -86,7 +102,9 @@ export default {
       error,
       nameFilter,
       rarityFilter,
-      applyFilters
+      applyFilters,
+      isMissing,
+      filteredCards
     }
   }
 }
@@ -94,38 +112,92 @@ export default {
 
 <style scoped>
 .collection-set-cards {
-  padding: 1rem;
+  padding: 2rem;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+.set-title {
+  font-size: 2.5rem;
+  color: #333;
+  margin-bottom: 2rem;
+  text-align: center;
 }
 
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .card {
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 1rem;
-  text-align: center;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+  background-color: #fff;
+  position: relative;
 }
 
-.card img {
-  max-width: 100%;
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card.missing {
+  box-shadow: 0 4px 6px rgba(244, 67, 54, 0.3);
+}
+
+.card-image {
+  width: 100%;
   height: auto;
+  display: block;
+}
+
+.card-info {
+  padding: 1rem;
+}
+
+.card-name {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+  color: #333;
+}
+
+.card-rarity {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.card-quantities {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #666;
 }
 
 .filters {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
+  justify-content: center;
 }
 
-.filters input,
-.filters select {
-  padding: 0.5rem;
+.filter-input,
+.filter-select {
+  padding: 0.75rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+.filter-input {
+  width: 250px;
+}
+
+.filter-select {
+  width: 150px;
 }
 
 .loading,
@@ -133,5 +205,18 @@ export default {
   text-align: center;
   margin-top: 2rem;
   font-size: 1.2rem;
+  color: #666;
+}
+
+.missing-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #f44336;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 </style>
