@@ -3,6 +3,7 @@ from models.set import Set
 from models.card import Card
 from database import db
 from sqlalchemy import asc, desc
+from sqlalchemy.orm import joinedload
 
 set_routes = Blueprint('set_routes', __name__)
 
@@ -49,28 +50,50 @@ def get_all_sets():
 
 @set_routes.route('/sets/<string:set_code>', methods=['GET'])
 def get_set(set_code):
-    set = Set.query.filter_by(code=set_code).first_or_404()
-    return jsonify(set.to_dict()), 200
+    set_instance = Set.query.filter_by(code=set_code).first_or_404()
+    return jsonify(set_instance.to_dict()), 200
 
 @set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
 def get_set_cards(set_code):
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    name = request.args.get('name', '', type=str)
-    rarity = request.args.get('rarity', '', type=str)
+    # Extract filter parameters
+    name_filter = request.args.get('name', '', type=str)
+    rarity_filter = request.args.get('rarity', '', type=str)
 
-    query = Card.query.filter_by(set_code=set_code)
+    # Eagerly load related 'collection' and 'set' data to optimize queries
+    query = Card.query.options(
+        joinedload(Card.collection),
+        joinedload(Card.set)
+    ).filter(Card.set_code == set_code)
 
-    if name:
-        query = query.filter(Card.name.ilike(f'%{name}%'))
-    if rarity:
-        query = query.filter(Card.rarity == rarity)
+    # Apply filters based on query parameters
+    if name_filter:
+        query = query.filter(Card.name.ilike(f'%{name_filter}%'))
+    if rarity_filter:
+        query = query.filter(Card.rarity == rarity_filter)
 
-    cards = query.paginate(page=page, per_page=per_page, error_out=False)
+    # Fetch all matching cards without pagination
+    cards = query.all()
+
+    # Serialize card data
+    cards_data = []
+    for card in cards:
+        card_dict = {
+            'id': card.id,
+            'name': card.name,
+            'rarity': card.rarity,
+            'quantity_regular': card.collection.quantity_regular if card.collection else 0,
+            'quantity_foil': card.collection.quantity_foil if card.collection else 0,
+            'set_name': card.set.name if card.set else '',
+            # Add other fields as necessary
+        }
+        # Optionally include image URIs or other related data
+        if hasattr(card, 'image_uris') and card.image_uris:
+            card_dict['image_uris'] = card.image_uris
+        cards_data.append(card_dict)
 
     return jsonify({
-        'cards': [card.to_dict() for card in cards.items],
-        'total': cards.total,
-        'pages': cards.pages,
-        'current_page': cards.page
+        'cards': cards_data,
+        'total': len(cards_data),
+        'pages': 1,
+        'current_page': 1
     }), 200

@@ -23,7 +23,6 @@
           <p>Foil: {{ card.quantity_foil }}</p>
         </div>
       </div>
-      <!-- Pagination removed -->
     </div>
   </div>
 </template>
