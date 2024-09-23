@@ -190,7 +190,19 @@ def update_collection(card_id):
 
     db.session.commit()
 
-    return jsonify(collection_item.to_dict()), 200
+    # Fetch the associated card
+    card = Card.query.filter_by(id=card_id).first()
+    if not card:
+        return jsonify({"error": "Card not found."}), 404
+
+    # Combine card data with updated quantities
+    card_data = card.to_dict()
+    card_data.update({
+        'quantity_regular': collection_item.quantity_regular,
+        'quantity_foil': collection_item.quantity_foil
+    })
+
+    return jsonify(card_data), 200
 
 @collection_routes.route('/collection/<string:card_id>', methods=['DELETE'])
 def remove_from_collection(card_id):
