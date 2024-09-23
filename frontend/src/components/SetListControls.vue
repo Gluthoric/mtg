@@ -1,32 +1,31 @@
 <template>
-  <div class="controls">
+  <div class="controls grid grid-cols-1 md:grid-cols-3 gap-1 mb-2">
     <div class="filter-section">
       <input
         v-model="localFilters.name"
         @input="emitFilters"
         placeholder="Search by name"
-        class="input"
       />
-      <select v-model="localFilters.set_type" @change="emitFilters" class="select">
+      <select v-model="localFilters.set_type" @change="emitFilters">
         <option value="">All Types</option>
         <option v-for="type in setTypes" :key="type" :value="type">{{ capitalize(type) }}</option>
       </select>
     </div>
     <div class="sort-section">
       <label for="sortBy">Sort By:</label>
-      <select v-model="localSorting.sortBy" @change="emitSorting" id="sortBy" class="select">
+      <select v-model="localSorting.sortBy" @change="emitSorting" id="sortBy">
         <option value="released_at">Release Date</option>
         <option value="name">Name</option>
         <option value="collection_count">Collection Count</option>
       </select>
-      <select v-model="localSorting.sortOrder" @change="emitSorting" class="select">
+      <select v-model="localSorting.sortOrder" @change="emitSorting">
         <option value="asc">Ascending</option>
         <option value="desc">Descending</option>
       </select>
     </div>
     <div class="pagination-section">
       <label for="perPage">Per Page:</label>
-      <select v-model="localPerPage" @change="emitPerPage" id="perPage" class="select">
+      <select v-model="localPerPage" @change="emitPerPage" id="perPage">
         <option v-for="option in perPageOptions" :key="option" :value="option">{{ option }}</option>
       </select>
     </div>
@@ -78,43 +77,7 @@ export default {
 </script>
 
 <style scoped>
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.filter-section,
-.sort-section,
-.pagination-section {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.input {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--input-background);
-  color: var(--text-color);
-}
-
-.select {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--input-background);
-  color: var(--text-color);
-}
-
-button {
-  background-color: var(--primary-color);
-  color: var(--text-color);
-}
-
-button:hover {
-  background-color: var(--link-color);
+.controls label {
+  margin-right: 0.5rem;
 }
 </style>

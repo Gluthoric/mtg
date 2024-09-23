@@ -1,13 +1,13 @@
 <template>
-  <div class="kiosk">
-    <h1>Kiosk Inventory</h1>
-    <div class="filters">
-      <input v-model="filters.name" placeholder="Search by name" @input="fetchCards">
-      <select v-model="filters.set" @change="fetchCards">
+  <div class="container">
+    <h1 class="text-center mb-4">Kiosk Inventory</h1>
+    <div class="filters grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+      <input v-model="filters.name" placeholder="Search by name" @input="fetchCards" class="w-full">
+      <select v-model="filters.set" @change="fetchCards" class="w-full">
         <option value="">All Sets</option>
         <option v-for="set in sets" :key="set.code" :value="set.code">{{ set.name }}</option>
       </select>
-      <select v-model="filters.rarity" @change="fetchCards">
+      <select v-model="filters.rarity" @change="fetchCards" class="w-full">
         <option value="">All Rarities</option>
         <option value="common">Common</option>
         <option value="uncommon">Uncommon</option>
@@ -15,23 +15,23 @@
         <option value="mythic">Mythic</option>
       </select>
     </div>
-    <div class="card-list">
-      <div v-for="card in cards" :key="card.id" class="card-item">
-        <img :src="card.image_uris.small" :alt="card.name">
-        <div class="card-details">
-          <h3>{{ card.name }}</h3>
-          <p>Set: {{ card.set_name }}</p>
-          <p>Rarity: {{ card.rarity }}</p>
-          <p>Regular: {{ card.quantity.quantity_regular }}</p>
-          <p>Foil: {{ card.quantity.quantity_foil }}</p>
-          <button @click="openEditModal(card)">Edit</button>
+    <div class="card-list grid grid-cols-auto gap-4">
+      <div v-for="card in cards" :key="card.id" class="card">
+        <img :src="card.image_uris.small" :alt="card.name" class="w-full mb-2">
+        <div class="card-details p-2">
+          <h3 class="mb-2 text-lg font-bold">{{ card.name }}</h3>
+          <p class="mb-1"><span class="font-semibold">Set:</span> {{ card.set_name }}</p>
+          <p class="mb-1"><span class="font-semibold">Rarity:</span> {{ card.rarity }}</p>
+          <p class="mb-1"><span class="font-semibold">Regular:</span> {{ card.quantity.quantity_regular }}</p>
+          <p class="mb-2"><span class="font-semibold">Foil:</span> {{ card.quantity.quantity_foil }}</p>
+          <button @click="openEditModal(card)" class="w-full">Edit</button>
         </div>
       </div>
     </div>
-    <div class="pagination">
-      <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
+    <div class="pagination text-center mt-4">
+      <button @click="changePage(-1)" :disabled="currentPage === 1" class="mr-2">Previous</button>
+      <span class="px-2 py-1 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button @click="changePage(1)" :disabled="currentPage === totalPages" class="ml-2">Next</button>
     </div>
     <!-- Edit Modal (implement later) -->
   </div>
@@ -102,30 +102,3 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.filters {
-  margin-bottom: 1rem;
-}
-
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.card-item {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 0.5rem;
-}
-
-.card-item img {
-  width: 100%;
-  height: auto;
-}
-
-.pagination {
-  margin-top: 1rem;
-}
-</style>

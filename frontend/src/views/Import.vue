@@ -1,55 +1,55 @@
 <template>
-  <div class="import">
-    <h1>Import Cards</h1>
+  <div class="container">
+    <h1 class="text-center mb-4">Import Cards</h1>
 
-    <div class="import-section">
-      <h2>Import Single Card</h2>
-      <form @submit.prevent="importSingleCard">
+    <div class="card mb-4">
+      <h2 class="mb-2">Import Single Card</h2>
+      <form @submit.prevent="importSingleCard" class="grid grid-cols-1 gap-2">
         <div>
-          <label for="scryfallId">Scryfall ID:</label>
-          <input v-model="singleCard.scryfallId" id="scryfallId" required>
+          <label for="scryfallId" class="block mb-1">Scryfall ID:</label>
+          <input v-model="singleCard.scryfallId" id="scryfallId" required class="w-full">
         </div>
         <div>
-          <label for="quantity">Quantity:</label>
-          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required>
+          <label for="quantity" class="block mb-1">Quantity:</label>
+          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required class="w-full">
+        </div>
+        <div class="flex items-center">
+          <input v-model="singleCard.foil" id="foil" type="checkbox" class="mr-2">
+          <label for="foil">Foil</label>
         </div>
         <div>
-          <label for="foil">Foil:</label>
-          <input v-model="singleCard.foil" id="foil" type="checkbox">
-        </div>
-        <div>
-          <label for="destination">Destination:</label>
-          <select v-model="singleCard.destination" id="destination" required>
+          <label for="destination" class="block mb-1">Destination:</label>
+          <select v-model="singleCard.destination" id="destination" required class="w-full">
             <option value="collection">Collection</option>
             <option value="kiosk">Kiosk</option>
           </select>
         </div>
-        <button type="submit">Import Card</button>
+        <button type="submit" class="mt-2">Import Card</button>
       </form>
     </div>
 
-    <div class="import-section">
-      <h2>CSV Import Guidelines</h2>
-      <p>Please ensure your CSV follows the format below:</p>
-      <pre>
+    <div class="card mb-4">
+      <h2 class="mb-2">CSV Import Guidelines</h2>
+      <p class="mb-2">Please ensure your CSV follows the format below:</p>
+      <pre class="bg-secondary p-2 mb-2 overflow-auto text-sm font-mono whitespace-pre-wrap break-words">
 Name,Edition,Edition code,Collector's number,Price,Foil,Currency,Scryfall ID,Quantity
 "Saw","Duskmourn: House of Horror","DSK","254","$0.21","Foil","USD","603c3ef4-4ef1-4db8-9ed2-e2b0926269d5","2"
       </pre>
-      <a href="/static/csv_template.csv" download="csv_template.csv">Download CSV Template</a>
+      <a href="/static/csv_template.csv" download="csv_template.csv" class="text-primary hover:underline">Download CSV Template</a>
     </div>
 
-    <div class="import-section">
-      <h2>Import from CSV</h2>
-      <form @submit.prevent="importFromCSV">
+    <div class="card mb-4">
+      <h2 class="mb-2">Import from CSV</h2>
+      <form @submit.prevent="importFromCSV" class="grid grid-cols-1 gap-2">
         <div>
-          <label for="csvFile">CSV File:</label>
-          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required>
+          <label for="csvFile" class="block mb-1">CSV File:</label>
+          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required class="w-full">
         </div>
-        <button type="submit">Import CSV</button>
+        <button type="submit" class="mt-2">Import CSV</button>
       </form>
     </div>
 
-    <div v-if="message" :class="['message', messageType]">
+    <div v-if="message" :class="['message', messageType, 'p-2 rounded']">
       {{ message }}
     </div>
   </div>
@@ -135,73 +135,3 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.import-section {
-  margin-bottom: 2rem;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-label {
-  font-weight: bold;
-}
-
-input[type="text"],
-input[type="number"],
-select {
-  width: 100%;
-  padding: 0.5rem;
-}
-
-button {
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #45a049;
-}
-
-.message {
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: 4px;
-}
-
-.success {
-  background-color: #dff0d8;
-  color: #3c763d;
-}
-
-.error {
-  background-color: #f2dede;
-  color: #a94442;
-}
-
-pre {
-  background-color: #f4f4f4;
-  border: 1px solid #ddd;
-  border-left: 3px solid #4CAF50;
-  color: #666;
-  page-break-inside: avoid;
-  font-family: monospace;
-  font-size: 15px;
-  line-height: 1.6;
-  margin-bottom: 1.6em;
-  max-width: 100%;
-  overflow: auto;
-  padding: 1em 1.5em;
-  display: block;
-  word-wrap: break-word;
-}
-</style>

@@ -1,18 +1,18 @@
 <template>
-  <div class="quantity-control">
-    <label :for="fieldId" class="quantity-label">
+  <div class="quantity-control flex flex-col">
+    <label :for="fieldId" class="quantity-label mb-1">
       {{ label }}
     </label>
-    <div class="input-wrapper">
+    <div class="input-wrapper flex">
       <input
         :id="fieldId"
         v-model.number="currentValue"
         type="number"
         min="0"
-        class="quantity-input"
+        class="quantity-input flex-1 p-2 text-center"
         @input="onInput"
       />
-      <div class="buttons">
+      <div class="buttons flex flex-col">
         <button
           @click="increment"
           class="btn increment-btn"
@@ -78,78 +78,44 @@ export default {
 </script>
 
 <style scoped>
-.quantity-control {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
 .quantity-label {
   font-size: 0.85rem;
-  color: #a0aec0;
 }
 
 .input-wrapper {
-  display: flex;
-  align-items: center;
-  border: 1px solid #4a5568;
+  border: 1px solid var(--border-color);
   border-radius: 0.25rem;
   overflow: hidden;
-  background-color: #2d3748;
+  background-color: var(--input-background);
 }
 
 .quantity-input {
-  flex: 1;
-  padding: 0.5rem;
   border: none;
-  text-align: center;
-  font-size: 1rem;
   background-color: transparent;
   outline: none;
-  color: #e2e8f0;
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .quantity-input::-webkit-inner-spin-button,
 .quantity-input::-webkit-outer-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
-.quantity-input {
-  -moz-appearance: textfield;
-}
-
 .buttons {
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid #4a5568;
+  border-left: 1px solid var(--border-color);
 }
 
 .btn {
   width: 2rem;
   height: 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #4a5568;
-  border: none;
-  cursor: pointer;
   font-size: 0.8rem;
-  color: #e2e8f0;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.btn:hover:not(:disabled) {
-  background-color: #718096;
-}
-
-.btn:disabled {
-  background-color: #2d3748;
-  color: #718096;
-  cursor: not-allowed;
 }
 
 .increment-btn {
-  border-bottom: 1px solid #4a5568;
+  border-bottom: 1px solid var(--border-color);
 }
 </style>

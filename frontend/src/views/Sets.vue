@@ -1,27 +1,31 @@
 <template>
-  <div class="sets">
-    <h1>Magic: The Gathering Sets</h1>
-    <div v-if="loading">Loading sets...</div>
-    <div v-else-if="error">Error: {{ error }}</div>
-    <div v-else-if="sets.length === 0">No sets found.</div>
+  <div class="container">
+    <h1 class="text-center text-2xl font-bold mb-4">Magic: The Gathering Sets</h1>
+    <div v-if="loading" class="text-center text-lg">Loading sets...</div>
+    <div v-else-if="error" class="error text-center text-lg text-error">Error: {{ error }}</div>
+    <div v-else-if="sets.length === 0" class="text-center text-lg">No sets found.</div>
     <div v-else>
-      <p>Total sets: {{ sets.length }}</p>
-      <div class="set-grid">
-        <div v-for="set in sets" :key="set.code" class="set-card">
-          <router-link :to="{ name: 'SetDetails', params: { setCode: set.code } }">
-            <img :src="set.icon_svg_uri" :alt="set.name" class="set-icon" />
-            <h2>{{ set.name }}</h2>
-            <p>Released: {{ formatDate(set.released_at) }}</p>
-            <div class="progress-container">
+      <p class="text-center mb-4">Total sets: {{ sets.length }}</p>
+      <div class="set-grid grid grid-cols-auto gap-4">
+        <div v-for="set in sets" :key="set.code" class="card p-4">
+          <router-link :to="{ name: 'SetDetails', params: { setCode: set.code } }" class="block">
+            <img :src="set.icon_svg_uri" :alt="set.name" class="w-12 h-12 mx-auto mb-2" />
+            <h2 class="text-lg font-semibold mb-2">{{ set.name }}</h2>
+            <p class="mb-2">Released: {{ formatDate(set.released_at) }}</p>
+            <div class="progress-container mb-2">
               <div
                 class="progress-bar"
-                :style="{ width: `${set.collection_percentage}%` }"
-                :class="getProgressBarClass(set.collection_percentage)"
+                :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
               ></div>
             </div>
-            <p class="collection-status">{{ formatCollectionProgress(set) }}</p>
+            <p class="collection-status font-bold">{{ formatCollectionProgress(set) }}</p>
           </router-link>
         </div>
+      </div>
+      <div class="pagination text-center mt-6">
+        <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-4 py-2 mr-2">Previous</button>
+        <span class="px-4 py-2 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button @click="changePage(1)" :disabled="currentPage === totalPages" class="px-4 py-2 ml-2">Next</button>
       </div>
     </div>
   </div>
@@ -80,13 +84,13 @@ export default {
       }
     }
 
-    const getProgressBarClass = (percentage) => {
-      if (percentage === 0) return 'not-started'
-      if (percentage < 25) return 'just-started'
-      if (percentage < 50) return 'in-progress'
-      if (percentage < 75) return 'well-progressed'
-      if (percentage < 100) return 'almost-complete'
-      return 'complete'
+    const getProgressColor = (percentage) => {
+      if (percentage === 0) return '#95a5a6'
+      if (percentage < 25) return '#e74c3c'
+      if (percentage < 50) return '#e67e22'
+      if (percentage < 75) return '#f1c40f'
+      if (percentage < 100) return '#2ecc71'
+      return '#3498db'
     }
 
     onMounted(fetchSets)
@@ -102,95 +106,8 @@ export default {
       changePage,
       formatDate,
       formatCollectionProgress,
-      getProgressBarClass
+      getProgressColor
     }
   }
 }
 </script>
-
-<style scoped>
-.sets {
-  padding: 20px;
-}
-
-.sets h1 {
-  font-size: 2em;
-  color: #ffffff;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.set-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.set-card {
-  background-color: #2c3e50;
-  border-radius: 8px;
-  padding: 15px;
-  text-align: center;
-  transition: transform 0.3s ease;
-}
-
-.set-card:hover {
-  transform: scale(1.05);
-}
-
-.set-icon {
-  width: 50px;
-  height: 50px;
-  margin-bottom: 10px;
-}
-
-.set-card h2 {
-  font-size: 1.2em;
-  color: #ffffff;
-  margin-bottom: 5px;
-}
-
-.set-card p {
-  font-size: 0.9em;
-  color: #cccccc;
-  margin: 5px 0;
-}
-
-.progress-container {
-  width: 100%;
-  background-color: #34495e;
-  border-radius: 10px;
-  margin: 10px 0;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 10px;
-  transition: width 0.5s ease-in-out;
-}
-
-.progress-bar.not-started {
-  background-color: #95a5a6;
-}
-.progress-bar.just-started {
-  background-color: #e74c3c;
-}
-.progress-bar.in-progress {
-  background-color: #e67e22;
-}
-.progress-bar.well-progressed {
-  background-color: #f1c40f;
-}
-.progress-bar.almost-complete {
-  background-color: #2ecc71;
-}
-.progress-bar.complete {
-  background-color: #3498db;
-}
-
-.collection-status {
-  font-weight: bold;
-  color: #ffffff;
-}
-</style>

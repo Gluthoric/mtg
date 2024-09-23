@@ -1,18 +1,16 @@
-<!-- CollectionSetCards.vue -->
 <template>
-  <div class="collection-set-cards">
-    <h1 class="set-title">{{ setName }}</h1>
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+  <div class="container">
+    <h1 class="text-center mb-2">{{ setName }}</h1>
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
     <div v-else>
-      <div class="filters">
+      <div class="filters grid grid-cols-1 md:grid-cols-2 gap-1 mb-2">
         <input
           v-model="nameFilter"
           @input="applyFilters"
           placeholder="Filter by name"
-          class="filter-input"
         />
-        <select v-model="rarityFilter" @change="applyFilters" class="filter-select">
+        <select v-model="rarityFilter" @change="applyFilters">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
           <option value="uncommon">Uncommon</option>
@@ -20,41 +18,41 @@
           <option value="mythic">Mythic</option>
         </select>
       </div>
-      <div class="card-grid">
+      <div class="card-grid grid grid-cols-auto gap-1">
         <div
           v-for="card in sortedCards"
           :key="card.id"
           class="card"
-          :class="{ missing: isMissing(card) }"
+          :class="{ 'border-error': isMissing(card) }"
         >
           <img
             v-if="getImageUrl(card)"
             :src="getImageUrl(card)"
             :alt="card.name"
-            class="card-image"
+            class="img-responsive"
             @error="handleImageError($event, card)"
           />
-          <div v-else class="no-image">No image available</div>
-          <div class="card-info">
-            <h3 class="card-name">{{ card.name }}</h3>
-            <p class="card-collector-number">Collector Number: {{ card.collector_number }}</p>
-            <p class="card-rarity">Rarity: {{ card.rarity }}</p>
-            <div class="card-quantities">
+          <div v-else class="p-2 text-center bg-secondary">No image available</div>
+          <div class="card-info p-1">
+            <h3 class="mb-1">{{ card.name }}</h3>
+            <p class="mb-1">Collector Number: {{ card.collector_number }}</p>
+            <p class="mb-1">Rarity: {{ card.rarity }}</p>
+            <div class="card-quantities grid grid-cols-2 gap-1">
               <QuantityControl
                 label="Regular"
-                fieldId="regular-{{ card.id }}"
+                :fieldId="'regular-' + card.id"
                 :value="card.quantity_regular"
                 @update="(val) => updateQuantity(card, 'regular', val)"
               />
               <QuantityControl
                 label="Foil"
-                fieldId="foil-{{ card.id }}"
+                :fieldId="'foil-' + card.id"
                 :value="card.quantity_foil"
                 @update="(val) => updateQuantity(card, 'foil', val)"
               />
             </div>
           </div>
-          <div v-if="isMissing(card)" class="missing-indicator">Missing</div>
+          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-error text-white p-1 rounded text-sm font-bold">Missing</div>
         </div>
       </div>
     </div>
@@ -94,7 +92,6 @@ export default {
         })
         cards.value = response.data.cards
         setName.value = cards.value.length > 0 ? cards.value[0].set_name : ''
-        console.log('Fetched cards:', cards.value)
       } catch (err) {
         console.error('Error fetching set cards:', err)
         error.value = 'Failed to load set cards'
@@ -162,7 +159,7 @@ export default {
     const handleImageError = (event, card) => {
       console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
       event.target.style.display = 'none';
-      const noImageDiv = event.target.parentNode.querySelector('.no-image');
+      const noImageDiv = event.target.parentNode.querySelector('.bg-secondary');
       if (noImageDiv) {
         noImageDiv.style.display = 'block';
       }
@@ -211,128 +208,5 @@ export default {
 </script>
 
 <style scoped>
-.collection-set-cards {
-  padding: 2rem;
-  background-color: #f5f5f5;
-  min-height: 100vh;
-}
-
-.set-title {
-  font-size: 2.5rem;
-  color: #333;
-  margin-bottom: 2rem;
-  text-align: center;
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.5rem;
-}
-
-.card {
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s, box-shadow 0.3s;
-  background-color: #fff;
-  position: relative;
-}
-
-.card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-}
-
-.card.missing {
-  box-shadow: 0 4px 6px rgba(244, 67, 54, 0.3);
-}
-
-.card-image {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.no-image {
-  display: none;
-  padding: 2rem;
-  text-align: center;
-  background-color: #f0f0f0;
-  color: #666;
-}
-
-.card-info {
-  padding: 1rem;
-}
-
-.card-name {
-  font-size: 1rem;
-  margin: 0 0 0.5rem;
-  color: #333;
-}
-
-.card-collector-number {
-  font-size: 0.9rem;
-  color: #555;
-  margin-bottom: 0.5rem;
-}
-
-.card-rarity {
-  font-size: 0.9rem;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.card-quantities {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: #666;
-}
-
-.loading,
-.error {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 1.2rem;
-  color: #666;
-}
-
-.missing-indicator {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: #f44336;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-/* Optional: Adjust filter styles for better integration */
-.filters {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  justify-content: center;
-}
-
-.filter-input,
-.filter-select {
-  padding: 0.75rem;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.filter-input {
-  width: 250px;
-}
-
-.filter-select {
-  width: 150px;
-}
+/* Component-specific styles can be added here if needed */
 </style>
