@@ -23,11 +23,7 @@
           <p>Foil: {{ card.quantity_foil }}</p>
         </div>
       </div>
-      <div class="pagination">
-        <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
-      </div>
+      <!-- Removed pagination -->
     </div>
   </div>
 </template>
@@ -46,9 +42,6 @@ export default {
     const cards = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const currentPage = ref(1)
-    const totalPages = ref(1)
-    const perPage = ref(20)
     const nameFilter = ref('')
     const rarityFilter = ref('')
 
@@ -58,18 +51,13 @@ export default {
       try {
         const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
           params: {
-            page: currentPage.value,
-            per_page: perPage.value,
             name: nameFilter.value,
             rarity: rarityFilter.value
+            // Removed page and per_page
           }
         })
         cards.value = response.data.cards
-        totalPages.value = response.data.pages
-        currentPage.value = response.data.current_page
-        if (cards.value.length > 0) {
-          setName.value = cards.value[0].set_name
-        }
+        setName.value = cards.value.length > 0 ? cards.value[0].set_name : ''
       } catch (err) {
         console.error('Error fetching set cards:', err)
         error.value = 'Failed to load set cards'
@@ -78,22 +66,12 @@ export default {
       }
     }
 
-    const changePage = (delta) => {
-      const newPage = currentPage.value + delta
-      if (newPage >= 1 && newPage <= totalPages.value) {
-        currentPage.value = newPage
-        fetchCards()
-      }
-    }
-
     const applyFilters = () => {
-      currentPage.value = 1
       fetchCards()
     }
 
     watch(() => route.params.setCode, (newSetCode) => {
       setCode.value = newSetCode
-      currentPage.value = 1
       fetchCards()
     })
 
@@ -106,11 +84,8 @@ export default {
       cards,
       loading,
       error,
-      currentPage,
-      totalPages,
       nameFilter,
       rarityFilter,
-      changePage,
       applyFilters
     }
   }
@@ -158,27 +133,5 @@ export default {
   text-align: center;
   margin-top: 2rem;
   font-size: 1.2rem;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 2rem;
-}
-
-.pagination button {
-  margin: 0 0.5rem;
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.pagination button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
 }
 </style>
