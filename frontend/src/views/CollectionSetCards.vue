@@ -43,7 +43,7 @@ export default {
     const error = ref(null)
     const nameFilter = ref('')
     const rarityFilter = ref('')
-    const perPage = ref(100) // Increased to 100 as requested
+    const perPage = ref(1000) // Increased to 100 as requested
 
     const fetchCards = async () => {
       loading.value = true

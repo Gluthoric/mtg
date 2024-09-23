@@ -826,6 +826,7 @@ from models.set import Set
 from models.card import Card
 from database import db
 from sqlalchemy import asc, desc
+from sqlalchemy.orm import joinedload
 
 set_routes = Blueprint('set_routes', __name__)
 
@@ -872,31 +873,54 @@ def get_all_sets():
 
 @set_routes.route('/sets/<string:set_code>', methods=['GET'])
 def get_set(set_code):
-    set = Set.query.filter_by(code=set_code).first_or_404()
-    return jsonify(set.to_dict()), 200
+    set_instance = Set.query.filter_by(code=set_code).first_or_404()
+    return jsonify(set_instance.to_dict()), 200
 
 @set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
 def get_set_cards(set_code):
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    name = request.args.get('name', '', type=str)
-    rarity = request.args.get('rarity', '', type=str)
+    # Extract filter parameters
+    name_filter = request.args.get('name', '', type=str)
+    rarity_filter = request.args.get('rarity', '', type=str)
 
-    query = Card.query.filter_by(set_code=set_code)
+    # Eagerly load related 'collection' and 'set' data to optimize queries
+    query = Card.query.options(
+        joinedload(Card.collection),
+        joinedload(Card.set)
+    ).filter(Card.set_code == set_code)
 
-    if name:
-        query = query.filter(Card.name.ilike(f'%{name}%'))
-    if rarity:
-        query = query.filter(Card.rarity == rarity)
+    # Apply filters based on query parameters
+    if name_filter:
+        query = query.filter(Card.name.ilike(f'%{name_filter}%'))
+    if rarity_filter:
+        query = query.filter(Card.rarity == rarity_filter)
 
-    cards = query.paginate(page=page, per_page=per_page, error_out=False)
+    # Fetch all matching cards without pagination
+    cards = query.all()
+
+    # Serialize card data
+    cards_data = []
+    for card in cards:
+        card_dict = {
+            'id': card.id,
+            'name': card.name,
+            'rarity': card.rarity,
+            'quantity_regular': card.collection.quantity_regular if card.collection else 0,
+            'quantity_foil': card.collection.quantity_foil if card.collection else 0,
+            'set_name': card.set.name if card.set else '',
+            # Add other fields as necessary
+        }
+        # Optionally include image URIs or other related data
+        if hasattr(card, 'image_uris') and card.image_uris:
+            card_dict['image_uris'] = card.image_uris
+        cards_data.append(card_dict)
 
     return jsonify({
-        'cards': [card.to_dict() for card in cards.items],
-        'total': cards.total,
-        'pages': cards.pages,
-        'current_page': cards.page
+        'cards': cards_data,
+        'total': len(cards_data),
+        'pages': 1,
+        'current_page': 1
     }), 200
+
 == End of backend/routes/set_routes.py ==
 
 == Start of frontend/.eslintrc.js ==
@@ -1612,11 +1636,6 @@ export default {
           <p>Foil: {{ card.quantity_foil }}</p>
         </div>
       </div>
-      <div class="pagination">
-        <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
-      </div>
     </div>
   </div>
 </template>
@@ -1635,11 +1654,9 @@ export default {
     const cards = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const currentPage = ref(1)
-    const totalPages = ref(1)
-    const perPage = ref(20)
     const nameFilter = ref('')
     const rarityFilter = ref('')
+    const perPage = ref(1000) // Increased to 100 as requested
 
     const fetchCards = async () => {
       loading.value = true
@@ -1647,18 +1664,13 @@ export default {
       try {
         const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
           params: {
-            page: currentPage.value,
-            per_page: perPage.value,
             name: nameFilter.value,
-            rarity: rarityFilter.value
+            rarity: rarityFilter.value,
+            per_page: perPage.value // Added per_page parameter
           }
         })
         cards.value = response.data.cards
-        totalPages.value = response.data.pages
-        currentPage.value = response.data.current_page
-        if (cards.value.length > 0) {
-          setName.value = cards.value[0].set_name
-        }
+        setName.value = cards.value.length > 0 ? cards.value[0].set_name : ''
       } catch (err) {
         console.error('Error fetching set cards:', err)
         error.value = 'Failed to load set cards'
@@ -1667,22 +1679,12 @@ export default {
       }
     }
 
-    const changePage = (delta) => {
-      const newPage = currentPage.value + delta
-      if (newPage >= 1 && newPage <= totalPages.value) {
-        currentPage.value = newPage
-        fetchCards()
-      }
-    }
-
     const applyFilters = () => {
-      currentPage.value = 1
       fetchCards()
     }
 
     watch(() => route.params.setCode, (newSetCode) => {
       setCode.value = newSetCode
-      currentPage.value = 1
       fetchCards()
     })
 
@@ -1695,11 +1697,8 @@ export default {
       cards,
       loading,
       error,
-      currentPage,
-      totalPages,
       nameFilter,
       rarityFilter,
-      changePage,
       applyFilters
     }
   }
@@ -1748,29 +1747,8 @@ export default {
   margin-top: 2rem;
   font-size: 1.2rem;
 }
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 2rem;
-}
-
-.pagination button {
-  margin: 0 0.5rem;
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.pagination button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
 </style>
+
 == End of frontend/src/views/CollectionSetCards.vue ==
 
 == Start of frontend/src/views/Home.vue ==
