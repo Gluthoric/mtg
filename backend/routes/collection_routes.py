@@ -5,7 +5,7 @@ from models.card import Card
 from models.kiosk import Kiosk
 from models.set import Set
 from database import db
-from sqlalchemy.sql import func, text
+from sqlalchemy.sql import func, asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
 
@@ -44,23 +44,134 @@ def get_collection():
 
 @collection_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
-    collection_sets = db.session.query(
-        Set,
-        func.count(Collection.card_id).label('collection_count')
-    ).join(Card, Card.set_code == Set.code
-    ).join(Collection, Collection.card_id == Card.id
-    ).group_by(Set).all()
+    try:
+        diagnostic_info = {
+            "set_count": Set.query.count(),
+            "collection_count": Collection.query.count(),
+            "card_count": Card.query.count(),
+            "step1_count": 0,
+            "step2_count": 0,
+            "step3_count": 0,
+            "total_count_before_pagination": 0
+        }
 
-    sets_list = []
-    for set, collection_count in collection_sets:
-        collection_percentage = (collection_count / set.card_count) * 100 if set.card_count else 0
-        sets_list.append({
-            **set.to_dict(),
-            'collection_count': collection_count,
-            'collection_percentage': collection_percentage
-        })
+        # Extract query parameters
+        name = request.args.get('name', type=str, default='')
+        set_type = request.args.get('set_type', type=str, default='')
+        sort_by = request.args.get('sort_by', type=str, default='released_at')
+        sort_order = request.args.get('sort_order', type=str, default='desc')
+        page = request.args.get('page', type=int, default=1)
+        per_page = request.args.get('per_page', type=int, default=20)
 
-    return jsonify({'sets': sets_list}), 200
+        logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+
+        # Base query with specific columns and collection count using outer joins
+        query = db.session.query(
+            Set.id,
+            Set.code,
+            Set.name,
+            Set.released_at,
+            Set.set_type,
+            Set.card_count,
+            Set.digital,
+            Set.foil_only,
+            Set.icon_svg_uri,
+            func.count(Collection.card_id).label('collection_count')
+        ).outerjoin(Card, Card.set_code == Set.code
+        ).outerjoin(Collection, Collection.card_id == Card.id
+        ).group_by(
+            Set.id,
+            Set.code,
+            Set.name,
+            Set.released_at,
+            Set.set_type,
+            Set.card_count,
+            Set.digital,
+            Set.foil_only,
+            Set.icon_svg_uri
+        )
+
+        # Step 1: After joining Set and Card
+        diagnostic_info["step1_count"] = query.count()
+
+        # Step 2: After joining with Collection
+        diagnostic_info["step2_count"] = query.count()
+
+        # Step 3: After grouping
+        diagnostic_info["step3_count"] = query.count()
+
+        # Apply filters
+        if name:
+            query = query.filter(Set.name.ilike(f'%{name}%'))
+            logger.info(f"Applied filter: Set.name ilike '%{name}%'")
+        if set_type:
+            query = query.filter(Set.set_type == set_type)
+            logger.info(f"Applied filter: Set.set_type == '{set_type}'")
+
+        # Validate and apply sorting
+        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
+        if sort_by not in valid_sort_fields:
+            error_message = f"Invalid sort_by field: {sort_by}"
+            logger.error(error_message)
+            return jsonify({"error": error_message, "diagnostic_info": diagnostic_info}), 400
+
+        if sort_by == 'collection_count':
+            sort_column = func.count(Collection.card_id)
+        else:
+            sort_column = getattr(Set, sort_by)
+
+        if sort_order.lower() == 'asc':
+            query = query.order_by(asc(sort_column))
+            logger.info(f"Sorting by {sort_by} in ascending order")
+        else:
+            query = query.order_by(desc(sort_column))
+            logger.info(f"Sorting by {sort_by} in descending order")
+
+        # Get total count before pagination
+        total_count = query.count()
+        diagnostic_info["total_count_before_pagination"] = total_count
+        logger.info(f"Total count before pagination: {total_count}")
+
+        # Apply pagination
+        paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
+        logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
+
+        # Build response
+        sets_list = []
+        for row in paginated_sets.items:
+            set_data = {
+                'id': row.id,
+                'code': row.code,
+                'name': row.name,
+                'released_at': row.released_at,
+                'set_type': row.set_type,
+                'card_count': row.card_count,
+                'digital': row.digital,
+                'foil_only': row.foil_only,
+                'icon_svg_uri': row.icon_svg_uri
+            }
+            collection_count = row.collection_count
+            collection_percentage = (collection_count / row.card_count) * 100 if row.card_count else 0
+            sets_list.append({
+                **set_data,
+                'collection_count': collection_count,
+                'collection_percentage': collection_percentage
+            })
+
+        response = {
+            'sets': sets_list,
+            'total': paginated_sets.total,
+            'pages': paginated_sets.pages,
+            'current_page': paginated_sets.page,
+            'diagnostic_info': diagnostic_info
+        }
+
+        logger.info(f"Returning response with {len(sets_list)} sets")
+        return jsonify(response), 200
+    except Exception as e:
+        error_message = f"An unexpected error occurred: {str(e)}"
+        logger.exception(error_message)
+        return jsonify({"error": error_message, "diagnostic_info": diagnostic_info}), 500
 
 @collection_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
@@ -170,6 +281,12 @@ def import_csv():
         missing = required_columns - set(df.columns)
         return jsonify({"error": f"CSV is missing columns: {', '.join(missing)}"}), 400
 
+    # **New Code Starts Here**
+    # Replace blank 'Foil' values with False
+    df['Foil'] = df['Foil'].fillna(False)          # Replace NaN with False
+    df['Foil'] = df['Foil'].replace('', False)    # Replace empty strings with False
+    # **New Code Ends Here**
+
     try:
         with db.session.begin_nested():
             for index, row in df.iterrows():
@@ -210,15 +327,12 @@ def process_csv_row(row, index):
         raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
 
     # Normalize foil value
-    foil_status = str(row['Foil']).strip().lower()
-    if not foil_status:
-        foil = False
-    elif foil_status in ['true', '1', 'yes', 'foil']:
-        foil = True
-    elif foil_status in ['false', '0', 'no', 'non-foil']:
-        foil = False
+    foil = row['Foil']
+    if isinstance(foil, bool):
+        foil_status = foil
     else:
-        raise ValueError(f"Invalid foil value for card '{card_name}' at row {index + 2}.")
+        # This should not happen as we've already replaced blanks with False
+        raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
 
     # Fetch the card from the database
     card = Card.query.filter_by(id=scryfall_id).first()
@@ -229,7 +343,7 @@ def process_csv_row(row, index):
     collection_item = Collection.query.filter_by(card_id=card.id).first()
     kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
 
-    if foil:
+    if foil_status:
         handle_foil_card(card, quantity, collection_item, kiosk_item)
     else:
         handle_non_foil_card(card, quantity, collection_item, kiosk_item)
