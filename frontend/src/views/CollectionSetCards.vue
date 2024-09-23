@@ -5,7 +5,12 @@
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
       <div class="filters">
-        <input v-model="nameFilter" @input="applyFilters" placeholder="Filter by name" class="filter-input" />
+        <input
+          v-model="nameFilter"
+          @input="applyFilters"
+          placeholder="Filter by name"
+          class="filter-input"
+        />
         <select v-model="rarityFilter" @change="applyFilters" class="filter-select">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
@@ -16,15 +21,23 @@
       </div>
       <div class="card-grid">
         <div
-          v-for="card in filteredCards"
+          v-for="card in sortedCards"
           :key="card.id"
           class="card"
           :class="{ missing: isMissing(card) }"
         >
-          <img :src="card.image_uris.small" :alt="card.name" class="card-image" />
+          <img
+            v-if="getImageUrl(card)"
+            :src="getImageUrl(card)"
+            :alt="card.name"
+            class="card-image"
+            @error="handleImageError($event, card)"
+          />
+          <div v-else class="no-image">No image available</div>
           <div class="card-info">
             <h3 class="card-name">{{ card.name }}</h3>
-            <p class="card-rarity">{{ card.rarity }}</p>
+            <p class="card-collector-number">Collector Number: {{ card.collector_number }}</p>
+            <p class="card-rarity">Rarity: {{ card.rarity }}</p>
             <div class="card-quantities">
               <p>Regular: {{ card.quantity_regular }}</p>
               <p>Foil: {{ card.quantity_foil }}</p>
@@ -66,6 +79,7 @@ export default {
         })
         cards.value = response.data.cards
         setName.value = cards.value.length > 0 ? cards.value[0].set_name : ''
+        console.log('Fetched cards:', cards.value)
       } catch (err) {
         console.error('Error fetching set cards:', err)
         error.value = 'Failed to load set cards'
@@ -91,9 +105,50 @@ export default {
       return (card.quantity_regular + card.quantity_foil) === 0
     }
 
-    const filteredCards = computed(() => {
-      return cards.value
-    })
+    const sortedCards = computed(() => {
+      return cards.value.slice().sort((a, b) => {
+        if (!a.collector_number && !b.collector_number) return 0;
+        if (!a.collector_number) return 1;
+        if (!b.collector_number) return -1;
+
+        const numA = parseInt(a.collector_number, 10);
+        const numB = parseInt(b.collector_number, 10);
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return a.collector_number.localeCompare(b.collector_number);
+      });
+    });
+
+    const getImageUrl = (card) => {
+      const imageSizes = ['normal', 'large', 'small', 'png', 'art_crop', 'border_crop'];
+
+      if (card.image_uris) {
+        for (const size of imageSizes) {
+          if (card.image_uris[size]) {
+            return card.image_uris[size];
+          }
+        }
+      }
+
+      if (card.card_faces && card.card_faces[0].image_uris) {
+        for (const size of imageSizes) {
+          if (card.card_faces[0].image_uris[size]) {
+            return card.card_faces[0].image_uris[size];
+          }
+        }
+      }
+
+      console.warn('No image URL found for card:', card.name);
+      return null;
+    }
+
+    const handleImageError = (event, card) => {
+      console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
+      event.target.style.display = 'none';
+      event.target.parentNode.querySelector('.no-image').style.display = 'block';
+    }
 
     return {
       setName,
@@ -104,7 +159,9 @@ export default {
       rarityFilter,
       applyFilters,
       isMissing,
-      filteredCards
+      sortedCards,
+      getImageUrl,
+      handleImageError
     }
   }
 }
@@ -154,6 +211,14 @@ export default {
   display: block;
 }
 
+.no-image {
+  display: none;
+  padding: 2rem;
+  text-align: center;
+  background-color: #f0f0f0;
+  color: #666;
+}
+
 .card-info {
   padding: 1rem;
 }
@@ -162,6 +227,12 @@ export default {
   font-size: 1rem;
   margin: 0 0 0.5rem;
   color: #333;
+}
+
+.card-collector-number {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 0.5rem;
 }
 
 .card-rarity {

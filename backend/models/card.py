@@ -18,7 +18,7 @@ class Card(db.Model):
     layout = db.Column(db.Text)
     highres_image = db.Column(db.Boolean)
     image_status = db.Column(db.Text)
-    image_uris = db.Column(JSONB)
+    image_uris = db.Column(JSONB)  # Now correctly mapped to JSONB
     mana_cost = db.Column(db.Text)
     cmc = db.Column(db.Float)
     type_line = db.Column(db.Text, index=True)
@@ -35,11 +35,15 @@ class Card(db.Model):
     finishes = db.Column(JSONB)
     oversized = db.Column(db.Boolean)
     promo = db.Column(db.Boolean)
+    full_art = db.Column(db.Boolean)
+    textless = db.Column(db.Boolean)
+    booster = db.Column(db.Boolean)
+    story_spotlight = db.Column(db.Boolean)
     reprint = db.Column(db.Boolean)
     variation = db.Column(db.Boolean)
     set_code = db.Column(db.Text, db.ForeignKey('sets.code'), index=True)
     set_name = db.Column(db.Text)
-    collector_number = db.Column(db.Text)
+    collector_number = db.Column(db.Text, nullable=False, default='0')
     digital = db.Column(db.Boolean)
     rarity = db.Column(db.Text, index=True)
     card_back_id = db.Column(db.Text)
@@ -48,10 +52,6 @@ class Card(db.Model):
     illustration_id = db.Column(db.Text)
     border_color = db.Column(db.Text)
     frame = db.Column(db.Text)
-    full_art = db.Column(db.Boolean)
-    textless = db.Column(db.Boolean)
-    booster = db.Column(db.Boolean)
-    story_spotlight = db.Column(db.Boolean)
     prices = db.Column(JSONB)
     related_uris = db.Column(JSONB)
     purchase_uris = db.Column(JSONB)
@@ -67,14 +67,14 @@ class Card(db.Model):
             'name': self.name,
             'set_name': self.set_name,
             'set_code': self.set_code,
-            'collector_number': self.collector_number,
+            'collector_number': self.collector_number if self.collector_number else 'N/A',
             'type_line': self.type_line,
             'rarity': self.rarity,
             'mana_cost': self.mana_cost,
             'cmc': self.cmc,
             'oracle_text': self.oracle_text,
             'colors': self.colors,
-            'image_uris': self.image_uris,
+            'image_uris': self.image_uris if self.image_uris else {},
             'prices': self.prices,
             'collection': self.collection.to_dict() if self.collection else None,
             'kiosk': self.kiosk.to_dict() if self.kiosk else None

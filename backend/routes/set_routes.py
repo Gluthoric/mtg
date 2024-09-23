@@ -84,11 +84,42 @@ def get_set_cards(set_code):
             'quantity_regular': card.collection.quantity_regular if card.collection else 0,
             'quantity_foil': card.collection.quantity_foil if card.collection else 0,
             'set_name': card.set.name if card.set else '',
-            # Add other fields as necessary
+            'set_code': card.set_code,
+            'collector_number': card.collector_number,
+            'mana_cost': card.mana_cost,
+            'cmc': card.cmc,
+            'type_line': card.type_line,
+            'oracle_text': card.oracle_text,
+            'colors': card.colors,
+            'color_identity': card.color_identity,
+            'keywords': card.keywords,
+            'legalities': card.legalities,
+            'reserved': card.reserved,
+            'foil': card.foil,
+            'nonfoil': card.nonfoil,
+            'full_art': card.full_art,
+            'textless': card.textless,
+            'promo': card.promo,
+            'reprint': card.reprint,
+            'variation': card.variation,
+            'artist': card.artist,
+            'frame': card.frame,
+            'border_color': card.border_color,
+            'released_at': card.released_at,
+            'prices': card.prices,
         }
-        # Optionally include image URIs or other related data
+        # Include image URIs
         if hasattr(card, 'image_uris') and card.image_uris:
             card_dict['image_uris'] = card.image_uris
+
+        # Include related URIs
+        if card.related_uris:
+            card_dict['related_uris'] = card.related_uris
+
+        # Include purchase URIs
+        if card.purchase_uris:
+            card_dict['purchase_uris'] = card.purchase_uris
+
         cards_data.append(card_dict)
 
     return jsonify({
