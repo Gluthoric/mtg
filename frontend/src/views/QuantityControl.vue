@@ -1,4 +1,3 @@
-<!-- QuantityControl.vue -->
 <template>
   <div class="quantity-control">
     <label :for="fieldId" class="quantity-label">
@@ -71,8 +70,8 @@ export default {
         this.$emit('update', this.currentValue - 1);
       }
     },
-    onInput(val) {
-      this.currentValue = val;
+    onInput(event) {
+      this.currentValue = event.target.value;
     }
   }
 }
@@ -87,16 +86,16 @@ export default {
 
 .quantity-label {
   font-size: 0.85rem;
-  color: #555;
+  color: #a0aec0;
 }
 
 .input-wrapper {
   display: flex;
   align-items: center;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  border: 1px solid #4a5568;
+  border-radius: 0.25rem;
   overflow: hidden;
-  background-color: #fff;
+  background-color: #2d3748;
 }
 
 .quantity-input {
@@ -107,7 +106,7 @@ export default {
   font-size: 1rem;
   background-color: transparent;
   outline: none;
-  color: #333;
+  color: #e2e8f0;
 }
 
 .quantity-input::-webkit-inner-spin-button,
@@ -123,39 +122,34 @@ export default {
 .buttons {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #ccc;
+  border-left: 1px solid #4a5568;
 }
 
 .btn {
-  width: 2.5rem;
-  height: 50%;
+  width: 2rem;
+  height: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f0f0f0;
+  background-color: #4a5568;
   border: none;
   cursor: pointer;
   font-size: 0.8rem;
-  color: #333;
+  color: #e2e8f0;
   transition: background-color 0.2s, color 0.2s;
 }
 
 .btn:hover:not(:disabled) {
-  background-color: #e0e0e0;
-  color: #000;
+  background-color: #718096;
 }
 
 .btn:disabled {
-  background-color: #f9f9f9;
-  color: #999;
+  background-color: #2d3748;
+  color: #718096;
   cursor: not-allowed;
 }
 
 .increment-btn {
-  border-bottom: 1px solid #ccc;
-}
-
-.decrement-btn {
-  /* No additional border needed as it's the last button */
+  border-bottom: 1px solid #4a5568;
 }
 </style>
