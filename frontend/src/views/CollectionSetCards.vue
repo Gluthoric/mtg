@@ -43,6 +43,7 @@ export default {
     const error = ref(null)
     const nameFilter = ref('')
     const rarityFilter = ref('')
+    const perPage = ref(100) // Increased to 100 as requested
 
     const fetchCards = async () => {
       loading.value = true
@@ -51,8 +52,8 @@ export default {
         const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
           params: {
             name: nameFilter.value,
-            rarity: rarityFilter.value
-            // Removed page and per_page
+            rarity: rarityFilter.value,
+            per_page: perPage.value // Added per_page parameter
           }
         })
         cards.value = response.data.cards
