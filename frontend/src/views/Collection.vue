@@ -1,10 +1,19 @@
 <template>
-  <div class="collection">
-    <h1>My Collection</h1>
-    <div v-if="stats" class="collection-stats">
-      <p>Total Cards: {{ stats.total_cards }}</p>
-      <p>Unique Cards: {{ stats.unique_cards }}</p>
-      <p>Total Value: ${{ stats.total_value.toFixed(2) }}</p>
+  <div class="container">
+    <h1 class="text-center mb-2">My Collection</h1>
+    <div v-if="stats" class="collection-stats card grid grid-cols-3 mb-2">
+      <div class="stat">
+        <h2>Total Cards</h2>
+        <p>{{ stats.total_cards }}</p>
+      </div>
+      <div class="stat">
+        <h2>Unique Cards</h2>
+        <p>{{ stats.unique_cards }}</p>
+      </div>
+      <div class="stat">
+        <h2>Total Value</h2>
+        <p>${{ stats.total_value.toFixed(2) }}</p>
+      </div>
     </div>
     <SetListControls
       :setTypes="setTypes"
@@ -13,14 +22,13 @@
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
     />
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else-if="sets && sets.length > 0" class="set-grid">
-      <div v-for="set in sets" :key="set.code" class="set-card">
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
+      <div v-for="set in sets" :key="set.code" class="card">
         <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
           <div class="set-icon">
             <img :src="set.icon_svg_uri" :alt="set.name" />
-            <div class="completion-circle" :style="{ '--percentage': set.collection_percentage + '%' }"></div>
           </div>
           <h3>{{ set.name }}</h3>
           <p>Code: {{ set.code }}</p>
@@ -28,15 +36,21 @@
           <p>Released: {{ formatDate(set.released_at) }}</p>
           <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
           <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
+          <div class="progress-container">
+            <div
+              class="progress-bar"
+              :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
+            ></div>
+          </div>
         </router-link>
       </div>
     </div>
-    <div v-else-if="!loading && sets.length === 0">
+    <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
       <p>No sets found in your collection.</p>
     </div>
-    <div class="pagination">
+    <div class="pagination text-center mt-2">
       <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
       <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
     </div>
   </div>
@@ -89,11 +103,9 @@ export default {
             per_page: perPage.value
           }
         })
-        console.log('Response data:', response.data) // Added console.log
         sets.value = response.data.sets
         totalPages.value = response.data.pages
         currentPage.value = response.data.current_page
-        console.log('Sets value:', sets.value) // Added console.log
       } catch (err) {
         console.error('Error fetching collection sets:', err)
         error.value = 'Failed to load collection sets'
@@ -131,6 +143,13 @@ export default {
       return new Date(dateString).toLocaleDateString()
     }
 
+    const getProgressColor = (percentage) => {
+      if (percentage < 25) return '#f44336'
+      if (percentage < 50) return '#ff9800'
+      if (percentage < 75) return '#ffc107'
+      return '#4caf50'
+    }
+
     onMounted(() => {
       fetchStats()
       fetchSets()
@@ -151,44 +170,21 @@ export default {
       updateSorting,
       updatePerPage,
       changePage,
-      formatDate
+      formatDate,
+      getProgressColor
     }
   }
 }
 </script>
 
 <style scoped>
-.collection {
-  padding: 1rem;
-}
-
-.collection-stats {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 1rem;
-  background-color: #f0f0f0;
-  padding: 1rem;
-  border-radius: 8px;
-}
-
-.set-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.set-card {
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 1rem;
+.collection-stats .stat {
   text-align: center;
-  background-color: #f9f9f9;
 }
 
 .set-icon {
-  position: relative;
-  width: 100px;
-  height: 100px;
+  width: 50px;
+  height: 50px;
   margin: 0 auto 1rem;
 }
 
@@ -196,47 +192,5 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-
-.completion-circle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: conic-gradient(
-    #4CAF50 calc(var(--percentage) * 1%),
-    #e0e0e0 calc(var(--percentage) * 1%)
-  );
-  opacity: 0.7;
-}
-
-.loading, .error {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 1.2rem;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 2rem;
-}
-
-.pagination button {
-  margin: 0 0.5rem;
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.pagination button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
 }
 </style>
