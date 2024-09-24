@@ -1,28 +1,28 @@
 <template>
   <div class="quantity-control flex flex-col">
-    <label :for="fieldId" class="quantity-label mb-1">
+    <label :for="fieldId" class="quantity-label mb-1 text-sm font-semibold">
       {{ label }}
     </label>
-    <div class="input-wrapper flex">
+    <div class="input-wrapper flex border rounded-md overflow-hidden">
       <input
         :id="fieldId"
         v-model.number="currentValue"
         type="number"
         min="0"
-        class="quantity-input flex-1 p-2 text-center"
+        class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-100"
         @input="onInput"
       />
-      <div class="buttons flex flex-col">
+      <div class="buttons flex flex-col bg-gray-200 border-l">
         <button
           @click="increment"
-          class="btn increment-btn"
+          class="btn increment-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
           aria-label="Increment"
         >
           ▲
         </button>
         <button
           @click="decrement"
-          class="btn decrement-btn"
+          class="btn decrement-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
           aria-label="Decrement"
           :disabled="currentValue === 0"
         >
@@ -82,17 +82,7 @@ export default {
   font-size: 0.85rem;
 }
 
-.input-wrapper {
-  border: 1px solid var(--border-color);
-  border-radius: 0.25rem;
-  overflow: hidden;
-  background-color: var(--input-background);
-}
-
 .quantity-input {
-  border: none;
-  background-color: transparent;
-  outline: none;
   -webkit-appearance: textfield;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -103,19 +93,5 @@ export default {
   -webkit-appearance: none;
   appearance: none;
   margin: 0;
-}
-
-.buttons {
-  border-left: 1px solid var(--border-color);
-}
-
-.btn {
-  width: 2rem;
-  height: 1.25rem;
-  font-size: 0.8rem;
-}
-
-.increment-btn {
-  border-bottom: 1px solid var(--border-color);
 }
 </style>

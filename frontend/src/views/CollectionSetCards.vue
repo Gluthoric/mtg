@@ -1,16 +1,17 @@
 <template>
-  <div class="container">
-    <h1 class="text-center mb-2">{{ setName }}</h1>
-    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
-    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+  <div class="container mx-auto px-4">
+    <h1 class="text-center mb-4 text-2xl font-bold text-blue-600">{{ setName }}</h1>
+    <div v-if="loading" class="loading text-center mt-4">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
     <div v-else>
-      <div class="filters grid grid-cols-1 md:grid-cols-2 gap-1 mb-2">
+      <div class="filters grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <input
           v-model="nameFilter"
           @input="applyFilters"
           placeholder="Filter by name"
+          class="p-2 border rounded"
         />
-        <select v-model="rarityFilter" @change="applyFilters">
+        <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
           <option value="uncommon">Uncommon</option>
@@ -18,26 +19,44 @@
           <option value="mythic">Mythic</option>
         </select>
       </div>
-      <div class="card-grid grid grid-cols-auto gap-1">
+
+      <!-- Slider to Adjust Card Size -->
+      <div class="mb-4">
+        <label for="card-size-slider" class="block text-sm font-medium mb-2">Card Size</label>
+        <input
+          id="card-size-slider"
+          type="range"
+          v-model="cardSize"
+          min="100"
+          max="300"
+          class="w-full"
+        />
+      </div>
+
+      <div class="card-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" :style="gridStyle">
         <div
           v-for="card in sortedCards"
           :key="card.id"
-          class="card"
-          :class="{ 'border-error': isMissing(card) }"
+          class="card bg-white shadow-md rounded-lg overflow-hidden relative"
+          :class="{ 'border-2 border-red-500': isMissing(card) }"
         >
-          <img
-            v-if="getImageUrl(card)"
-            :src="getImageUrl(card)"
-            :alt="card.name"
-            class="img-responsive"
-            @error="handleImageError($event, card)"
-          />
-          <div v-else class="p-2 text-center bg-secondary">No image available</div>
-          <div class="card-info p-1">
-            <h3 class="mb-1">{{ card.name }}</h3>
-            <p class="mb-1">Collector Number: {{ card.collector_number }}</p>
-            <p class="mb-1">Rarity: {{ card.rarity }}</p>
-            <div class="card-quantities grid grid-cols-2 gap-1">
+          <div class="image-container" :style="{ height: `${cardSize}px` }">
+            <img
+              v-if="getImageUrl(card)"
+              :src="getImageUrl(card)"
+              :alt="card.name"
+              class="w-full h-full object-contain"
+              @error="handleImageError($event, card)"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500">
+              No image available
+            </div>
+          </div>
+          <div class="card-info p-4">
+            <h3 class="text-lg font-semibold mb-2 truncate">{{ card.name }}</h3>
+            <p class="text-sm mb-1">Collector Number: {{ card.collector_number }}</p>
+            <p class="text-sm mb-2">Rarity: {{ card.rarity }}</p>
+            <div class="card-quantities grid grid-cols-2 gap-2">
               <QuantityControl
                 label="Regular"
                 :fieldId="'regular-' + card.id"
@@ -52,7 +71,9 @@
               />
             </div>
           </div>
-          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-error text-white p-1 rounded text-sm font-bold">Missing</div>
+          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+            Missing
+          </div>
         </div>
       </div>
     </div>
@@ -60,62 +81,68 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
-import axios from 'axios'
-import { useRoute } from 'vue-router'
-import QuantityControl from './QuantityControl.vue' // Adjust the path as needed
+import { ref, onMounted, watch, computed } from 'vue';
+import axios from 'axios';
+import { useRoute } from 'vue-router';
+import QuantityControl from './QuantityControl.vue'; // Adjust the path as needed
 
 export default {
   name: 'CollectionSetCards',
   components: {
-    QuantityControl
+    QuantityControl,
   },
   setup() {
-    const route = useRoute()
-    const setCode = ref(route.params.setCode)
-    const setName = ref('')
-    const cards = ref([])
-    const loading = ref(true)
-    const error = ref(null)
-    const nameFilter = ref('')
-    const rarityFilter = ref('')
+    const route = useRoute();
+    const setCode = ref(route.params.setCode);
+    const setName = ref('');
+    const cards = ref([]);
+    const loading = ref(true);
+    const error = ref(null);
+    const nameFilter = ref('');
+    const rarityFilter = ref('');
+
+    // Card size slider
+    const cardSize = ref(200); // Default card size
 
     const fetchCards = async () => {
-      loading.value = true
-      error.value = null
+      loading.value = true;
+      error.value = null;
       try {
         const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
           params: {
             name: nameFilter.value,
-            rarity: rarityFilter.value
-          }
-        })
-        cards.value = response.data.cards
-        setName.value = cards.value.length > 0 ? cards.value[0].set_name : ''
+            rarity: rarityFilter.value,
+          },
+        });
+        cards.value = response.data.cards;
+        setName.value = cards.value.length > 0 ? cards.value[0].set_name : '';
       } catch (err) {
-        console.error('Error fetching set cards:', err)
-        error.value = 'Failed to load set cards'
+        console.error('Error fetching set cards:', err);
+        error.value = 'Failed to load set cards';
       } finally {
-        loading.value = false
+        loading.value = false;
       }
-    }
+    };
 
     const applyFilters = () => {
-      fetchCards()
-    }
+      fetchCards();
+    };
 
-    watch(() => route.params.setCode, (newSetCode) => {
-      setCode.value = newSetCode
-      fetchCards()
-    })
+    watch(
+      () => route.params.setCode,
+      (newSetCode) => {
+        setCode.value = newSetCode;
+        fetchCards();
+      }
+    );
 
     onMounted(() => {
-      fetchCards()
-    })
+      fetchCards();
+    });
 
     const isMissing = (card) => {
-      return (card.quantity_regular + card.quantity_foil) === 0
-    }
+      return card.quantity_regular + card.quantity_foil === 0;
+    };
 
     const sortedCards = computed(() => {
       return cards.value.slice().sort((a, b) => {
@@ -154,7 +181,7 @@ export default {
 
       console.warn('No image URL found for card:', card.name);
       return null;
-    }
+    };
 
     const handleImageError = (event, card) => {
       console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
@@ -163,31 +190,35 @@ export default {
       if (noImageDiv) {
         noImageDiv.style.display = 'block';
       }
-    }
+    };
 
     const updateQuantity = async (card, type, newValue) => {
-      const updatedCard = { ...card }
+      const updatedCard = { ...card };
       if (type === 'regular') {
-        updatedCard.quantity_regular = newValue
+        updatedCard.quantity_regular = newValue;
       } else if (type === 'foil') {
-        updatedCard.quantity_foil = newValue
+        updatedCard.quantity_foil = newValue;
       }
 
       try {
         const response = await axios.put(`/api/collection/${card.id}`, {
           quantity_regular: updatedCard.quantity_regular,
-          quantity_foil: updatedCard.quantity_foil
-        })
+          quantity_foil: updatedCard.quantity_foil,
+        });
         // Update the local card data
-        const index = cards.value.findIndex(c => c.id === card.id)
+        const index = cards.value.findIndex((c) => c.id === card.id);
         if (index !== -1) {
-          cards.value[index] = response.data
+          cards.value[index] = response.data;
         }
       } catch (err) {
-        console.error('Error updating quantity:', err)
-        alert('Failed to update quantity. Please try again.')
+        console.error('Error updating quantity:', err);
+        alert('Failed to update quantity. Please try again.');
       }
-    }
+    };
+
+    const gridStyle = computed(() => ({
+      gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize.value}px, 1fr))`,
+    }));
 
     return {
       setName,
@@ -201,12 +232,40 @@ export default {
       sortedCards,
       getImageUrl,
       handleImageError,
-      updateQuantity
-    }
-  }
-}
+      updateQuantity,
+      cardSize,
+      gridStyle,
+    };
+  },
+};
 </script>
 
 <style scoped>
-/* Component-specific styles can be added here if needed */
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-quantities {
+  margin-top: auto;
+}
+
+.image-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+.missing-indicator {
+  position: absolute;
+}
+
+.bg-secondary {
+  background-color: #f2f2f2;
+}
 </style>
