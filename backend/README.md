@@ -6,29 +6,33 @@ This is the backend application for the Magic: The Gathering Collection Kiosk pr
 
 1. Make sure you have [Python](https://www.python.org/) (version 3.7 or higher) installed on your system.
 
-2. It's recommended to use a virtual environment. Create and activate one using:
+2. Install [Redis](https://redis.io/download) on your system. It's used for caching to improve performance.
+
+3. It's recommended to use a virtual environment. Create and activate one using:
 
    ```
    python -m venv venv
    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
    ```
 
-3. Install the required packages:
+4. Install the required packages:
 
    ```
    pip install -r requirements.txt
    ```
 
-4. Environment variables are already set up in the `.env` file in the `refactor/backend` directory. The file contains:
+5. Environment variables are already set up in the `.env` file in the `refactor/backend` directory. The file contains:
 
    ```
    DATABASE_URI=postgresql://postgres.xbuiunafhcscvjftnvxr:Timothy2-Sample-Underwent@aws-0-us-west-1.pooler.supabase.com:6543/postgres?sslmode=require
    SECRET_KEY=you-will-never-guess
+   REDIS_URL=redis://localhost:6379/0
    ```
 
    If you need to modify these values:
    - Update the `DATABASE_URI` if you're using a different Supabase project or database.
    - Change the `SECRET_KEY` to a different secure random string of your choice.
+   - Update the `REDIS_URL` if your Redis server is not running on the default localhost:6379.
 
 ## Running the Development Server
 
@@ -39,6 +43,8 @@ python main.py
 ```
 
 This will start the Flask development server, usually at `http://localhost:5000`.
+
+Make sure your Redis server is running before starting the application.
 
 ## Database Initialization
 
@@ -72,6 +78,26 @@ For detailed API documentation, refer to the inline comments in the route files.
 ## Database
 
 This project uses SQLAlchemy with PostgreSQL, connected to a Supabase instance. The connection details are managed through the `DATABASE_URI` environment variable in the `.env` file.
+
+## Performance Optimizations
+
+The backend has been optimized for better performance, particularly focusing on the collection-related routes:
+
+1. **Caching with Redis**: Frequently accessed data is cached using Redis, reducing database load and improving response times. The cache is automatically invalidated when data is updated. This includes:
+   - Collection data
+   - Collection sets data
+   - Collection statistics
+   - Set cards in the collection
+
+2. **Efficient Serialization**: The `orjson` library is used for faster JSON serialization and deserialization, particularly beneficial for large datasets.
+
+3. **Query Optimization**: Database queries have been optimized to reduce the load on the database and improve response times.
+
+4. **Pagination**: All list endpoints support pagination to handle large datasets efficiently.
+
+5. **Cache Invalidation**: When data is updated (e.g., adding or removing cards from the collection), related caches are automatically invalidated to ensure data consistency.
+
+These optimizations significantly improve the application's performance, especially when dealing with large collections or high traffic.
 
 ## Additional Notes
 

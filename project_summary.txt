@@ -54,6 +54,11 @@ from config import Config
 from database import db
 from routes import register_routes
 from routes.set_routes import set_routes
+from routes.kiosk_routes import kiosk_routes
+import redis
+import orjson
+
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
 def create_app():
     app = Flask(__name__)
@@ -66,6 +71,14 @@ def create_app():
     # Register routes
     register_routes(app)
     app.register_blueprint(set_routes, url_prefix='/api')
+    app.register_blueprint(kiosk_routes, url_prefix='/api')
+
+    # Add Redis client to app context
+    app.redis_client = redis_client
+
+    # Use orjson for JSON serialization
+    app.json_encoder = orjson.dumps
+    app.json_decoder = orjson.loads
 
     return app
 
@@ -95,7 +108,7 @@ class Card(db.Model):
     layout = db.Column(db.Text)
     highres_image = db.Column(db.Boolean)
     image_status = db.Column(db.Text)
-    image_uris = db.Column(JSONB)
+    image_uris = db.Column(JSONB)  # Now correctly mapped to JSONB
     mana_cost = db.Column(db.Text)
     cmc = db.Column(db.Float)
     type_line = db.Column(db.Text, index=True)
@@ -112,11 +125,15 @@ class Card(db.Model):
     finishes = db.Column(JSONB)
     oversized = db.Column(db.Boolean)
     promo = db.Column(db.Boolean)
+    full_art = db.Column(db.Boolean)
+    textless = db.Column(db.Boolean)
+    booster = db.Column(db.Boolean)
+    story_spotlight = db.Column(db.Boolean)
     reprint = db.Column(db.Boolean)
     variation = db.Column(db.Boolean)
     set_code = db.Column(db.Text, db.ForeignKey('sets.code'), index=True)
     set_name = db.Column(db.Text)
-    collector_number = db.Column(db.Text)
+    collector_number = db.Column(db.Text, nullable=False, default='0')
     digital = db.Column(db.Boolean)
     rarity = db.Column(db.Text, index=True)
     card_back_id = db.Column(db.Text)
@@ -125,10 +142,6 @@ class Card(db.Model):
     illustration_id = db.Column(db.Text)
     border_color = db.Column(db.Text)
     frame = db.Column(db.Text)
-    full_art = db.Column(db.Boolean)
-    textless = db.Column(db.Boolean)
-    booster = db.Column(db.Boolean)
-    story_spotlight = db.Column(db.Boolean)
     prices = db.Column(JSONB)
     related_uris = db.Column(JSONB)
     purchase_uris = db.Column(JSONB)
@@ -144,14 +157,14 @@ class Card(db.Model):
             'name': self.name,
             'set_name': self.set_name,
             'set_code': self.set_code,
-            'collector_number': self.collector_number,
+            'collector_number': self.collector_number if self.collector_number else 'N/A',
             'type_line': self.type_line,
             'rarity': self.rarity,
             'mana_cost': self.mana_cost,
             'cmc': self.cmc,
             'oracle_text': self.oracle_text,
             'colors': self.colors,
-            'image_uris': self.image_uris,
+            'image_uris': self.image_uris if self.image_uris else {},
             'prices': self.prices,
             'collection': self.collection.to_dict() if self.collection else None,
             'kiosk': self.kiosk.to_dict() if self.kiosk else None
@@ -338,15 +351,18 @@ def search_cards():
 
 == Start of backend/routes/collection_routes.py ==
 import pandas as pd
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
+from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import func, asc, desc, text
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.collection import Collection
 from models.card import Card
 from models.kiosk import Kiosk
 from models.set import Set
 from database import db
-from sqlalchemy.sql import func, asc, desc, text
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+import time
 import logging
+import orjson
 
 collection_routes = Blueprint('collection_routes', __name__)
 
@@ -354,11 +370,28 @@ collection_routes = Blueprint('collection_routes', __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def serialize_collection(collection_items):
+    return [{
+        **item.card.to_dict(),
+        'quantity_regular': item.quantity_regular,
+        'quantity_foil': item.quantity_foil
+    } for item in collection_items]
+
 @collection_routes.route('/collection', methods=['GET'])
 def get_collection():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     set_code = request.args.get('set_code', '', type=str)
+
+    cache_key = f"collection:page:{page}:per_page:{per_page}:set_code:{set_code}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
 
     query = Collection.query.join(Card).join(Set)
 
@@ -367,44 +400,44 @@ def get_collection():
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return jsonify({
-        'collection': [
-            {
-                **item.card.to_dict(),
-                'quantity_regular': item.quantity_regular,
-                'quantity_foil': item.quantity_foil
-            }
-            for item in collection.items
-        ],
+    result = {
+        'collection': serialize_collection(collection.items),
         'total': collection.total,
         'pages': collection.pages,
         'current_page': page
-    }), 200
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
 
 @collection_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
-        diagnostic_info = {
-            "set_count": Set.query.count(),
-            "collection_count": Collection.query.count(),
-            "card_count": Card.query.count(),
-            "step1_count": 0,
-            "step2_count": 0,
-            "step3_count": 0,
-            "total_count_before_pagination": 0
-        }
+        name = request.args.get('name', type=str)
+        set_type = request.args.get('set_type', type=str)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        sort_by = request.args.get('sort_by', 'released_at', type=str)
+        sort_order = request.args.get('sort_order', 'desc', type=str)
 
-        # Extract query parameters
-        name = request.args.get('name', type=str, default='')
-        set_type = request.args.get('set_type', type=str, default='')
-        sort_by = request.args.get('sort_by', type=str, default='released_at')
-        sort_order = request.args.get('sort_order', type=str, default='desc')
-        page = request.args.get('page', type=int, default=1)
-        per_page = request.args.get('per_page', type=int, default=20)
+        cache_key = f"collection_sets:name:{name}:set_type:{set_type}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
+        cached_data = current_app.redis_client.get(cache_key)
+
+        if cached_data:
+            return current_app.response_class(
+                response=cached_data,
+                status=200,
+                mimetype='application/json'
+            )
 
         logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
-        # Base query with specific columns and collection count using outer joins
         query = db.session.query(
             Set.id,
             Set.code,
@@ -430,16 +463,6 @@ def get_collection_sets():
             Set.icon_svg_uri
         )
 
-        # Step 1: After joining Set and Card
-        diagnostic_info["step1_count"] = query.count()
-
-        # Step 2: After joining with Collection
-        diagnostic_info["step2_count"] = query.count()
-
-        # Step 3: After grouping
-        diagnostic_info["step3_count"] = query.count()
-
-        # Apply filters
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
             logger.info(f"Applied filter: Set.name ilike '%{name}%'")
@@ -447,12 +470,11 @@ def get_collection_sets():
             query = query.filter(Set.set_type == set_type)
             logger.info(f"Applied filter: Set.set_type == '{set_type}'")
 
-        # Validate and apply sorting
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
         if sort_by not in valid_sort_fields:
             error_message = f"Invalid sort_by field: {sort_by}"
             logger.error(error_message)
-            return jsonify({"error": error_message, "diagnostic_info": diagnostic_info}), 400
+            return jsonify({"error": error_message}), 400
 
         if sort_by == 'collection_count':
             sort_column = func.count(Collection.card_id)
@@ -466,16 +488,9 @@ def get_collection_sets():
             query = query.order_by(desc(sort_column))
             logger.info(f"Sorting by {sort_by} in descending order")
 
-        # Get total count before pagination
-        total_count = query.count()
-        diagnostic_info["total_count_before_pagination"] = total_count
-        logger.info(f"Total count before pagination: {total_count}")
-
-        # Apply pagination
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
-        # Build response
         sets_list = []
         for row in paginated_sets.items:
             set_data = {
@@ -501,16 +516,22 @@ def get_collection_sets():
             'sets': sets_list,
             'total': paginated_sets.total,
             'pages': paginated_sets.pages,
-            'current_page': paginated_sets.page,
-            'diagnostic_info': diagnostic_info
+            'current_page': paginated_sets.page
         }
 
+        serialized_data = orjson.dumps(response)
+        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
         logger.info(f"Returning response with {len(sets_list)} sets")
-        return jsonify(response), 200
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
-        return jsonify({"error": error_message, "diagnostic_info": diagnostic_info}), 500
+        return jsonify({"error": error_message}), 500
 
 @collection_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
@@ -529,7 +550,26 @@ def update_collection(card_id):
 
     db.session.commit()
 
-    return jsonify(collection_item.to_dict()), 200
+    # Invalidate related caches
+    current_app.redis_client.delete("collection:*")
+    current_app.redis_client.delete("collection_sets:*")
+    current_app.redis_client.delete("collection_stats")
+
+    card = Card.query.filter_by(id=card_id).first()
+    if not card:
+        return jsonify({"error": "Card not found."}), 404
+
+    card_data = card.to_dict()
+    card_data.update({
+        'quantity_regular': collection_item.quantity_regular,
+        'quantity_foil': collection_item.quantity_foil
+    })
+
+    return current_app.response_class(
+        response=orjson.dumps(card_data),
+        status=200,
+        mimetype='application/json'
+    )
 
 @collection_routes.route('/collection/<string:card_id>', methods=['DELETE'])
 def remove_from_collection(card_id):
@@ -537,15 +577,29 @@ def remove_from_collection(card_id):
     db.session.delete(collection_item)
     db.session.commit()
 
+    # Invalidate related caches
+    current_app.redis_client.delete("collection:*")
+    current_app.redis_client.delete("collection_sets:*")
+    current_app.redis_client.delete("collection_stats")
+
     return '', 204
 
 @collection_routes.route('/collection/stats', methods=['GET'])
 def get_collection_stats():
     try:
+        cache_key = "collection_stats"
+        cached_data = current_app.redis_client.get(cache_key)
+
+        if cached_data:
+            return current_app.response_class(
+                response=cached_data,
+                status=200,
+                mimetype='application/json'
+            )
+
         total_cards = db.session.query(func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
         unique_cards = Collection.query.count()
 
-        # Use a raw SQL query to calculate the total value
         total_value_query = text("""
             SELECT SUM(
                 (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * collections.quantity_regular) +
@@ -556,20 +610,39 @@ def get_collection_stats():
         """)
         total_value = db.session.execute(total_value_query).scalar() or 0
 
-        return jsonify({
+        result = {
             'total_cards': int(total_cards),
             'unique_cards': unique_cards,
             'total_value': round(total_value, 2)
-        }), 200
+        }
+
+        serialized_data = orjson.dumps(result)
+        current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
+
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @collection_routes.route('/collection/sets/<string:set_code>/cards', methods=['GET'])
 def get_collection_set_cards(set_code):
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 300, type=int)
     name = request.args.get('name', '', type=str)
     rarity = request.args.get('rarity', '', type=str)
+
+    cache_key = f"collection_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name}:rarity:{rarity}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
 
     query = Collection.query.join(Card).join(Set).filter(Set.code == set_code)
 
@@ -580,19 +653,21 @@ def get_collection_set_cards(set_code):
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return jsonify({
-        'cards': [
-            {
-                **item.card.to_dict(),
-                'quantity_regular': item.quantity_regular,
-                'quantity_foil': item.quantity_foil
-            }
-            for item in collection.items
-        ],
+    result = {
+        'cards': serialize_collection(collection.items),
         'total': collection.total,
         'pages': collection.pages,
         'current_page': page
-    }), 200
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
 
 @collection_routes.route('/collection/import_csv', methods=['POST'])
 def import_csv():
@@ -620,11 +695,7 @@ def import_csv():
         missing = required_columns - set(df.columns)
         return jsonify({"error": f"CSV is missing columns: {', '.join(missing)}"}), 400
 
-    # **New Code Starts Here**
-    # Replace blank 'Foil' values with False
-    df['Foil'] = df['Foil'].fillna(False)          # Replace NaN with False
-    df['Foil'] = df['Foil'].replace('', False)    # Replace empty strings with False
-    # **New Code Ends Here**
+    df['Foil'] = df['Foil'].fillna(False).replace('', False)
 
     try:
         with db.session.begin_nested():
@@ -633,19 +704,23 @@ def import_csv():
                     process_csv_row(row, index)
                 except ValueError as e:
                     logger.error(f"Error processing row {index + 2}: {str(e)}")
-                    # Optionally, collect errors to return after processing
-                    continue  # Skip to the next row
+                    continue
                 except IntegrityError as e:
                     logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
                     db.session.rollback()
                     return jsonify({"error": f"Database integrity error at row {index + 2}: {str(e)}"}), 500
 
-                # Flush every 100 rows to catch potential errors earlier
                 if index % 100 == 0:
                     db.session.flush()
 
         db.session.commit()
         logger.info("CSV imported successfully")
+
+        # Invalidate related caches
+        current_app.redis_client.delete("collection:*")
+        current_app.redis_client.delete("collection_sets:*")
+        current_app.redis_client.delete("collection_stats")
+
         return jsonify({"message": "CSV imported successfully"}), 200
 
     except SQLAlchemyError as e:
@@ -657,7 +732,6 @@ def process_csv_row(row, index):
     scryfall_id = row['Scryfall ID']
     card_name = row['Name']
 
-    # Validate and parse quantity
     try:
         quantity = int(row['Quantity'])
         if quantity < 1:
@@ -665,20 +739,16 @@ def process_csv_row(row, index):
     except ValueError:
         raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
 
-    # Normalize foil value
     foil = row['Foil']
     if isinstance(foil, bool):
         foil_status = foil
     else:
-        # This should not happen as we've already replaced blanks with False
         raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
 
-    # Fetch the card from the database
     card = Card.query.filter_by(id=scryfall_id).first()
     if not card:
         raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
 
-    # Fetch or create collection and kiosk entries
     collection_item = Collection.query.filter_by(card_id=card.id).first()
     kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
 
@@ -742,22 +812,41 @@ def handle_non_foil_card(card, quantity, collection_item, kiosk_item):
 == End of backend/routes/collection_routes.py ==
 
 == Start of backend/routes/kiosk_routes.py ==
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from models.kiosk import Kiosk
 from models.card import Card
+from models.set import Set
 from database import db
 from sqlalchemy.sql import func, text
+from sqlalchemy import distinct
+import orjson
 
 kiosk_routes = Blueprint('kiosk_routes', __name__)
+
+def serialize_sets(sets):
+    return [set_obj.to_dict() for set_obj in sets]
+
+def serialize_cards(cards):
+    return [{**card.to_dict(), 'quantity': kiosk_item.to_dict()} for card, kiosk_item in cards]
 
 @kiosk_routes.route('/kiosk', methods=['GET'])
 def get_kiosk():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
 
+    cache_key = f"kiosk:page:{page}:per_page:{per_page}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
+
     kiosk = Kiosk.query.join(Card).paginate(page=page, per_page=per_page, error_out=False)
 
-    return jsonify({
+    result = {
         'kiosk': [
             {**item.card.to_dict(), 'quantity': item.to_dict()}
             for item in kiosk.items
@@ -765,7 +854,138 @@ def get_kiosk():
         'total': kiosk.total,
         'pages': kiosk.pages,
         'current_page': page
-    }), 200
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
+
+@kiosk_routes.route('/kiosk/sets', methods=['GET'])
+def get_kiosk_sets():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    sort_by = request.args.get('sortBy', 'released_at')
+    sort_order = request.args.get('sortOrder', 'desc')
+
+    cache_key = f"kiosk_sets:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
+
+    kiosk_sets = db.session.query(Set).\
+        join(Card, Card.set_code == Set.code).\
+        join(Kiosk, Kiosk.card_id == Card.id).\
+        filter((Kiosk.quantity_regular > 0) | (Kiosk.quantity_foil > 0)).\
+        distinct()
+
+    if sort_order == 'desc':
+        kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
+    else:
+        kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
+
+    paginated_sets = kiosk_sets.paginate(page=page, per_page=per_page, error_out=False)
+
+    sets_data = []
+    for set_obj in paginated_sets.items:
+        set_dict = set_obj.to_dict()
+
+        kiosk_count = db.session.query(func.count(distinct(Card.id))).\
+            join(Kiosk, Kiosk.card_id == Card.id).\
+            filter(Card.set_code == set_obj.code).\
+            filter((Kiosk.quantity_regular > 0) | (Kiosk.quantity_foil > 0)).\
+            scalar()
+
+        set_dict['kiosk_count'] = kiosk_count
+        set_dict['kiosk_percentage'] = (kiosk_count / set_obj.card_count) * 100 if set_obj.card_count > 0 else 0
+
+        sets_data.append(set_dict)
+
+    result = {
+        'sets': sets_data,
+        'total': paginated_sets.total,
+        'pages': paginated_sets.pages,
+        'current_page': page
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 600, serialized_data)  # Cache for 10 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
+
+@kiosk_routes.route('/kiosk/sets/<string:set_code>/cards', methods=['GET'])
+def get_kiosk_set_cards(set_code):
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    name_filter = request.args.get('name', '')
+    rarity_filter = request.args.get('rarity', '')
+    sort_by = request.args.get('sortBy', 'name')
+    sort_order = request.args.get('sortOrder', 'asc')
+
+    cache_key = f"kiosk_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name_filter}:rarity:{rarity_filter}:sort_by:{sort_by}:sort_order:{sort_order}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
+
+    query = db.session.query(Card, Kiosk).\
+        join(Kiosk, Kiosk.card_id == Card.id).\
+        filter(Card.set_code == set_code).\
+        filter((Kiosk.quantity_regular > 0) | (Kiosk.quantity_foil > 0))
+
+    if name_filter:
+        query = query.filter(Card.name.ilike(f'%{name_filter}%'))
+    if rarity_filter:
+        query = query.filter(Card.rarity == rarity_filter)
+
+    if sort_order == 'desc':
+        query = query.order_by(getattr(Card, sort_by).desc())
+    else:
+        query = query.order_by(getattr(Card, sort_by))
+
+    paginated_cards = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    cards_data = []
+    for card, kiosk_item in paginated_cards.items:
+        card_dict = card.to_dict()
+        card_dict['quantity'] = kiosk_item.to_dict()
+        cards_data.append(card_dict)
+
+    set_name = Set.query.filter_by(code=set_code).first().name
+
+    result = {
+        'cards': cards_data,
+        'set_name': set_name,
+        'total': paginated_cards.total,
+        'pages': paginated_cards.pages,
+        'current_page': page
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
 
 @kiosk_routes.route('/kiosk/<string:card_id>', methods=['POST', 'PUT'])
 def update_kiosk(card_id):
@@ -784,23 +1004,47 @@ def update_kiosk(card_id):
 
     db.session.commit()
 
-    return jsonify(kiosk_item.to_dict()), 200
+    # Invalidate related caches
+    current_app.redis_client.delete("kiosk:*")
+    current_app.redis_client.delete("kiosk_sets:*")
+    current_app.redis_client.delete(f"kiosk_set_cards:{kiosk_item.card.set_code}:*")
+
+    return current_app.response_class(
+        response=orjson.dumps(kiosk_item.to_dict()),
+        status=200,
+        mimetype='application/json'
+    )
 
 @kiosk_routes.route('/kiosk/<string:card_id>', methods=['DELETE'])
 def remove_from_kiosk(card_id):
     kiosk_item = Kiosk.query.filter_by(card_id=card_id).first_or_404()
+    set_code = kiosk_item.card.set_code
     db.session.delete(kiosk_item)
     db.session.commit()
+
+    # Invalidate related caches
+    current_app.redis_client.delete("kiosk:*")
+    current_app.redis_client.delete("kiosk_sets:*")
+    current_app.redis_client.delete(f"kiosk_set_cards:{set_code}:*")
 
     return '', 204
 
 @kiosk_routes.route('/kiosk/stats', methods=['GET'])
 def get_kiosk_stats():
+    cache_key = "kiosk_stats"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
+
     try:
         total_cards = db.session.query(func.sum(Kiosk.quantity_regular + Kiosk.quantity_foil)).scalar() or 0
         unique_cards = Kiosk.query.count()
 
-        # Use a raw SQL query to calculate the total value
         total_value_query = text("""
             SELECT SUM(
                 (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * kiosk.quantity_regular) +
@@ -811,11 +1055,20 @@ def get_kiosk_stats():
         """)
         total_value = db.session.execute(total_value_query).scalar() or 0
 
-        return jsonify({
+        result = {
             'total_cards': int(total_cards),
             'unique_cards': unique_cards,
             'total_value': round(total_value, 2)
-        }), 200
+        }
+
+        serialized_data = orjson.dumps(result)
+        current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
+
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 == End of backend/routes/kiosk_routes.py ==
@@ -907,11 +1160,42 @@ def get_set_cards(set_code):
             'quantity_regular': card.collection.quantity_regular if card.collection else 0,
             'quantity_foil': card.collection.quantity_foil if card.collection else 0,
             'set_name': card.set.name if card.set else '',
-            # Add other fields as necessary
+            'set_code': card.set_code,
+            'collector_number': card.collector_number,
+            'mana_cost': card.mana_cost,
+            'cmc': card.cmc,
+            'type_line': card.type_line,
+            'oracle_text': card.oracle_text,
+            'colors': card.colors,
+            'color_identity': card.color_identity,
+            'keywords': card.keywords,
+            'legalities': card.legalities,
+            'reserved': card.reserved,
+            'foil': card.foil,
+            'nonfoil': card.nonfoil,
+            'full_art': card.full_art,
+            'textless': card.textless,
+            'promo': card.promo,
+            'reprint': card.reprint,
+            'variation': card.variation,
+            'artist': card.artist,
+            'frame': card.frame,
+            'border_color': card.border_color,
+            'released_at': card.released_at,
+            'prices': card.prices,
         }
-        # Optionally include image URIs or other related data
+        # Include image URIs
         if hasattr(card, 'image_uris') and card.image_uris:
             card_dict['image_uris'] = card.image_uris
+
+        # Include related URIs
+        if card.related_uris:
+            card_dict['related_uris'] = card.related_uris
+
+        # Include purchase URIs
+        if card.purchase_uris:
+            card_dict['purchase_uris'] = card.purchase_uris
+
         cards_data.append(card_dict)
 
     return jsonify({
@@ -926,6 +1210,7 @@ def get_set_cards(set_code):
 == Start of frontend/.eslintrc.js ==
 module.exports = {
   root: true,
+  parser: '@babel/eslint-parser',
   env: {
     node: true,
   },
@@ -934,7 +1219,9 @@ module.exports = {
     'eslint:recommended',
   ],
   parserOptions: {
-    parser: '@babel/eslint-parser',
+    requireConfigFile: false,
+    ecmaVersion: 2020,
+    sourceType: 'module',
   },
   rules: {
     'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
@@ -992,10 +1279,10 @@ export default defineConfig({
 <template>
   <div id="app">
     <nav>
-      <router-link to="/">Home</router-link> |
-      <router-link to="/collection">Collection</router-link> |
-      <router-link to="/kiosk">Kiosk</router-link> |
-      <router-link to="/sets">Sets</router-link> |
+      <router-link to="/">Home</router-link>
+      <router-link to="/collection">Collection</router-link>
+      <router-link to="/kiosk">Kiosk</router-link>
+      <router-link to="/sets">Sets</router-link>
       <router-link to="/import">Import</router-link>
     </nav>
     <router-view/>
@@ -1009,11 +1296,7 @@ export default {
 </script>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  text-align: center;
-  color: inherit; /* Inherit text color from body */
-}
+/* Styles are now handled in main.css */
 </style>
 == End of frontend/src/App.vue ==
 
@@ -1066,6 +1349,10 @@ body {
   box-sizing: border-box;
 }
 
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
 /* Link Styles */
 a {
   color: var(--link-color);
@@ -1079,12 +1366,14 @@ a:hover {
 /* Navigation Styles */
 nav {
   background-color: var(--secondary-color);
-  padding: 20px;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
 }
 
 nav a {
   color: var(--text-color);
-  margin: 0 10px;
   font-weight: bold;
 }
 
@@ -1096,7 +1385,7 @@ nav a.router-link-exact-active {
 button {
   background-color: var(--button-background);
   color: var(--text-color);
-  border: none;
+  border: 1px solid var(--border-color);
   padding: 0.5rem 1rem;
   cursor: pointer;
   border-radius: 4px;
@@ -1126,17 +1415,64 @@ input::placeholder {
 }
 
 /* Card Styles */
-.set-card, .card-item, .stat-card {
+.card {
   background-color: var(--secondary-color);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
   color: var(--text-color);
   transition: transform 0.3s ease;
+  height: auto; /* Let the card content determine the height */
+  display: flex;
+  flex-direction: column;
 }
 
-.set-card:hover, .card-item:hover, .stat-card:hover {
+.card:hover {
   transform: scale(1.02);
+}
+
+/* Grid Layout */
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-cols-auto {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* Flex Layout */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
 }
 
 /* Progress Bars */
@@ -1170,11 +1506,59 @@ input::placeholder {
   color: #ffffff;
 }
 
-/* Additional Global Styles */
+/* Containers */
 .container {
-  max-width: 1200px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0 15px;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 1rem; }
+.mt-4 { margin-top: 1.5rem; }
+
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+
+.ml-1 { margin-left: 0.25rem; }
+.ml-2 { margin-left: 0.5rem; }
+.ml-3 { margin-left: 1rem; }
+.ml-4 { margin-left: 1.5rem; }
+
+.mr-1 { margin-right: 0.25rem; }
+.mr-2 { margin-right: 0.5rem; }
+.mr-3 { margin-right: 1rem; }
+.mr-4 { margin-right: 1.5rem; }
+
+.p-1 { padding: 0.25rem; }
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 1rem; }
+.p-4 { padding: 1.5rem; }
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+/* Responsive image */
+.img-responsive {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 
 /* Ensure all images and icons are compatible with dark mode */
@@ -1182,38 +1566,69 @@ img {
   max-width: 100%;
   height: auto;
 }
+
+/* Quantity Control Styles */
+.quantity-control {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quantity-input {
+  width: 60px;
+  text-align: center;
+}
+
+/* Card Content Styles */
+.card-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-image-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-details {
+  margin-top: auto;
+}
 == End of frontend/src/assets/main.css ==
 
 == Start of frontend/src/components/SetListControls.vue ==
 <template>
-  <div class="controls">
+  <div class="controls grid grid-cols-1 md:grid-cols-3 gap-1 mb-2">
     <div class="filter-section">
       <input
         v-model="localFilters.name"
         @input="emitFilters"
         placeholder="Search by name"
-        class="input"
       />
-      <select v-model="localFilters.set_type" @change="emitFilters" class="select">
+      <select v-model="localFilters.set_type" @change="emitFilters">
         <option value="">All Types</option>
         <option v-for="type in setTypes" :key="type" :value="type">{{ capitalize(type) }}</option>
       </select>
     </div>
     <div class="sort-section">
       <label for="sortBy">Sort By:</label>
-      <select v-model="localSorting.sortBy" @change="emitSorting" id="sortBy" class="select">
+      <select v-model="localSorting.sortBy" @change="emitSorting" id="sortBy">
         <option value="released_at">Release Date</option>
         <option value="name">Name</option>
         <option value="collection_count">Collection Count</option>
       </select>
-      <select v-model="localSorting.sortOrder" @change="emitSorting" class="select">
+      <select v-model="localSorting.sortOrder" @change="emitSorting">
         <option value="asc">Ascending</option>
         <option value="desc">Descending</option>
       </select>
     </div>
     <div class="pagination-section">
       <label for="perPage">Per Page:</label>
-      <select v-model="localPerPage" @change="emitPerPage" id="perPage" class="select">
+      <select v-model="localPerPage" @change="emitPerPage" id="perPage">
         <option v-for="option in perPageOptions" :key="option" :value="option">{{ option }}</option>
       </select>
     </div>
@@ -1265,44 +1680,8 @@ export default {
 </script>
 
 <style scoped>
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.filter-section,
-.sort-section,
-.pagination-section {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.input {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--input-background);
-  color: var(--text-color);
-}
-
-.select {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--input-background);
-  color: var(--text-color);
-}
-
-button {
-  background-color: var(--primary-color);
-  color: var(--text-color);
-}
-
-button:hover {
-  background-color: var(--link-color);
+.controls label {
+  margin-right: 0.5rem;
 }
 </style>
 == End of frontend/src/components/SetListControls.vue ==
@@ -1313,6 +1692,7 @@ import Home from '../views/Home.vue'
 import Collection from '../views/Collection.vue'
 import CollectionSetCards from '../views/CollectionSetCards.vue'
 import Kiosk from '../views/Kiosk.vue'
+import KioskSetCards from '../views/KioskSetCards.vue'
 import Import from '../views/Import.vue'
 import Sets from '../views/Sets.vue'
 import SetDetails from '../views/SetDetails.vue'
@@ -1338,6 +1718,12 @@ const routes = [
     path: '/kiosk',
     name: 'Kiosk',
     component: Kiosk
+  },
+  {
+    path: '/kiosk/sets/:setCode',
+    name: 'KioskSetCards',
+    component: KioskSetCards,
+    props: true
   },
   {
     path: '/import',
@@ -1367,12 +1753,21 @@ export default router
 
 == Start of frontend/src/views/Collection.vue ==
 <template>
-  <div class="collection">
-    <h1>My Collection</h1>
-    <div v-if="stats" class="collection-stats">
-      <p>Total Cards: {{ stats.total_cards }}</p>
-      <p>Unique Cards: {{ stats.unique_cards }}</p>
-      <p>Total Value: ${{ stats.total_value.toFixed(2) }}</p>
+  <div class="container">
+    <h1 class="text-center mb-2">My Collection</h1>
+    <div v-if="stats" class="collection-stats card grid grid-cols-3 mb-2">
+      <div class="stat">
+        <h2>Total Cards</h2>
+        <p>{{ stats.total_cards }}</p>
+      </div>
+      <div class="stat">
+        <h2>Unique Cards</h2>
+        <p>{{ stats.unique_cards }}</p>
+      </div>
+      <div class="stat">
+        <h2>Total Value</h2>
+        <p>${{ stats.total_value.toFixed(2) }}</p>
+      </div>
     </div>
     <SetListControls
       :setTypes="setTypes"
@@ -1381,14 +1776,13 @@ export default router
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
     />
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else-if="sets && sets.length > 0" class="set-grid">
-      <div v-for="set in sets" :key="set.code" class="set-card">
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
+      <div v-for="set in sets" :key="set.code" class="card">
         <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
           <div class="set-icon">
             <img :src="set.icon_svg_uri" :alt="set.name" />
-            <div class="completion-circle" :style="{ '--percentage': set.collection_percentage + '%' }"></div>
           </div>
           <h3>{{ set.name }}</h3>
           <p>Code: {{ set.code }}</p>
@@ -1396,15 +1790,21 @@ export default router
           <p>Released: {{ formatDate(set.released_at) }}</p>
           <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
           <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
+          <div class="progress-container">
+            <div
+              class="progress-bar"
+              :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
+            ></div>
+          </div>
         </router-link>
       </div>
     </div>
-    <div v-else-if="!loading && sets.length === 0">
+    <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
       <p>No sets found in your collection.</p>
     </div>
-    <div class="pagination">
+    <div class="pagination text-center mt-2">
       <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
       <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
     </div>
   </div>
@@ -1457,11 +1857,9 @@ export default {
             per_page: perPage.value
           }
         })
-        console.log('Response data:', response.data) // Added console.log
         sets.value = response.data.sets
         totalPages.value = response.data.pages
         currentPage.value = response.data.current_page
-        console.log('Sets value:', sets.value) // Added console.log
       } catch (err) {
         console.error('Error fetching collection sets:', err)
         error.value = 'Failed to load collection sets'
@@ -1499,6 +1897,13 @@ export default {
       return new Date(dateString).toLocaleDateString()
     }
 
+    const getProgressColor = (percentage) => {
+      if (percentage < 25) return '#f44336'
+      if (percentage < 50) return '#ff9800'
+      if (percentage < 75) return '#ffc107'
+      return '#4caf50'
+    }
+
     onMounted(() => {
       fetchStats()
       fetchSets()
@@ -1519,44 +1924,21 @@ export default {
       updateSorting,
       updatePerPage,
       changePage,
-      formatDate
+      formatDate,
+      getProgressColor
     }
   }
 }
 </script>
 
 <style scoped>
-.collection {
-  padding: 1rem;
-}
-
-.collection-stats {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 1rem;
-  background-color: #f0f0f0;
-  padding: 1rem;
-  border-radius: 8px;
-}
-
-.set-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.set-card {
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 1rem;
+.collection-stats .stat {
   text-align: center;
-  background-color: #f9f9f9;
 }
 
 .set-icon {
-  position: relative;
-  width: 100px;
-  height: 100px;
+  width: 50px;
+  height: 50px;
   margin: 0 auto 1rem;
 }
 
@@ -1565,60 +1947,22 @@ export default {
   height: 100%;
   object-fit: contain;
 }
-
-.completion-circle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: conic-gradient(
-    #4CAF50 calc(var(--percentage) * 1%),
-    #e0e0e0 calc(var(--percentage) * 1%)
-  );
-  opacity: 0.7;
-}
-
-.loading, .error {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 1.2rem;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 2rem;
-}
-
-.pagination button {
-  margin: 0 0.5rem;
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.pagination button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
 </style>
 == End of frontend/src/views/Collection.vue ==
 
 == Start of frontend/src/views/CollectionSetCards.vue ==
 <template>
-  <div class="collection-set-cards">
-    <h1>{{ setName }}</h1>
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+  <div class="container">
+    <h1 class="text-center mb-2">{{ setName }}</h1>
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
     <div v-else>
-      <div class="filters">
-        <input v-model="nameFilter" @input="applyFilters" placeholder="Filter by name" />
+      <div class="filters grid grid-cols-1 md:grid-cols-2 gap-1 mb-2">
+        <input
+          v-model="nameFilter"
+          @input="applyFilters"
+          placeholder="Filter by name"
+        />
         <select v-model="rarityFilter" @change="applyFilters">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
@@ -1627,13 +1971,41 @@ export default {
           <option value="mythic">Mythic</option>
         </select>
       </div>
-      <div class="card-grid">
-        <div v-for="card in cards" :key="card.id" class="card">
-          <img :src="card.image_uris.small" :alt="card.name" />
-          <h3>{{ card.name }}</h3>
-          <p>Rarity: {{ card.rarity }}</p>
-          <p>Regular: {{ card.quantity_regular }}</p>
-          <p>Foil: {{ card.quantity_foil }}</p>
+      <div class="card-grid grid grid-cols-auto gap-1">
+        <div
+          v-for="card in sortedCards"
+          :key="card.id"
+          class="card"
+          :class="{ 'border-error': isMissing(card) }"
+        >
+          <img
+            v-if="getImageUrl(card)"
+            :src="getImageUrl(card)"
+            :alt="card.name"
+            class="img-responsive"
+            @error="handleImageError($event, card)"
+          />
+          <div v-else class="p-2 text-center bg-secondary">No image available</div>
+          <div class="card-info p-1">
+            <h3 class="mb-1">{{ card.name }}</h3>
+            <p class="mb-1">Collector Number: {{ card.collector_number }}</p>
+            <p class="mb-1">Rarity: {{ card.rarity }}</p>
+            <div class="card-quantities grid grid-cols-2 gap-1">
+              <QuantityControl
+                label="Regular"
+                :fieldId="'regular-' + card.id"
+                :value="card.quantity_regular"
+                @update="(val) => updateQuantity(card, 'regular', val)"
+              />
+              <QuantityControl
+                label="Foil"
+                :fieldId="'foil-' + card.id"
+                :value="card.quantity_foil"
+                @update="(val) => updateQuantity(card, 'foil', val)"
+              />
+            </div>
+          </div>
+          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-error text-white p-1 rounded text-sm font-bold">Missing</div>
         </div>
       </div>
     </div>
@@ -1641,12 +2013,16 @@ export default {
 </template>
 
 <script>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useRoute } from 'vue-router'
+import QuantityControl from './QuantityControl.vue' // Adjust the path as needed
 
 export default {
   name: 'CollectionSetCards',
+  components: {
+    QuantityControl
+  },
   setup() {
     const route = useRoute()
     const setCode = ref(route.params.setCode)
@@ -1656,17 +2032,15 @@ export default {
     const error = ref(null)
     const nameFilter = ref('')
     const rarityFilter = ref('')
-    const perPage = ref(1000) // Increased to 100 as requested
 
     const fetchCards = async () => {
       loading.value = true
       error.value = null
       try {
-        const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
+        const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
           params: {
             name: nameFilter.value,
-            rarity: rarityFilter.value,
-            per_page: perPage.value // Added per_page parameter
+            rarity: rarityFilter.value
           }
         })
         cards.value = response.data.cards
@@ -1692,6 +2066,82 @@ export default {
       fetchCards()
     })
 
+    const isMissing = (card) => {
+      return (card.quantity_regular + card.quantity_foil) === 0
+    }
+
+    const sortedCards = computed(() => {
+      return cards.value.slice().sort((a, b) => {
+        if (!a.collector_number && !b.collector_number) return 0;
+        if (!a.collector_number) return 1;
+        if (!b.collector_number) return -1;
+
+        const numA = parseInt(a.collector_number, 10);
+        const numB = parseInt(b.collector_number, 10);
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return a.collector_number.localeCompare(b.collector_number);
+      });
+    });
+
+    const getImageUrl = (card) => {
+      const imageSizes = ['normal', 'large', 'small', 'png', 'art_crop', 'border_crop'];
+
+      if (card.image_uris) {
+        for (const size of imageSizes) {
+          if (card.image_uris[size]) {
+            return card.image_uris[size];
+          }
+        }
+      }
+
+      if (card.card_faces && card.card_faces[0].image_uris) {
+        for (const size of imageSizes) {
+          if (card.card_faces[0].image_uris[size]) {
+            return card.card_faces[0].image_uris[size];
+          }
+        }
+      }
+
+      console.warn('No image URL found for card:', card.name);
+      return null;
+    }
+
+    const handleImageError = (event, card) => {
+      console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
+      event.target.style.display = 'none';
+      const noImageDiv = event.target.parentNode.querySelector('.bg-secondary');
+      if (noImageDiv) {
+        noImageDiv.style.display = 'block';
+      }
+    }
+
+    const updateQuantity = async (card, type, newValue) => {
+      const updatedCard = { ...card }
+      if (type === 'regular') {
+        updatedCard.quantity_regular = newValue
+      } else if (type === 'foil') {
+        updatedCard.quantity_foil = newValue
+      }
+
+      try {
+        const response = await axios.put(`/api/collection/${card.id}`, {
+          quantity_regular: updatedCard.quantity_regular,
+          quantity_foil: updatedCard.quantity_foil
+        })
+        // Update the local card data
+        const index = cards.value.findIndex(c => c.id === card.id)
+        if (index !== -1) {
+          cards.value[index] = response.data
+        }
+      } catch (err) {
+        console.error('Error updating quantity:', err)
+        alert('Failed to update quantity. Please try again.')
+      }
+    }
+
     return {
       setName,
       cards,
@@ -1699,77 +2149,44 @@ export default {
       error,
       nameFilter,
       rarityFilter,
-      applyFilters
+      applyFilters,
+      isMissing,
+      sortedCards,
+      getImageUrl,
+      handleImageError,
+      updateQuantity
     }
   }
 }
 </script>
 
 <style scoped>
-.collection-set-cards {
-  padding: 1rem;
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.card {
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 1rem;
-  text-align: center;
-}
-
-.card img {
-  max-width: 100%;
-  height: auto;
-}
-
-.filters {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.filters input,
-.filters select {
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.loading,
-.error {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 1.2rem;
-}
+/* Component-specific styles can be added here if needed */
 </style>
 
 == End of frontend/src/views/CollectionSetCards.vue ==
 
 == Start of frontend/src/views/Home.vue ==
 <template>
-  <div class="home">
-    <h1>MTG Collection Manager</h1>
-    <div class="dashboard">
-      <div class="stat-card">
-        <h2>Total Cards</h2>
-        <p>{{ stats.totalCards }}</p>
+  <div class="container">
+    <h1 class="text-center mb-4">MTG Collection Manager</h1>
+    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="card text-center">
+        <h2 class="mb-2">Total Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.totalCards }}</p>
       </div>
-      <div class="stat-card">
-        <h2>Unique Cards</h2>
-        <p>{{ stats.uniqueCards }}</p>
+      <div class="card text-center">
+        <h2 class="mb-2">Unique Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.uniqueCards }}</p>
       </div>
-      <div class="stat-card">
-        <h2>Sets Collected</h2>
-        <p>{{ stats.setsCollected }}</p>
+      <div class="card text-center">
+        <h2 class="mb-2">Sets Collected</h2>
+        <p class="text-2xl font-bold">{{ stats.setsCollected }}</p>
       </div>
     </div>
-    <button @click="refreshStats">Refresh Stats</button>
+    <div class="text-center">
+      <button @click="refreshStats" class="px-4 py-2">Refresh Stats</button>
+    </div>
   </div>
 </template>
 
@@ -1816,95 +2233,61 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.home {
-  padding: 1rem;
-}
-
-.dashboard {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 2rem;
-}
-
-.stat-card {
-  background-color: var(--secondary-color);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1rem;
-  color: var(--text-color);
-}
-
-button {
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  background-color: var(--primary-color);
-  color: var(--text-color);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: var(--link-color);
-}
-</style>
 == End of frontend/src/views/Home.vue ==
 
 == Start of frontend/src/views/Import.vue ==
 <template>
-  <div class="import">
-    <h1>Import Cards</h1>
+  <div class="container">
+    <h1 class="text-center mb-4">Import Cards</h1>
 
-    <div class="import-section">
-      <h2>Import Single Card</h2>
-      <form @submit.prevent="importSingleCard">
+    <div class="card mb-4">
+      <h2 class="mb-2">Import Single Card</h2>
+      <form @submit.prevent="importSingleCard" class="grid grid-cols-1 gap-2">
         <div>
-          <label for="scryfallId">Scryfall ID:</label>
-          <input v-model="singleCard.scryfallId" id="scryfallId" required>
+          <label for="scryfallId" class="block mb-1">Scryfall ID:</label>
+          <input v-model="singleCard.scryfallId" id="scryfallId" required class="w-full">
         </div>
         <div>
-          <label for="quantity">Quantity:</label>
-          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required>
+          <label for="quantity" class="block mb-1">Quantity:</label>
+          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required class="w-full">
+        </div>
+        <div class="flex items-center">
+          <input v-model="singleCard.foil" id="foil" type="checkbox" class="mr-2">
+          <label for="foil">Foil</label>
         </div>
         <div>
-          <label for="foil">Foil:</label>
-          <input v-model="singleCard.foil" id="foil" type="checkbox">
-        </div>
-        <div>
-          <label for="destination">Destination:</label>
-          <select v-model="singleCard.destination" id="destination" required>
+          <label for="destination" class="block mb-1">Destination:</label>
+          <select v-model="singleCard.destination" id="destination" required class="w-full">
             <option value="collection">Collection</option>
             <option value="kiosk">Kiosk</option>
           </select>
         </div>
-        <button type="submit">Import Card</button>
+        <button type="submit" class="mt-2">Import Card</button>
       </form>
     </div>
 
-    <div class="import-section">
-      <h2>CSV Import Guidelines</h2>
-      <p>Please ensure your CSV follows the format below:</p>
-      <pre>
+    <div class="card mb-4">
+      <h2 class="mb-2">CSV Import Guidelines</h2>
+      <p class="mb-2">Please ensure your CSV follows the format below:</p>
+      <pre class="bg-secondary p-2 mb-2 overflow-auto text-sm font-mono whitespace-pre-wrap break-words">
 Name,Edition,Edition code,Collector's number,Price,Foil,Currency,Scryfall ID,Quantity
 "Saw","Duskmourn: House of Horror","DSK","254","$0.21","Foil","USD","603c3ef4-4ef1-4db8-9ed2-e2b0926269d5","2"
       </pre>
-      <a href="/static/csv_template.csv" download="csv_template.csv">Download CSV Template</a>
+      <a href="/static/csv_template.csv" download="csv_template.csv" class="text-primary hover:underline">Download CSV Template</a>
     </div>
 
-    <div class="import-section">
-      <h2>Import from CSV</h2>
-      <form @submit.prevent="importFromCSV">
+    <div class="card mb-4">
+      <h2 class="mb-2">Import from CSV</h2>
+      <form @submit.prevent="importFromCSV" class="grid grid-cols-1 gap-2">
         <div>
-          <label for="csvFile">CSV File:</label>
-          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required>
+          <label for="csvFile" class="block mb-1">CSV File:</label>
+          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required class="w-full">
         </div>
-        <button type="submit">Import CSV</button>
+        <button type="submit" class="mt-2">Import CSV</button>
       </form>
     </div>
 
-    <div v-if="message" :class="['message', messageType]">
+    <div v-if="message" :class="['message', messageType, 'p-2 rounded']">
       {{ message }}
     </div>
   </div>
@@ -1990,228 +2373,193 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.import-section {
-  margin-bottom: 2rem;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-label {
-  font-weight: bold;
-}
-
-input[type="text"],
-input[type="number"],
-select {
-  width: 100%;
-  padding: 0.5rem;
-}
-
-button {
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #45a049;
-}
-
-.message {
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: 4px;
-}
-
-.success {
-  background-color: #dff0d8;
-  color: #3c763d;
-}
-
-.error {
-  background-color: #f2dede;
-  color: #a94442;
-}
-
-pre {
-  background-color: #f4f4f4;
-  border: 1px solid #ddd;
-  border-left: 3px solid #4CAF50;
-  color: #666;
-  page-break-inside: avoid;
-  font-family: monospace;
-  font-size: 15px;
-  line-height: 1.6;
-  margin-bottom: 1.6em;
-  max-width: 100%;
-  overflow: auto;
-  padding: 1em 1.5em;
-  display: block;
-  word-wrap: break-word;
-}
-</style>
 == End of frontend/src/views/Import.vue ==
 
 == Start of frontend/src/views/Kiosk.vue ==
+<!-- Kiosk.vue -->
 <template>
-  <div class="kiosk">
-    <h1>Kiosk Inventory</h1>
-    <div class="filters">
-      <input v-model="filters.name" placeholder="Search by name" @input="fetchCards">
-      <select v-model="filters.set" @change="fetchCards">
-        <option value="">All Sets</option>
-        <option v-for="set in sets" :key="set.code" :value="set.code">{{ set.name }}</option>
-      </select>
-      <select v-model="filters.rarity" @change="fetchCards">
-        <option value="">All Rarities</option>
-        <option value="common">Common</option>
-        <option value="uncommon">Uncommon</option>
-        <option value="rare">Rare</option>
-        <option value="mythic">Mythic</option>
-      </select>
-    </div>
-    <div class="card-list">
-      <div v-for="card in cards" :key="card.id" class="card-item">
-        <img :src="card.image_uris.small" :alt="card.name">
-        <div class="card-details">
-          <h3>{{ card.name }}</h3>
-          <p>Set: {{ card.set_name }}</p>
-          <p>Rarity: {{ card.rarity }}</p>
-          <p>Regular: {{ card.quantity.quantity_regular }}</p>
-          <p>Foil: {{ card.quantity.quantity_foil }}</p>
-          <button @click="openEditModal(card)">Edit</button>
-        </div>
+  <div class="container">
+    <h1 class="text-center mb-2">Kiosk Inventory</h1>
+    <SetListControls
+      :setTypes="setTypes"
+      :totalPages="totalPages"
+      @update-filters="updateFilters"
+      @update-sorting="updateSorting"
+      @update-per-page="updatePerPage"
+    />
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
+      <div v-for="set in sets" :key="set.code" class="card">
+        <router-link :to="{ name: 'KioskSetCards', params: { setCode: set.code } }">
+          <div class="set-icon">
+            <img :src="set.icon_svg_uri" :alt="set.name" />
+          </div>
+          <h3>{{ set.name }}</h3>
+          <p>Code: {{ set.code }}</p>
+          <p>Type: {{ set.set_type }}</p>
+          <p>Released: {{ formatDate(set.released_at) }}</p>
+          <p>Kiosk Cards: {{ set.kiosk_count }} / {{ set.card_count }}</p>
+          <p>Completion: {{ Math.round(set.kiosk_percentage) }}%</p>
+          <div class="progress-container">
+            <div
+              class="progress-bar"
+              :style="{ width: `${set.kiosk_percentage}%`, backgroundColor: getProgressColor(set.kiosk_percentage) }"
+            ></div>
+          </div>
+        </router-link>
       </div>
     </div>
-    <div class="pagination">
+    <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
+      <p>No sets found in your kiosk inventory.</p>
+    </div>
+    <div class="pagination text-center mt-2">
       <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
       <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
     </div>
-    <!-- Edit Modal (implement later) -->
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import SetListControls from '../components/SetListControls.vue'
 
 export default {
   name: 'Kiosk',
+  components: {
+    SetListControls
+  },
   setup() {
-    const cards = ref([])
     const sets = ref([])
-    const filters = ref({ name: '', set: '', rarity: '' })
+    const loading = ref(true)
+    const error = ref(null)
+    const filters = ref({})
+    const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
+    const perPage = ref(20)
+    const setTypes = ref([
+      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
+      'starter', 'box', 'promo', 'token', 'memorabilia'
+    ])
 
-    const fetchCards = async () => {
+    const fetchSets = async () => {
+      loading.value = true
+      error.value = null
       try {
-        const response = await axios.get('/api/kiosk', {
+        const response = await axios.get('/api/kiosk/sets', {
           params: {
             ...filters.value,
-            page: currentPage.value
+            ...sorting.value,
+            page: currentPage.value,
+            per_page: perPage.value
           }
         })
-        cards.value = response.data.kiosk
+        sets.value = response.data.sets
         totalPages.value = response.data.pages
-      } catch (error) {
-        console.error('Error fetching kiosk cards:', error)
+        currentPage.value = response.data.current_page
+      } catch (err) {
+        console.error('Error fetching kiosk sets:', err)
+        error.value = 'Failed to load kiosk sets'
+      } finally {
+        loading.value = false
       }
     }
 
-    const fetchSets = async () => {
-      try {
-        const response = await axios.get('/api/sets')
-        sets.value = response.data.sets
-      } catch (error) {
-        console.error('Error fetching sets:', error)
-      }
+    const updateFilters = (newFilters) => {
+      filters.value = { ...filters.value, ...newFilters }
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const updateSorting = (newSorting) => {
+      sorting.value = { ...newSorting }
+      fetchSets()
+    }
+
+    const updatePerPage = (newPerPage) => {
+      perPage.value = newPerPage
+      currentPage.value = 1
+      fetchSets()
     }
 
     const changePage = (delta) => {
-      currentPage.value += delta
-      fetchCards()
+      const newPage = currentPage.value + delta
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage
+        fetchSets()
+      }
     }
 
-    const openEditModal = (card) => {
-      // Implement edit modal logic
-      console.log('Edit kiosk card:', card)
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString()
+    }
+
+    const getProgressColor = (percentage) => {
+      if (percentage < 25) return '#f44336'
+      if (percentage < 50) return '#ff9800'
+      if (percentage < 75) return '#ffc107'
+      return '#4caf50'
     }
 
     onMounted(() => {
-      fetchCards()
       fetchSets()
     })
 
     return {
-      cards,
       sets,
+      loading,
+      error,
       filters,
+      sorting,
       currentPage,
       totalPages,
-      fetchCards,
+      perPage,
+      setTypes,
+      updateFilters,
+      updateSorting,
+      updatePerPage,
       changePage,
-      openEditModal
+      formatDate,
+      getProgressColor
     }
   }
 }
 </script>
 
 <style scoped>
-.filters {
-  margin-bottom: 1rem;
+.set-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 1rem;
 }
 
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.card-item {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 0.5rem;
-}
-
-.card-item img {
+.set-icon img {
   width: 100%;
-  height: auto;
-}
-
-.pagination {
-  margin-top: 1rem;
+  height: 100%;
+  object-fit: contain;
 }
 </style>
 == End of frontend/src/views/Kiosk.vue ==
 
 == Start of frontend/src/views/SetDetails.vue ==
 <template>
-  <div class="set-details">
-    <div v-if="set" class="set-info">
-      <img :src="set.icon_svg_uri" :alt="set.name" class="set-icon">
-      <h1>{{ set.name }}</h1>
-      <p>Code: {{ set.code }}</p>
-      <p>Released: {{ new Date(set.released_at).toLocaleDateString() }}</p>
-      <p>Card Count: {{ set.card_count }}</p>
+  <div class="container">
+    <div v-if="set" class="set-info text-center mb-6">
+      <img :src="set.icon_svg_uri" :alt="set.name" class="set-icon w-24 h-24 mx-auto mb-4">
+      <h1 class="text-2xl font-bold mb-2">{{ set.name }}</h1>
+      <p class="mb-1">Code: {{ set.code }}</p>
+      <p class="mb-1">Released: {{ new Date(set.released_at).toLocaleDateString() }}</p>
+      <p class="mb-1">Card Count: {{ set.card_count }}</p>
       <p>Set Type: {{ set.set_type }}</p>
     </div>
 
-    <h2>Cards in this Set</h2>
-    <div class="filters">
-      <input v-model="filters.name" placeholder="Search by card name" @input="fetchCards">
-      <select v-model="filters.rarity" @change="fetchCards">
+    <h2 class="text-xl font-bold text-center mb-4">Cards in this Set</h2>
+    <div class="filters grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+      <input v-model="filters.name" placeholder="Search by card name" @input="fetchCards" class="w-full p-2">
+      <select v-model="filters.rarity" @change="fetchCards" class="w-full p-2">
         <option value="">All Rarities</option>
         <option value="common">Common</option>
         <option value="uncommon">Uncommon</option>
@@ -2220,23 +2568,23 @@ export default {
       </select>
     </div>
 
-    <div class="card-list">
-      <div v-for="card in cards" :key="card.id" class="card-item">
-        <img :src="card.image_uris.small" :alt="card.name">
-        <div class="card-details">
-          <h3>{{ card.name }}</h3>
-          <p>Rarity: {{ card.rarity }}</p>
-          <p>Collector Number: {{ card.collector_number }}</p>
-          <p v-if="card.collection">In Collection: {{ card.collection.quantity_regular + card.collection.quantity_foil }}</p>
-          <p v-if="card.kiosk">In Kiosk: {{ card.kiosk.quantity_regular + card.kiosk.quantity_foil }}</p>
+    <div class="card-list grid grid-cols-auto gap-4">
+      <div v-for="card in cards" :key="card.id" class="card">
+        <img :src="card.image_uris.small" :alt="card.name" class="w-full mb-2">
+        <div class="card-details p-2">
+          <h3 class="text-lg font-semibold mb-2">{{ card.name }}</h3>
+          <p class="mb-1"><span class="font-medium">Rarity:</span> {{ card.rarity }}</p>
+          <p class="mb-1"><span class="font-medium">Collector Number:</span> {{ card.collector_number }}</p>
+          <p v-if="card.collection" class="mb-1"><span class="font-medium">In Collection:</span> {{ card.collection.quantity_regular + card.collection.quantity_foil }}</p>
+          <p v-if="card.kiosk"><span class="font-medium">In Kiosk:</span> {{ card.kiosk.quantity_regular + card.kiosk.quantity_foil }}</p>
         </div>
       </div>
     </div>
 
-    <div class="pagination">
-      <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
+    <div class="pagination text-center mt-6">
+      <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-4 py-2 mr-2">Previous</button>
+      <span class="px-4 py-2 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button @click="changePage(1)" :disabled="currentPage === totalPages" class="px-4 py-2 ml-2">Next</button>
     </div>
   </div>
 </template>
@@ -2306,70 +2654,37 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.set-info {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.set-icon {
-  width: 100px;
-  height: 100px;
-}
-
-.filters {
-  margin-bottom: 1rem;
-}
-
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.card-item {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 0.5rem;
-}
-
-.card-item img {
-  width: 100%;
-  height: auto;
-}
-
-.pagination {
-  margin-top: 1rem;
-}
-</style>
 == End of frontend/src/views/SetDetails.vue ==
 
 == Start of frontend/src/views/Sets.vue ==
 <template>
-  <div class="sets">
-    <h1>Magic: The Gathering Sets</h1>
-    <div v-if="loading">Loading sets...</div>
-    <div v-else-if="error">Error: {{ error }}</div>
-    <div v-else-if="sets.length === 0">No sets found.</div>
+  <div class="container">
+    <h1 class="text-center text-2xl font-bold mb-4">Magic: The Gathering Sets</h1>
+    <div v-if="loading" class="text-center text-lg">Loading sets...</div>
+    <div v-else-if="error" class="error text-center text-lg text-error">Error: {{ error }}</div>
+    <div v-else-if="sets.length === 0" class="text-center text-lg">No sets found.</div>
     <div v-else>
-      <p>Total sets: {{ sets.length }}</p>
-      <div class="set-grid">
-        <div v-for="set in sets" :key="set.code" class="set-card">
-          <router-link :to="{ name: 'SetDetails', params: { setCode: set.code } }">
-            <img :src="set.icon_svg_uri" :alt="set.name" class="set-icon" />
-            <h2>{{ set.name }}</h2>
-            <p>Released: {{ formatDate(set.released_at) }}</p>
-            <div class="progress-container">
+      <p class="text-center mb-4">Total sets: {{ sets.length }}</p>
+      <div class="set-grid grid grid-cols-auto gap-4">
+        <div v-for="set in sets" :key="set.code" class="card p-4">
+          <router-link :to="{ name: 'SetDetails', params: { setCode: set.code } }" class="block">
+            <img :src="set.icon_svg_uri" :alt="set.name" class="w-12 h-12 mx-auto mb-2" />
+            <h2 class="text-lg font-semibold mb-2">{{ set.name }}</h2>
+            <p class="mb-2">Released: {{ formatDate(set.released_at) }}</p>
+            <div class="progress-container mb-2">
               <div
                 class="progress-bar"
-                :style="{ width: `${set.collection_percentage}%` }"
-                :class="getProgressBarClass(set.collection_percentage)"
+                :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
               ></div>
             </div>
-            <p class="collection-status">{{ formatCollectionProgress(set) }}</p>
+            <p class="collection-status font-bold">{{ formatCollectionProgress(set) }}</p>
           </router-link>
         </div>
+      </div>
+      <div class="pagination text-center mt-6">
+        <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-4 py-2 mr-2">Previous</button>
+        <span class="px-4 py-2 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button @click="changePage(1)" :disabled="currentPage === totalPages" class="px-4 py-2 ml-2">Next</button>
       </div>
     </div>
   </div>
@@ -2428,13 +2743,13 @@ export default {
       }
     }
 
-    const getProgressBarClass = (percentage) => {
-      if (percentage === 0) return 'not-started'
-      if (percentage < 25) return 'just-started'
-      if (percentage < 50) return 'in-progress'
-      if (percentage < 75) return 'well-progressed'
-      if (percentage < 100) return 'almost-complete'
-      return 'complete'
+    const getProgressColor = (percentage) => {
+      if (percentage === 0) return '#95a5a6'
+      if (percentage < 25) return '#e74c3c'
+      if (percentage < 50) return '#e67e22'
+      if (percentage < 75) return '#f1c40f'
+      if (percentage < 100) return '#2ecc71'
+      return '#3498db'
     }
 
     onMounted(fetchSets)
@@ -2450,97 +2765,10 @@ export default {
       changePage,
       formatDate,
       formatCollectionProgress,
-      getProgressBarClass
+      getProgressColor
     }
   }
 }
 </script>
-
-<style scoped>
-.sets {
-  padding: 20px;
-}
-
-.sets h1 {
-  font-size: 2em;
-  color: #ffffff;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.set-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.set-card {
-  background-color: #2c3e50;
-  border-radius: 8px;
-  padding: 15px;
-  text-align: center;
-  transition: transform 0.3s ease;
-}
-
-.set-card:hover {
-  transform: scale(1.05);
-}
-
-.set-icon {
-  width: 50px;
-  height: 50px;
-  margin-bottom: 10px;
-}
-
-.set-card h2 {
-  font-size: 1.2em;
-  color: #ffffff;
-  margin-bottom: 5px;
-}
-
-.set-card p {
-  font-size: 0.9em;
-  color: #cccccc;
-  margin: 5px 0;
-}
-
-.progress-container {
-  width: 100%;
-  background-color: #34495e;
-  border-radius: 10px;
-  margin: 10px 0;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 10px;
-  transition: width 0.5s ease-in-out;
-}
-
-.progress-bar.not-started {
-  background-color: #95a5a6;
-}
-.progress-bar.just-started {
-  background-color: #e74c3c;
-}
-.progress-bar.in-progress {
-  background-color: #e67e22;
-}
-.progress-bar.well-progressed {
-  background-color: #f1c40f;
-}
-.progress-bar.almost-complete {
-  background-color: #2ecc71;
-}
-.progress-bar.complete {
-  background-color: #3498db;
-}
-
-.collection-status {
-  font-weight: bold;
-  color: #ffffff;
-}
-</style>
 == End of frontend/src/views/Sets.vue ==
 

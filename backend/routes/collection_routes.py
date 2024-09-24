@@ -1,5 +1,5 @@
 import pandas as pd
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import func, asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -10,6 +10,7 @@ from models.set import Set
 from database import db
 import time
 import logging
+import orjson
 
 collection_routes = Blueprint('collection_routes', __name__)
 
@@ -17,11 +18,28 @@ collection_routes = Blueprint('collection_routes', __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def serialize_collection(collection_items):
+    return [{
+        **item.card.to_dict(),
+        'quantity_regular': item.quantity_regular,
+        'quantity_foil': item.quantity_foil
+    } for item in collection_items]
+
 @collection_routes.route('/collection', methods=['GET'])
 def get_collection():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     set_code = request.args.get('set_code', '', type=str)
+
+    cache_key = f"collection:page:{page}:per_page:{per_page}:set_code:{set_code}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
 
     query = Collection.query.join(Card).join(Set)
 
@@ -30,35 +48,25 @@ def get_collection():
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return jsonify({
-        'collection': [
-            {
-                **item.card.to_dict(),
-                'quantity_regular': item.quantity_regular,
-                'quantity_foil': item.quantity_foil
-            }
-            for item in collection.items
-        ],
+    result = {
+        'collection': serialize_collection(collection.items),
         'total': collection.total,
         'pages': collection.pages,
         'current_page': page
-    }), 200
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
 
 @collection_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
-        # Diagnostic info to track query stages
-        diagnostic_info = {
-            "set_count": Set.query.count(),
-            "collection_count": Collection.query.count(),
-            "card_count": Card.query.count(),
-            "step1_count": 0,
-            "step2_count": 0,
-            "step3_count": 0,
-            "total_count_before_pagination": 0
-        }
-
-        # Extract query parameters
         name = request.args.get('name', type=str)
         set_type = request.args.get('set_type', type=str)
         page = request.args.get('page', 1, type=int)
@@ -66,10 +74,18 @@ def get_collection_sets():
         sort_by = request.args.get('sort_by', 'released_at', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
-        # Log received parameters
+        cache_key = f"collection_sets:name:{name}:set_type:{set_type}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
+        cached_data = current_app.redis_client.get(cache_key)
+
+        if cached_data:
+            return current_app.response_class(
+                response=cached_data,
+                status=200,
+                mimetype='application/json'
+            )
+
         logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
-        # Initialize base query with joins and outer joins for collection count
         query = db.session.query(
             Set.id,
             Set.code,
@@ -95,16 +111,6 @@ def get_collection_sets():
             Set.icon_svg_uri
         )
 
-        # Step 1: After joining Set and Card
-        diagnostic_info["step1_count"] = query.count()
-
-        # Step 2: After joining with Collection
-        diagnostic_info["step2_count"] = query.count()
-
-        # Step 3: After grouping
-        diagnostic_info["step3_count"] = query.count()
-
-        # Apply filters
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
             logger.info(f"Applied filter: Set.name ilike '%{name}%'")
@@ -112,12 +118,11 @@ def get_collection_sets():
             query = query.filter(Set.set_type == set_type)
             logger.info(f"Applied filter: Set.set_type == '{set_type}'")
 
-        # Validate and apply sorting
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
         if sort_by not in valid_sort_fields:
             error_message = f"Invalid sort_by field: {sort_by}"
             logger.error(error_message)
-            return jsonify({"error": error_message, "diagnostic_info": diagnostic_info}), 400
+            return jsonify({"error": error_message}), 400
 
         if sort_by == 'collection_count':
             sort_column = func.count(Collection.card_id)
@@ -131,16 +136,9 @@ def get_collection_sets():
             query = query.order_by(desc(sort_column))
             logger.info(f"Sorting by {sort_by} in descending order")
 
-        # Get total count before pagination
-        total_count = query.count()
-        diagnostic_info["total_count_before_pagination"] = total_count
-        logger.info(f"Total count before pagination: {total_count}")
-
-        # Apply pagination
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
-        # Build response
         sets_list = []
         for row in paginated_sets.items:
             set_data = {
@@ -166,16 +164,22 @@ def get_collection_sets():
             'sets': sets_list,
             'total': paginated_sets.total,
             'pages': paginated_sets.pages,
-            'current_page': paginated_sets.page,
-            'diagnostic_info': diagnostic_info
+            'current_page': paginated_sets.page
         }
 
+        serialized_data = orjson.dumps(response)
+        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
         logger.info(f"Returning response with {len(sets_list)} sets")
-        return jsonify(response), 200
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
-        return jsonify({"error": error_message, "diagnostic_info": diagnostic_info}), 500
+        return jsonify({"error": error_message}), 500
 
 @collection_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
@@ -194,19 +198,26 @@ def update_collection(card_id):
 
     db.session.commit()
 
-    # Fetch the associated card
+    # Invalidate related caches
+    current_app.redis_client.delete("collection:*")
+    current_app.redis_client.delete("collection_sets:*")
+    current_app.redis_client.delete("collection_stats")
+
     card = Card.query.filter_by(id=card_id).first()
     if not card:
         return jsonify({"error": "Card not found."}), 404
 
-    # Combine card data with updated quantities
     card_data = card.to_dict()
     card_data.update({
         'quantity_regular': collection_item.quantity_regular,
         'quantity_foil': collection_item.quantity_foil
     })
 
-    return jsonify(card_data), 200
+    return current_app.response_class(
+        response=orjson.dumps(card_data),
+        status=200,
+        mimetype='application/json'
+    )
 
 @collection_routes.route('/collection/<string:card_id>', methods=['DELETE'])
 def remove_from_collection(card_id):
@@ -214,11 +225,26 @@ def remove_from_collection(card_id):
     db.session.delete(collection_item)
     db.session.commit()
 
+    # Invalidate related caches
+    current_app.redis_client.delete("collection:*")
+    current_app.redis_client.delete("collection_sets:*")
+    current_app.redis_client.delete("collection_stats")
+
     return '', 204
 
 @collection_routes.route('/collection/stats', methods=['GET'])
 def get_collection_stats():
     try:
+        cache_key = "collection_stats"
+        cached_data = current_app.redis_client.get(cache_key)
+
+        if cached_data:
+            return current_app.response_class(
+                response=cached_data,
+                status=200,
+                mimetype='application/json'
+            )
+
         total_cards = db.session.query(func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
         unique_cards = Collection.query.count()
 
@@ -232,20 +258,39 @@ def get_collection_stats():
         """)
         total_value = db.session.execute(total_value_query).scalar() or 0
 
-        return jsonify({
+        result = {
             'total_cards': int(total_cards),
             'unique_cards': unique_cards,
             'total_value': round(total_value, 2)
-        }), 200
+        }
+
+        serialized_data = orjson.dumps(result)
+        current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
+
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @collection_routes.route('/collection/sets/<string:set_code>/cards', methods=['GET'])
 def get_collection_set_cards(set_code):
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 300, type=int)
     name = request.args.get('name', '', type=str)
     rarity = request.args.get('rarity', '', type=str)
+
+    cache_key = f"collection_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name}:rarity:{rarity}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data,
+            status=200,
+            mimetype='application/json'
+        )
 
     query = Collection.query.join(Card).join(Set).filter(Set.code == set_code)
 
@@ -256,19 +301,21 @@ def get_collection_set_cards(set_code):
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return jsonify({
-        'cards': [
-            {
-                **item.card.to_dict(),
-                'quantity_regular': item.quantity_regular,
-                'quantity_foil': item.quantity_foil
-            }
-            for item in collection.items
-        ],
+    result = {
+        'cards': serialize_collection(collection.items),
         'total': collection.total,
         'pages': collection.pages,
         'current_page': page
-    }), 200
+    }
+
+    serialized_data = orjson.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
 
 @collection_routes.route('/collection/import_csv', methods=['POST'])
 def import_csv():
@@ -296,7 +343,6 @@ def import_csv():
         missing = required_columns - set(df.columns)
         return jsonify({"error": f"CSV is missing columns: {', '.join(missing)}"}), 400
 
-    # Replace blank 'Foil' values with False
     df['Foil'] = df['Foil'].fillna(False).replace('', False)
 
     try:
@@ -306,18 +352,23 @@ def import_csv():
                     process_csv_row(row, index)
                 except ValueError as e:
                     logger.error(f"Error processing row {index + 2}: {str(e)}")
-                    continue  # Skip to the next row
+                    continue
                 except IntegrityError as e:
                     logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
                     db.session.rollback()
                     return jsonify({"error": f"Database integrity error at row {index + 2}: {str(e)}"}), 500
 
-                # Flush every 100 rows to catch potential errors earlier
                 if index % 100 == 0:
                     db.session.flush()
 
         db.session.commit()
         logger.info("CSV imported successfully")
+
+        # Invalidate related caches
+        current_app.redis_client.delete("collection:*")
+        current_app.redis_client.delete("collection_sets:*")
+        current_app.redis_client.delete("collection_stats")
+
         return jsonify({"message": "CSV imported successfully"}), 200
 
     except SQLAlchemyError as e:
