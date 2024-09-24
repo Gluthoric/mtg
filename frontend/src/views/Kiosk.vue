@@ -1,104 +1,166 @@
+<!-- Kiosk.vue -->
 <template>
   <div class="container">
-    <h1 class="text-center mb-4">Kiosk Inventory</h1>
-    <div class="filters grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
-      <input v-model="filters.name" placeholder="Search by name" @input="fetchCards" class="w-full">
-      <select v-model="filters.set" @change="fetchCards" class="w-full">
-        <option value="">All Sets</option>
-        <option v-for="set in sets" :key="set.code" :value="set.code">{{ set.name }}</option>
-      </select>
-      <select v-model="filters.rarity" @change="fetchCards" class="w-full">
-        <option value="">All Rarities</option>
-        <option value="common">Common</option>
-        <option value="uncommon">Uncommon</option>
-        <option value="rare">Rare</option>
-        <option value="mythic">Mythic</option>
-      </select>
-    </div>
-    <div class="card-list grid grid-cols-auto gap-4">
-      <div v-for="card in cards" :key="card.id" class="card">
-        <img :src="card.image_uris.small" :alt="card.name" class="w-full mb-2">
-        <div class="card-details p-2">
-          <h3 class="mb-2 text-lg font-bold">{{ card.name }}</h3>
-          <p class="mb-1"><span class="font-semibold">Set:</span> {{ card.set_name }}</p>
-          <p class="mb-1"><span class="font-semibold">Rarity:</span> {{ card.rarity }}</p>
-          <p class="mb-1"><span class="font-semibold">Regular:</span> {{ card.quantity.quantity_regular }}</p>
-          <p class="mb-2"><span class="font-semibold">Foil:</span> {{ card.quantity.quantity_foil }}</p>
-          <button @click="openEditModal(card)" class="w-full">Edit</button>
-        </div>
+    <h1 class="text-center mb-2">Kiosk Inventory</h1>
+    <SetListControls
+      :setTypes="setTypes"
+      :totalPages="totalPages"
+      @update-filters="updateFilters"
+      @update-sorting="updateSorting"
+      @update-per-page="updatePerPage"
+    />
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
+      <div v-for="set in sets" :key="set.code" class="card">
+        <router-link :to="{ name: 'KioskSetCards', params: { setCode: set.code } }">
+          <div class="set-icon">
+            <img :src="set.icon_svg_uri" :alt="set.name" />
+          </div>
+          <h3>{{ set.name }}</h3>
+          <p>Code: {{ set.code }}</p>
+          <p>Type: {{ set.set_type }}</p>
+          <p>Released: {{ formatDate(set.released_at) }}</p>
+          <p>Kiosk Cards: {{ set.kiosk_count }} / {{ set.card_count }}</p>
+          <p>Completion: {{ Math.round(set.kiosk_percentage) }}%</p>
+          <div class="progress-container">
+            <div
+              class="progress-bar"
+              :style="{ width: `${set.kiosk_percentage}%`, backgroundColor: getProgressColor(set.kiosk_percentage) }"
+            ></div>
+          </div>
+        </router-link>
       </div>
     </div>
-    <div class="pagination text-center mt-4">
-      <button @click="changePage(-1)" :disabled="currentPage === 1" class="mr-2">Previous</button>
-      <span class="px-2 py-1 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button @click="changePage(1)" :disabled="currentPage === totalPages" class="ml-2">Next</button>
+    <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
+      <p>No sets found in your kiosk inventory.</p>
     </div>
-    <!-- Edit Modal (implement later) -->
+    <div class="pagination text-center mt-2">
+      <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
+      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
+    </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import SetListControls from '../components/SetListControls.vue'
 
 export default {
   name: 'Kiosk',
+  components: {
+    SetListControls
+  },
   setup() {
-    const cards = ref([])
     const sets = ref([])
-    const filters = ref({ name: '', set: '', rarity: '' })
+    const loading = ref(true)
+    const error = ref(null)
+    const filters = ref({})
+    const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
+    const perPage = ref(20)
+    const setTypes = ref([
+      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
+      'starter', 'box', 'promo', 'token', 'memorabilia'
+    ])
 
-    const fetchCards = async () => {
+    const fetchSets = async () => {
+      loading.value = true
+      error.value = null
       try {
-        const response = await axios.get('/api/kiosk', {
+        const response = await axios.get('/api/kiosk/sets', {
           params: {
             ...filters.value,
-            page: currentPage.value
+            ...sorting.value,
+            page: currentPage.value,
+            per_page: perPage.value
           }
         })
-        cards.value = response.data.kiosk
+        sets.value = response.data.sets
         totalPages.value = response.data.pages
-      } catch (error) {
-        console.error('Error fetching kiosk cards:', error)
+        currentPage.value = response.data.current_page
+      } catch (err) {
+        console.error('Error fetching kiosk sets:', err)
+        error.value = 'Failed to load kiosk sets'
+      } finally {
+        loading.value = false
       }
     }
 
-    const fetchSets = async () => {
-      try {
-        const response = await axios.get('/api/sets')
-        sets.value = response.data.sets
-      } catch (error) {
-        console.error('Error fetching sets:', error)
-      }
+    const updateFilters = (newFilters) => {
+      filters.value = { ...filters.value, ...newFilters }
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const updateSorting = (newSorting) => {
+      sorting.value = { ...newSorting }
+      fetchSets()
+    }
+
+    const updatePerPage = (newPerPage) => {
+      perPage.value = newPerPage
+      currentPage.value = 1
+      fetchSets()
     }
 
     const changePage = (delta) => {
-      currentPage.value += delta
-      fetchCards()
+      const newPage = currentPage.value + delta
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage
+        fetchSets()
+      }
     }
 
-    const openEditModal = (card) => {
-      // Implement edit modal logic
-      console.log('Edit kiosk card:', card)
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString()
+    }
+
+    const getProgressColor = (percentage) => {
+      if (percentage < 25) return '#f44336'
+      if (percentage < 50) return '#ff9800'
+      if (percentage < 75) return '#ffc107'
+      return '#4caf50'
     }
 
     onMounted(() => {
-      fetchCards()
       fetchSets()
     })
 
     return {
-      cards,
       sets,
+      loading,
+      error,
       filters,
+      sorting,
       currentPage,
       totalPages,
-      fetchCards,
+      perPage,
+      setTypes,
+      updateFilters,
+      updateSorting,
+      updatePerPage,
       changePage,
-      openEditModal
+      formatDate,
+      getProgressColor
     }
   }
 }
 </script>
+
+<style scoped>
+.set-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 1rem;
+}
+
+.set-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+</style>

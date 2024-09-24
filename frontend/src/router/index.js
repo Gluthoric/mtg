@@ -3,6 +3,7 @@ import Home from '../views/Home.vue'
 import Collection from '../views/Collection.vue'
 import CollectionSetCards from '../views/CollectionSetCards.vue'
 import Kiosk from '../views/Kiosk.vue'
+import KioskSetCards from '../views/KioskSetCards.vue'
 import Import from '../views/Import.vue'
 import Sets from '../views/Sets.vue'
 import SetDetails from '../views/SetDetails.vue'
@@ -28,6 +29,12 @@ const routes = [
     path: '/kiosk',
     name: 'Kiosk',
     component: Kiosk
+  },
+  {
+    path: '/kiosk/sets/:setCode',
+    name: 'KioskSetCards',
+    component: KioskSetCards,
+    props: true
   },
   {
     path: '/import',
