@@ -102,7 +102,7 @@
                 <div class="input-wrapper flex items-center justify-center border rounded-md overflow-hidden">
                   <button
                     @click="decrement(card, 'regular')"
-                    class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Regular Quantity"
                     :disabled="card.quantity_regular === 0"
                   >
@@ -113,12 +113,12 @@
                     v-model.number="card.quantity_regular"
                     type="number"
                     min="0"
-                    class="quantity-input w-12 h-8 text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
                     @input="onInput(card, 'regular')"
                   />
                   <button
                     @click="increment(card, 'regular')"
-                    class="btn increment-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    class="btn increment-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Increment Regular Quantity"
                   >
                     +
@@ -536,6 +536,19 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
   max-width: 120px;
   margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+}
+
+.quantity-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn {
+  flex-shrink: 0;
+  width: 24px;
+  min-width: 24px;
 }
 
 @media (max-width: 640px) {
