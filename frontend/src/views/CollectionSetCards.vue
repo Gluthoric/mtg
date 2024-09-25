@@ -59,16 +59,16 @@
               No image available
             </div>
           </div>
-          <div class="card-info p-2">
+          <div class="card-info p-2 flex flex-col h-full">
             <h3 class="text-base font-semibold mb-1 truncate text-primary">{{ card.name }}</h3>
             <p class="text-xs mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
             <p class="text-xs mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
-            <div class="card-quantities flex justify-between gap-1">
-              <div class="quantity-control flex flex-col flex-1">
-                <label :for="'regular-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
+            <div class="card-quantities mt-auto">
+              <div class="quantity-control mb-2">
+                <label :for="'regular-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light block">
                   Regular
                 </label>
-                <div class="input-wrapper flex items-center border rounded-md overflow-hidden">
+                <div class="input-wrapper flex items-center justify-center border rounded-md overflow-hidden">
                   <button
                     @click="decrement(card, 'regular')"
                     class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
@@ -94,11 +94,11 @@
                   </button>
                 </div>
               </div>
-              <div class="quantity-control flex flex-col flex-1">
-                <label :for="'foil-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
+              <div class="quantity-control">
+                <label :for="'foil-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light block">
                   Foil
                 </label>
-                <div class="input-wrapper flex items-center border rounded-md overflow-hidden">
+                <div class="input-wrapper flex items-center justify-center border rounded-md overflow-hidden">
                   <button
                     @click="decrement(card, 'foil')"
                     class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
@@ -419,5 +419,25 @@ input[type="range"]::-moz-range-thumb {
   background: #4299e1;
   cursor: pointer;
   border-radius: 50%;
+}
+
+.quantity-control {
+  width: 100%;
+}
+
+.input-wrapper {
+  width: 100%;
+  max-width: 120px;
+  margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .card-quantities {
+    flex-direction: column;
+  }
+
+  .quantity-control {
+    margin-bottom: 0.5rem;
+  }
 }
 </style>
