@@ -1,0 +1,1952 @@
+File: /home/gluth/mtg/frontend/src/assets/main.css
+================================================================================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Define CSS Variables for Dark Mode */
+:root {
+  --background-color: #121212;
+  --text-color: #e0e0e0;
+  --primary-color: #4299e1;
+  --secondary-color: #1f1f1f;
+  --border-color: #333333;
+  --input-background: #2d2d2d;
+  --button-background: #333333;
+  --button-hover-background: #444444;
+  --link-color: #4299e1;
+  --error-color: #f44336;
+  --success-color: #4caf50;
+}
+
+/* Apply Global Styles */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+/* Link Styles */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Navigation Styles */
+nav {
+  background-color: var(--secondary-color);
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+}
+
+nav a {
+  color: var(--text-color);
+  font-weight: bold;
+}
+
+nav a.router-link-exact-active {
+  color: var(--primary-color);
+}
+
+/* Button Styles */
+button {
+  background-color: var(--button-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: var(--button-hover-background);
+}
+
+button:disabled {
+  background-color: #555555;
+  cursor: not-allowed;
+}
+
+/* Form Elements */
+input, select, textarea {
+  background-color: var(--input-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.5);
+}
+
+input::placeholder, textarea::placeholder {
+  color: #a0aec0;
+}
+
+/* Card Styles */
+.card {
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--text-color);
+  transition: transform 0.3s ease;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+/* Grid Layout */
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-cols-auto {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* Flex Layout */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+/* Progress Bars */
+.progress-container {
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 10px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 10px;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Message Styles */
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.message.success {
+  background-color: var(--success-color);
+  color: #ffffff;
+}
+
+.message.error {
+  background-color: var(--error-color);
+  color: #ffffff;
+}
+
+/* Containers */
+.container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 1rem; }
+.mt-4 { margin-top: 1.5rem; }
+
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+
+.ml-1 { margin-left: 0.25rem; }
+.ml-2 { margin-left: 0.5rem; }
+.ml-3 { margin-left: 1rem; }
+.ml-4 { margin-left: 1.5rem; }
+
+.mr-1 { margin-right: 0.25rem; }
+.mr-2 { margin-right: 0.5rem; }
+.mr-3 { margin-right: 1rem; }
+.mr-4 { margin-right: 1.5rem; }
+
+.p-1 { padding: 0.25rem; }
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 1rem; }
+.p-4 { padding: 1.5rem; }
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+/* Responsive image */
+.img-responsive {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* Ensure all images and icons are compatible with dark mode */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Quantity Control Styles */
+.quantity-control {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quantity-input {
+  width: 60px;
+  text-align: center;
+}
+
+/* Card Content Styles */
+.card-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-image-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-details {
+  margin-top: auto;
+}
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/components/SetListControls.vue
+================================================================================
+<template>
+  <div class="controls grid grid-cols-1 md:grid-cols-3 gap-1 mb-2">
+    <div class="filter-section">
+      <input
+        v-model="localFilters.name"
+        @input="emitFilters"
+        placeholder="Search by name"
+      />
+      <select v-model="localFilters.set_type" @change="emitFilters">
+        <option value="">All Types</option>
+        <option v-for="type in setTypes" :key="type" :value="type">{{ capitalize(type) }}</option>
+      </select>
+    </div>
+    <div class="sort-section">
+      <label for="sortBy">Sort By:</label>
+      <select v-model="localSorting.sortBy" @change="emitSorting" id="sortBy">
+        <option value="released_at">Release Date</option>
+        <option value="name">Name</option>
+        <option value="collection_count">Collection Count</option>
+      </select>
+      <select v-model="localSorting.sortOrder" @change="emitSorting">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+    </div>
+    <div class="pagination-section">
+      <label for="perPage">Per Page:</label>
+      <select v-model="localPerPage" @change="emitPerPage" id="perPage">
+        <option v-for="option in perPageOptions" :key="option" :value="option">{{ option }}</option>
+      </select>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'SetListControls',
+  props: {
+    setTypes: {
+      type: Array,
+      required: true
+    },
+    totalPages: {
+      type: Number,
+      required: true
+    }
+  },
+  data() {
+    return {
+      localFilters: {
+        name: '',
+        set_type: ''
+      },
+      localSorting: {
+        sortBy: 'released_at',
+        sortOrder: 'desc'
+      },
+      localPerPage: 20,
+      perPageOptions: [10, 20, 50, 100]
+    }
+  },
+  methods: {
+    emitFilters() {
+      this.$emit('update-filters', { ...this.localFilters })
+    },
+    emitSorting() {
+      this.$emit('update-sorting', { ...this.localSorting })
+    },
+    emitPerPage() {
+      this.$emit('update-per-page', this.localPerPage)
+    },
+    capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1)
+    }
+  }
+}
+</script>
+
+<style scoped>
+.controls label {
+  margin-right: 0.5rem;
+}
+</style>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/router/index.js
+================================================================================
+import { createRouter, createWebHistory } from 'vue-router'
+import Home from '../views/Home.vue'
+import Collection from '../views/Collection.vue'
+import CollectionSetCards from '../views/CollectionSetCards.vue'
+import Kiosk from '../views/Kiosk.vue'
+import KioskSetCards from '../views/KioskSetCards.vue'
+import Import from '../views/Import.vue'
+import Sets from '../views/Sets.vue'
+import SetDetails from '../views/SetDetails.vue'
+
+const routes = [
+  {
+    path: '/',
+    name: 'Home',
+    component: Home
+  },
+  {
+    path: '/collection',
+    name: 'Collection',
+    component: Collection
+  },
+  {
+    path: '/collection/sets/:setCode',
+    name: 'CollectionSetCards',
+    component: CollectionSetCards,
+    props: true
+  },
+  {
+    path: '/kiosk',
+    name: 'Kiosk',
+    component: Kiosk
+  },
+  {
+    path: '/kiosk/sets/:setCode',
+    name: 'KioskSetCards',
+    component: KioskSetCards,
+    props: true
+  },
+  {
+    path: '/import',
+    name: 'Import',
+    component: Import
+  },
+  {
+    path: '/sets',
+    name: 'Sets',
+    component: Sets
+  },
+  {
+    path: '/sets/:setCode',
+    name: 'SetDetails',
+    component: SetDetails,
+    props: true
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes
+})
+
+export default router
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/Collection.vue
+================================================================================
+<template>
+  <div class="container">
+    <h1 class="text-center mb-2">My Collection</h1>
+    <div v-if="stats" class="collection-stats card grid grid-cols-3 mb-2">
+      <div class="stat">
+        <h2>Total Cards</h2>
+        <p>{{ stats.total_cards }}</p>
+      </div>
+      <div class="stat">
+        <h2>Unique Cards</h2>
+        <p>{{ stats.unique_cards }}</p>
+      </div>
+      <div class="stat">
+        <h2>Total Value</h2>
+        <p>${{ stats.total_value.toFixed(2) }}</p>
+      </div>
+    </div>
+    <SetListControls
+      :setTypes="setTypes"
+      :totalPages="totalPages"
+      @update-filters="updateFilters"
+      @update-sorting="updateSorting"
+      @update-per-page="updatePerPage"
+    />
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
+      <div v-for="set in sets" :key="set.code" class="card">
+        <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
+          <div class="set-icon">
+            <img :src="set.icon_svg_uri" :alt="set.name" />
+          </div>
+          <h3>{{ set.name }}</h3>
+          <p>Code: {{ set.code }}</p>
+          <p>Type: {{ set.set_type }}</p>
+          <p>Released: {{ formatDate(set.released_at) }}</p>
+          <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
+          <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
+          <div class="progress-container">
+            <div
+              class="progress-bar"
+              :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
+            ></div>
+          </div>
+        </router-link>
+      </div>
+    </div>
+    <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
+      <p>No sets found in your collection.</p>
+    </div>
+    <div class="pagination text-center mt-2">
+      <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
+      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+import SetListControls from '../components/SetListControls.vue'
+
+export default {
+  name: 'Collection',
+  components: {
+    SetListControls
+  },
+  setup() {
+    const sets = ref([])
+    const stats = ref(null)
+    const loading = ref(true)
+    const error = ref(null)
+    const filters = ref({})
+    const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
+    const currentPage = ref(1)
+    const totalPages = ref(1)
+    const perPage = ref(20)
+    const setTypes = ref([
+      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
+      'starter', 'box', 'promo', 'token', 'memorabilia'
+    ])
+
+    const fetchStats = async () => {
+      try {
+        const response = await axios.get('/api/collection/stats')
+        stats.value = response.data
+      } catch (err) {
+        console.error('Error fetching collection stats:', err)
+        error.value = 'Failed to load collection stats'
+      }
+    }
+
+    const fetchSets = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const response = await axios.get('/api/collection/sets', {
+          params: {
+            ...filters.value,
+            ...sorting.value,
+            page: currentPage.value,
+            per_page: perPage.value
+          }
+        })
+        sets.value = response.data.sets
+        totalPages.value = response.data.pages
+        currentPage.value = response.data.current_page
+      } catch (err) {
+        console.error('Error fetching collection sets:', err)
+        error.value = 'Failed to load collection sets'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const updateFilters = (newFilters) => {
+      filters.value = { ...filters.value, ...newFilters }
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const updateSorting = (newSorting) => {
+      sorting.value = { ...newSorting }
+      fetchSets()
+    }
+
+    const updatePerPage = (newPerPage) => {
+      perPage.value = newPerPage
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const changePage = (delta) => {
+      const newPage = currentPage.value + delta
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage
+        fetchSets()
+      }
+    }
+
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString()
+    }
+
+    const getProgressColor = (percentage) => {
+      if (percentage < 25) return '#f44336'
+      if (percentage < 50) return '#ff9800'
+      if (percentage < 75) return '#ffc107'
+      return '#4caf50'
+    }
+
+    onMounted(() => {
+      fetchStats()
+      fetchSets()
+    })
+
+    return {
+      sets,
+      stats,
+      loading,
+      error,
+      filters,
+      sorting,
+      currentPage,
+      totalPages,
+      perPage,
+      setTypes,
+      updateFilters,
+      updateSorting,
+      updatePerPage,
+      changePage,
+      formatDate,
+      getProgressColor
+    }
+  }
+}
+</script>
+
+<style scoped>
+.collection-stats .stat {
+  text-align: center;
+}
+
+.set-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 1rem;
+}
+
+.set-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+</style>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/CollectionSetCards.vue
+================================================================================
+<template>
+  <div class="container mx-auto px-4 bg-dark-300 text-white">
+    <h1 class="text-center mb-4 text-2xl font-bold text-primary">{{ setName }}</h1>
+    <div v-if="loading" class="loading text-center mt-4">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
+    <div v-else>
+      <div class="filters grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <input
+          v-model="nameFilter"
+          @input="debouncedApplyFilters"
+          placeholder="Filter by name"
+          class="p-2 border rounded bg-dark-100 text-white placeholder-gray-medium w-full"
+        />
+        <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded bg-dark-100 text-white w-full">
+          <option value="">All Rarities</option>
+          <option value="common">Common</option>
+          <option value="uncommon">Uncommon</option>
+          <option value="rare">Rare</option>
+          <option value="mythic">Mythic</option>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label for="card-size-slider" class="block text-sm font-medium mb-2 text-gray-light">Card Size</label>
+        <input
+          id="card-size-slider"
+          type="range"
+          v-model="cardSize"
+          min="150"
+          max="300"
+          class="w-full bg-dark-100"
+        />
+      </div>
+
+      <div class="card-grid grid gap-4" :style="gridStyle">
+        <div
+          v-for="card in sortedCards"
+          :key="card.id"
+          class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative"
+          :class="{ 'border-2 border-red-500': isMissing(card) }"
+          :style="{ width: `${cardSize}px` }"
+        >
+          <div class="image-container" :style="{ height: `${cardSize}px` }">
+            <img
+              v-if="getImageUrl(card)"
+              :src="getImageUrl(card)"
+              :alt="card.name"
+              class="w-full h-full object-contain"
+              @error="handleImageError($event, card)"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center bg-dark-100 text-gray-medium">
+              No image available
+            </div>
+          </div>
+          <div class="card-info p-4">
+            <h3 class="text-lg font-semibold mb-2 truncate text-primary">{{ card.name }}</h3>
+            <p class="text-sm mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
+            <p class="text-sm mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
+            <div class="card-quantities grid grid-cols-2 gap-2">
+              <div class="quantity-control flex flex-col">
+                <label :for="'regular-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
+                  Regular
+                </label>
+                <div class="input-wrapper flex border rounded-md overflow-hidden">
+                  <input
+                    :id="'regular-' + card.id"
+                    v-model.number="card.quantity_regular"
+                    type="number"
+                    min="0"
+                    class="quantity-input flex-1 p-1 text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    @input="onInput(card, 'regular')"
+                  />
+                  <div class="buttons flex flex-col bg-dark-200 border-l border-dark-400">
+                    <button
+                      @click="increment(card, 'regular')"
+                      class="btn increment-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
+                      aria-label="Increment Regular Quantity"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      @click="decrement(card, 'regular')"
+                      class="btn decrement-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
+                      aria-label="Decrement Regular Quantity"
+                      :disabled="card.quantity_regular === 0"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="quantity-control flex flex-col">
+                <label :for="'foil-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
+                  Foil
+                </label>
+                <div class="input-wrapper flex border rounded-md overflow-hidden">
+                  <input
+                    :id="'foil-' + card.id"
+                    v-model.number="card.quantity_foil"
+                    type="number"
+                    min="0"
+                    class="quantity-input flex-1 p-1 text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    @input="onInput(card, 'foil')"
+                  />
+                  <div class="buttons flex flex-col bg-dark-200 border-l border-dark-400">
+                    <button
+                      @click="increment(card, 'foil')"
+                      class="btn increment-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
+                      aria-label="Increment Foil Quantity"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      @click="decrement(card, 'foil')"
+                      class="btn decrement-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
+                      aria-label="Decrement Foil Quantity"
+                      :disabled="card.quantity_foil === 0"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+            Missing
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted, watch, computed } from 'vue';
+import axios from 'axios';
+import { useRoute } from 'vue-router';
+
+export default {
+  name: 'CollectionSetCards',
+  setup() {
+    const route = useRoute();
+    const setCode = ref(route.params.setCode);
+    const setName = ref('');
+    const cards = ref([]);
+    const loading = ref(true);
+    const error = ref(null);
+    const nameFilter = ref('');
+    const rarityFilter = ref('');
+    const cardSize = ref(200);
+    let debounceTimer = null;
+
+    const fetchCards = async () => {
+      loading.value = true;
+      error.value = null;
+      try {
+        const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
+          params: {
+            name: nameFilter.value,
+            rarity: rarityFilter.value,
+          },
+        });
+        cards.value = response.data.cards;
+        setName.value = cards.value.length > 0 ? cards.value[0].set_name : '';
+      } catch (err) {
+        console.error('Error fetching set cards:', err);
+        error.value = 'Failed to load set cards';
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const applyFilters = () => {
+      fetchCards();
+    };
+
+    const debouncedApplyFilters = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchCards();
+      }, 300);
+    };
+
+    watch(
+      () => route.params.setCode,
+      (newSetCode) => {
+        setCode.value = newSetCode;
+        fetchCards();
+      }
+    );
+
+    onMounted(() => {
+      fetchCards();
+    });
+
+    const isMissing = (card) => {
+      return card.quantity_regular + card.quantity_foil === 0;
+    };
+
+    const sortedCards = computed(() => {
+      return cards.value.slice().sort((a, b) => {
+        if (!a.collector_number && !b.collector_number) return 0;
+        if (!a.collector_number) return 1;
+        if (!b.collector_number) return -1;
+
+        const numA = parseInt(a.collector_number, 10);
+        const numB = parseInt(b.collector_number, 10);
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return a.collector_number.localeCompare(b.collector_number);
+      });
+    });
+
+    const getImageUrl = (card) => {
+      const imageSizes = ['normal', 'large', 'small', 'png', 'art_crop', 'border_crop'];
+
+      if (card.image_uris) {
+        for (const size of imageSizes) {
+          if (card.image_uris[size]) {
+            return card.image_uris[size];
+          }
+        }
+      }
+
+      if (card.card_faces && card.card_faces[0].image_uris) {
+        for (const size of imageSizes) {
+          if (card.card_faces[0].image_uris[size]) {
+            return card.card_faces[0].image_uris[size];
+          }
+        }
+      }
+
+      console.warn('No image URL found for card:', card.name);
+      return null;
+    };
+
+    const handleImageError = (event, card) => {
+      console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
+      event.target.style.display = 'none';
+      const noImageDiv = event.target.parentNode.querySelector('.bg-dark-100');
+      if (noImageDiv) {
+        noImageDiv.style.display = 'flex';
+      }
+    };
+
+    const updateQuantity = async (card) => {
+      try {
+        const response = await axios.put(`/api/collection/${card.id}`, {
+          quantity_regular: card.quantity_regular,
+          quantity_foil: card.quantity_foil,
+        });
+        const index = cards.value.findIndex((c) => c.id === card.id);
+        if (index !== -1) {
+          cards.value[index] = response.data;
+        }
+      } catch (err) {
+        console.error('Error updating quantity:', err);
+        alert('Failed to update quantity. Please try again.');
+      }
+    };
+
+    const increment = (card, type) => {
+      if (type === 'regular') {
+        card.quantity_regular += 1;
+      } else if (type === 'foil') {
+        card.quantity_foil += 1;
+      }
+      updateQuantity(card);
+    };
+
+    const decrement = (card, type) => {
+      if (type === 'regular' && card.quantity_regular > 0) {
+        card.quantity_regular -= 1;
+        updateQuantity(card);
+      } else if (type === 'foil' && card.quantity_foil > 0) {
+        card.quantity_foil -= 1;
+        updateQuantity(card);
+      }
+    };
+
+    const onInput = (card, type) => {
+      if (type === 'regular') {
+        card.quantity_regular = Math.max(0, parseInt(card.quantity_regular) || 0);
+      } else if (type === 'foil') {
+        card.quantity_foil = Math.max(0, parseInt(card.quantity_foil) || 0);
+      }
+      updateQuantity(card);
+    };
+
+    const gridStyle = computed(() => ({
+      gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize.value}px, 1fr))`,
+    }));
+
+    return {
+      setName,
+      cards,
+      loading,
+      error,
+      nameFilter,
+      rarityFilter,
+      applyFilters,
+      debouncedApplyFilters,
+      isMissing,
+      sortedCards,
+      getImageUrl,
+      handleImageError,
+      increment,
+      decrement,
+      onInput,
+      cardSize,
+      gridStyle,
+    };
+  },
+};
+</script>
+
+<style scoped>
+.card {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+.card-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-quantities {
+  margin-top: auto;
+}
+
+.image-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+.quantity-label {
+  font-size: 0.75rem;
+}
+
+.quantity-input {
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.quantity-input::-webkit-inner-spin-button,
+.quantity-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.missing-indicator {
+  position: absolute;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: #4a5568;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  border-radius: 5px;
+}
+
+input[type="range"]:hover {
+  opacity: 1;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #4299e1;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #4299e1;
+  cursor: pointer;
+  border-radius: 50%;
+}
+</style>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/Home.vue
+================================================================================
+<template>
+  <div class="container">
+    <h1 class="text-center mb-4">MTG Collection Manager</h1>
+
+    <!-- Collection Stats -->
+    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="card text-center">
+        <h2 class="mb-2">Collection Total Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.collection.total_cards }}</p>
+      </div>
+      <div class="card text-center">
+        <h2 class="mb-2">Collection Unique Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.collection.unique_cards }}</p>
+      </div>
+      <div class="card text-center">
+        <h2 class="mb-2">Collection Total Value</h2>
+        <p class="text-2xl font-bold">${{ stats.collection.total_value.toFixed(2) }}</p>
+      </div>
+    </div>
+
+    <!-- Kiosk Stats -->
+    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="card text-center">
+        <h2 class="mb-2">Kiosk Total Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.kiosk.total_cards }}</p>
+      </div>
+      <div class="card text-center">
+        <h2 class="mb-2">Kiosk Unique Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.kiosk.unique_cards }}</p>
+      </div>
+      <div class="card text-center">
+        <h2 class="mb-2">Kiosk Total Value</h2>
+        <p class="text-2xl font-bold">${{ stats.kiosk.total_value.toFixed(2) }}</p>
+      </div>
+    </div>
+
+    <!-- Total Stats -->
+    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="card text-center">
+        <h2 class="mb-2">Total Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.total.total_cards }}</p>
+      </div>
+      <div class="card text-center">
+        <h2 class="mb-2">Total Unique Cards</h2>
+        <p class="text-2xl font-bold">{{ stats.total.unique_cards }}</p>
+      </div>
+      <div class="card text-center">
+        <h2 class="mb-2">Total Value</h2>
+        <p class="text-2xl font-bold">${{ stats.total.total_value.toFixed(2) }}</p>
+      </div>
+    </div>
+
+    <!-- Refresh Button -->
+    <div class="text-center">
+      <button @click="refreshStats" class="px-4 py-2">Refresh Stats</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
+
+export default {
+  name: 'Home',
+  setup() {
+    const stats = ref({
+      collection: { total_cards: 0, unique_cards: 0, total_value: 0 },
+      kiosk: { total_cards: 0, unique_cards: 0, total_value: 0 },
+      total: { total_cards: 0, unique_cards: 0, total_value: 0 }
+    })
+    let refreshInterval
+
+    const fetchStats = async (forceRefresh = false) => {
+      try {
+        const response = await axios.get('/api/stats', {
+          params: { refresh: forceRefresh }
+        })
+        stats.value = response.data
+      } catch (error) {
+        console.error('Failed to fetch stats:', error)
+      }
+    }
+
+    const refreshStats = () => {
+      fetchStats(true)
+    }
+
+    onMounted(() => {
+      fetchStats()
+      refreshInterval = setInterval(() => fetchStats(), 300000) // Refresh every 5 minutes
+    })
+
+    onUnmounted(() => {
+      clearInterval(refreshInterval)
+    })
+
+    return {
+      stats,
+      refreshStats
+    }
+  }
+}
+</script>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/Import.vue
+================================================================================
+<template>
+  <div class="container">
+    <h1 class="text-center mb-4">Import Cards</h1>
+
+    <div class="card mb-4">
+      <h2 class="mb-2">Import Single Card</h2>
+      <form @submit.prevent="importSingleCard" class="grid grid-cols-1 gap-2">
+        <div>
+          <label for="scryfallId" class="block mb-1">Scryfall ID:</label>
+          <input v-model="singleCard.scryfallId" id="scryfallId" required class="w-full">
+        </div>
+        <div>
+          <label for="quantity" class="block mb-1">Quantity:</label>
+          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required class="w-full">
+        </div>
+        <div class="flex items-center">
+          <input v-model="singleCard.foil" id="foil" type="checkbox" class="mr-2">
+          <label for="foil">Foil</label>
+        </div>
+        <div>
+          <label for="destination" class="block mb-1">Destination:</label>
+          <select v-model="singleCard.destination" id="destination" required class="w-full">
+            <option value="collection">Collection</option>
+            <option value="kiosk">Kiosk</option>
+          </select>
+        </div>
+        <button type="submit" class="mt-2">Import Card</button>
+      </form>
+    </div>
+
+    <div class="card mb-4">
+      <h2 class="mb-2">CSV Import Guidelines</h2>
+      <p class="mb-2">Please ensure your CSV follows the format below:</p>
+      <pre class="bg-secondary p-2 mb-2 overflow-auto text-sm font-mono whitespace-pre-wrap break-words">
+Name,Edition,Edition code,Collector's number,Price,Foil,Currency,Scryfall ID,Quantity
+"Saw","Duskmourn: House of Horror","DSK","254","$0.21","Foil","USD","603c3ef4-4ef1-4db8-9ed2-e2b0926269d5","2"
+      </pre>
+      <a href="/static/csv_template.csv" download="csv_template.csv" class="text-primary hover:underline">Download CSV Template</a>
+    </div>
+
+    <div class="card mb-4">
+      <h2 class="mb-2">Import from CSV</h2>
+      <form @submit.prevent="importFromCSV" class="grid grid-cols-1 gap-2">
+        <div>
+          <label for="csvFile" class="block mb-1">CSV File:</label>
+          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required class="w-full">
+        </div>
+        <button type="submit" class="mt-2">Import CSV</button>
+      </form>
+    </div>
+
+    <div v-if="message" :class="['message', messageType, 'p-2 rounded']">
+      {{ message }}
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref } from 'vue'
+import axios from 'axios'
+
+export default {
+  name: 'Import',
+  setup() {
+    const singleCard = ref({
+      scryfallId: '',
+      quantity: 1,
+      foil: false,
+      destination: 'collection'
+    })
+
+    const csvImport = ref({
+      file: null
+    })
+
+    const message = ref('')
+    const messageType = ref('')
+
+    const importSingleCard = async () => {
+      try {
+        const response = await axios.post(`/api/collection`, {
+          scryfall_id: singleCard.value.scryfallId,
+          quantity: singleCard.value.quantity,
+          foil: singleCard.value.foil ? 1 : 0
+        })
+        message.value = `Card imported successfully: ${response.data.message}`
+        messageType.value = 'success'
+        // Reset form
+        singleCard.value = { scryfallId: '', quantity: 1, foil: false, destination: 'collection' }
+      } catch (error) {
+        message.value = `Error importing card: ${error.response?.data?.error || error.message}`
+        messageType.value = 'error'
+      }
+    }
+
+    const handleFileUpload = (event) => {
+      csvImport.value.file = event.target.files[0]
+    }
+
+    const importFromCSV = async () => {
+      if (!csvImport.value.file) {
+        message.value = 'Please select a CSV file'
+        messageType.value = 'error'
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('file', csvImport.value.file)
+
+      try {
+        const response = await axios.post('/api/collection/import_csv', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        message.value = `CSV imported successfully: ${response.data.message}`
+        messageType.value = 'success'
+        // Reset form
+        csvImport.value = { file: null }
+      } catch (error) {
+        message.value = `Error importing CSV: ${error.response?.data?.error || error.message}`
+        messageType.value = 'error'
+      }
+    }
+
+    return {
+      singleCard,
+      csvImport,
+      message,
+      messageType,
+      importSingleCard,
+      handleFileUpload,
+      importFromCSV
+    }
+  }
+}
+</script>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/Kiosk.vue
+================================================================================
+<!-- Kiosk.vue -->
+<template>
+  <div class="container">
+    <h1 class="text-center mb-2">Kiosk Inventory</h1>
+    <SetListControls
+      :setTypes="setTypes"
+      :totalPages="totalPages"
+      @update-filters="updateFilters"
+      @update-sorting="updateSorting"
+      @update-per-page="updatePerPage"
+    />
+    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
+      <div v-for="set in sets" :key="set.code" class="card">
+        <router-link :to="{ name: 'KioskSetCards', params: { setCode: set.code } }">
+          <div class="set-icon">
+            <img :src="set.icon_svg_uri" :alt="set.name" />
+          </div>
+          <h3>{{ set.name }}</h3>
+          <p>Code: {{ set.code }}</p>
+          <p>Type: {{ set.set_type }}</p>
+          <p>Released: {{ formatDate(set.released_at) }}</p>
+          <p>Kiosk Cards: {{ set.kiosk_count }} / {{ set.card_count }}</p>
+          <p>Completion: {{ Math.round(set.kiosk_percentage) }}%</p>
+          <div class="progress-container">
+            <div
+              class="progress-bar"
+              :style="{ width: `${set.kiosk_percentage}%`, backgroundColor: getProgressColor(set.kiosk_percentage) }"
+            ></div>
+          </div>
+        </router-link>
+      </div>
+    </div>
+    <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
+      <p>No sets found in your kiosk inventory.</p>
+    </div>
+    <div class="pagination text-center mt-2">
+      <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
+      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+import SetListControls from '../components/SetListControls.vue'
+
+export default {
+  name: 'Kiosk',
+  components: {
+    SetListControls
+  },
+  setup() {
+    const sets = ref([])
+    const loading = ref(true)
+    const error = ref(null)
+    const filters = ref({})
+    const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
+    const currentPage = ref(1)
+    const totalPages = ref(1)
+    const perPage = ref(20)
+    const setTypes = ref([
+      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
+      'starter', 'box', 'promo', 'token', 'memorabilia'
+    ])
+
+    const fetchSets = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const response = await axios.get('/api/kiosk/sets', {
+          params: {
+            ...filters.value,
+            ...sorting.value,
+            page: currentPage.value,
+            per_page: perPage.value
+          }
+        })
+        sets.value = response.data.sets
+        totalPages.value = response.data.pages
+        currentPage.value = response.data.current_page
+      } catch (err) {
+        console.error('Error fetching kiosk sets:', err)
+        error.value = 'Failed to load kiosk sets'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const updateFilters = (newFilters) => {
+      filters.value = { ...filters.value, ...newFilters }
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const updateSorting = (newSorting) => {
+      sorting.value = { ...newSorting }
+      fetchSets()
+    }
+
+    const updatePerPage = (newPerPage) => {
+      perPage.value = newPerPage
+      currentPage.value = 1
+      fetchSets()
+    }
+
+    const changePage = (delta) => {
+      const newPage = currentPage.value + delta
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage
+        fetchSets()
+      }
+    }
+
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString()
+    }
+
+    const getProgressColor = (percentage) => {
+      if (percentage < 25) return '#f44336'
+      if (percentage < 50) return '#ff9800'
+      if (percentage < 75) return '#ffc107'
+      return '#4caf50'
+    }
+
+    onMounted(() => {
+      fetchSets()
+    })
+
+    return {
+      sets,
+      loading,
+      error,
+      filters,
+      sorting,
+      currentPage,
+      totalPages,
+      perPage,
+      setTypes,
+      updateFilters,
+      updateSorting,
+      updatePerPage,
+      changePage,
+      formatDate,
+      getProgressColor
+    }
+  }
+}
+</script>
+
+<style scoped>
+.set-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 1rem;
+}
+
+.set-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+</style>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/KioskSetCards.vue
+================================================================================
+<!-- KioskSetCards.vue -->
+<template>
+  <div class="container">
+    <h1 class="text-center mb-4">{{ setName }} - Kiosk Inventory</h1>
+    <div v-if="loading" class="loading text-center mt-4">Loading...</div>
+    <div v-else-if="error" class="error text-center mt-4">{{ error }}</div>
+    <div v-else>
+      <div class="filters grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+        <input v-model="filters.name" placeholder="Search by name" @input="fetchCards" class="w-full">
+        <select v-model="filters.rarity" @change="fetchCards" class="w-full">
+          <option value="">All Rarities</option>
+          <option value="common">Common</option>
+          <option value="uncommon">Uncommon</option>
+          <option value="rare">Rare</option>
+          <option value="mythic">Mythic</option>
+        </select>
+        <select v-model="sorting.sortBy" @change="fetchCards" class="w-full">
+          <option value="name">Name</option>
+          <option value="rarity">Rarity</option>
+          <option value="collector_number">Collector Number</option>
+        </select>
+      </div>
+      <div class="card-list grid grid-cols-auto gap-4">
+        <div v-for="card in cards" :key="card.id" class="card">
+          <img :src="card.image_uris.small" :alt="card.name" class="w-full mb-2">
+          <div class="card-details p-2">
+            <h3 class="mb-2 text-lg font-bold">{{ card.name }}</h3>
+            <p class="mb-1"><span class="font-semibold">Rarity:</span> {{ card.rarity }}</p>
+            <div class="quantity-controls mb-2">
+              <div class="quantity-row">
+                <span class="font-semibold">Regular:</span>
+                <button @click="updateQuantity(card, 'regular', -1)" class="quantity-btn">-</button>
+                <input v-model.number="card.quantity.quantity_regular" @change="updateQuantity(card, 'regular')" type="number" min="0" class="quantity-input">
+                <button @click="updateQuantity(card, 'regular', 1)" class="quantity-btn">+</button>
+              </div>
+              <div class="quantity-row">
+                <span class="font-semibold">Foil:</span>
+                <button @click="updateQuantity(card, 'foil', -1)" class="quantity-btn">-</button>
+                <input v-model.number="card.quantity.quantity_foil" @change="updateQuantity(card, 'foil')" type="number" min="0" class="quantity-input">
+                <button @click="updateQuantity(card, 'foil', 1)" class="quantity-btn">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pagination text-center mt-4">
+        <button @click="changePage(-1)" :disabled="currentPage === 1" class="mr-2">Previous</button>
+        <span class="px-2 py-1 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button @click="changePage(1)" :disabled="currentPage === totalPages" class="ml-2">Next</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import axios from 'axios'
+
+export default {
+  name: 'KioskSetCards',
+  setup() {
+    const route = useRoute()
+    const setCode = route.params.setCode
+    const setName = ref('')
+    const cards = ref([])
+    const loading = ref(true)
+    const error = ref(null)
+    const filters = ref({ name: '', rarity: '' })
+    const sorting = ref({ sortBy: 'name', sortOrder: 'asc' })
+    const currentPage = ref(1)
+    const totalPages = ref(1)
+
+    const fetchCards = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const response = await axios.get(`/api/kiosk/sets/${setCode}/cards`, {
+          params: {
+            ...filters.value,
+            ...sorting.value,
+            page: currentPage.value
+          }
+        })
+        cards.value = response.data.cards
+        setName.value = response.data.set_name
+        totalPages.value = response.data.pages
+        currentPage.value = response.data.current_page
+      } catch (err) {
+        console.error('Error fetching kiosk set cards:', err)
+        error.value = 'Failed to load kiosk set cards'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const updateQuantity = async (card, type, delta = 0) => {
+      const newQuantity = type === 'regular'
+        ? card.quantity.quantity_regular + delta
+        : card.quantity.quantity_foil + delta
+
+      if (newQuantity < 0) return
+
+      try {
+        await axios.put(`/api/kiosk/${card.id}`, {
+          quantity_regular: type === 'regular' ? newQuantity : card.quantity.quantity_regular,
+          quantity_foil: type === 'foil' ? newQuantity : card.quantity.quantity_foil
+        })
+
+        if (type === 'regular') {
+          card.quantity.quantity_regular = newQuantity
+        } else {
+          card.quantity.quantity_foil = newQuantity
+        }
+      } catch (err) {
+        console.error('Error updating card quantity:', err)
+        error.value = 'Failed to update card quantity'
+      }
+    }
+
+    const changePage = (delta) => {
+      const newPage = currentPage.value + delta
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage
+        fetchCards()
+      }
+    }
+
+    onMounted(() => {
+      fetchCards()
+    })
+
+    return {
+      setName,
+      cards,
+      loading,
+      error,
+      filters,
+      sorting,
+      currentPage,
+      totalPages,
+      fetchCards,
+      changePage,
+      updateQuantity
+    }
+  }
+}
+</script>
+
+<style scoped>
+.quantity-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quantity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quantity-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.quantity-input {
+  width: 40px;
+  text-align: center;
+}
+</style>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/SetDetails.vue
+================================================================================
+<template>
+  <div class="container mx-auto px-4 bg-dark-300 text-white min-h-screen">
+    <div v-if="set" class="set-info text-center mb-6 pt-6">
+      <img :src="set.icon_svg_uri" :alt="set.name" class="set-icon w-24 h-24 mx-auto mb-4">
+      <h1 class="text-3xl font-bold mb-2 text-primary">{{ set.name }}</h1>
+      <p class="mb-1 text-gray-light">Code: {{ set.code }}</p>
+      <p class="mb-1 text-gray-light">Released: {{ new Date(set.released_at).toLocaleDateString() }}</p>
+      <p class="mb-1 text-gray-light">Card Count: {{ set.card_count }}</p>
+      <p class="text-gray-light">Set Type: {{ set.set_type }}</p>
+    </div>
+
+    <h2 class="text-2xl font-bold text-center mb-6 text-primary">Cards in this Set</h2>
+    <div class="filters grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <input
+        v-model="filters.name"
+        placeholder="Search by card name"
+        @input="fetchCards"
+        class="w-full p-3 bg-dark-100 text-white placeholder-gray-medium border border-dark-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+      <select
+        v-model="filters.rarity"
+        @change="fetchCards"
+        class="w-full p-3 bg-dark-100 text-white border border-dark-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+        <option value="">All Rarities</option>
+        <option value="common">Common</option>
+        <option value="uncommon">Uncommon</option>
+        <option value="rare">Rare</option>
+        <option value="mythic">Mythic</option>
+      </select>
+    </div>
+
+    <div class="card-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div v-for="card in cards" :key="card.id" class="card bg-dark-200 rounded-lg overflow-hidden shadow-lg">
+        <img :src="card.image_uris.small" :alt="card.name" class="w-full">
+        <div class="card-details p-4">
+          <h3 class="text-lg font-semibold mb-2 text-primary">{{ card.name }}</h3>
+          <p class="mb-1"><span class="font-medium text-gray-medium">Rarity:</span> {{ card.rarity }}</p>
+          <p class="mb-1"><span class="font-medium text-gray-medium">Collector Number:</span> {{ card.collector_number }}</p>
+          <p v-if="card.collection" class="mb-1"><span class="font-medium text-gray-medium">In Collection:</span> {{ card.collection.quantity_regular + card.collection.quantity_foil }}</p>
+          <p v-if="card.kiosk"><span class="font-medium text-gray-medium">In Kiosk:</span> {{ card.kiosk.quantity_regular + card.kiosk.quantity_foil }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pagination text-center mt-8 mb-8">
+      <button
+        @click="changePage(-1)"
+        :disabled="currentPage === 1"
+        class="px-4 py-2 mr-2 bg-primary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Previous
+      </button>
+      <span class="px-4 py-2 bg-dark-100 text-white rounded-lg">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button
+        @click="changePage(1)"
+        :disabled="currentPage === totalPages"
+        class="px-4 py-2 ml-2 bg-primary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+
+export default {
+  name: 'SetDetails',
+  props: {
+    setCode: {
+      type: String,
+      required: true
+    }
+  },
+  setup(props) {
+    const set = ref(null)
+    const cards = ref([])
+    const filters = ref({ name: '', rarity: '' })
+    const currentPage = ref(1)
+    const totalPages = ref(1)
+
+    const fetchSet = async () => {
+      try {
+        const response = await axios.get(`/api/sets/${props.setCode}`)
+        set.value = response.data
+      } catch (error) {
+        console.error('Error fetching set details:', error)
+      }
+    }
+
+    const fetchCards = async () => {
+      try {
+        const response = await axios.get(`/api/sets/${props.setCode}/cards`, {
+          params: {
+            ...filters.value,
+            page: currentPage.value
+          }
+        })
+        cards.value = response.data.cards
+        totalPages.value = response.data.pages
+      } catch (error) {
+        console.error('Error fetching set cards:', error)
+      }
+    }
+
+    const changePage = (delta) => {
+      currentPage.value += delta
+      fetchCards()
+    }
+
+    onMounted(() => {
+      fetchSet()
+      fetchCards()
+    })
+
+    return {
+      set,
+      cards,
+      filters,
+      currentPage,
+      totalPages,
+      fetchCards,
+      changePage
+    }
+  }
+}
+</script>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/views/Sets.vue
+================================================================================
+<template>
+  <div class="container">
+    <h1 class="text-center text-2xl font-bold mb-4">Magic: The Gathering Sets</h1>
+    <div v-if="loading" class="text-center text-lg">Loading sets...</div>
+    <div v-else-if="error" class="error text-center text-lg text-error">Error: {{ error }}</div>
+    <div v-else-if="sets.length === 0" class="text-center text-lg">No sets found.</div>
+    <div v-else>
+      <p class="text-center mb-4">Total sets: {{ sets.length }}</p>
+      <div class="set-grid grid grid-cols-auto gap-4">
+        <div v-for="set in sets" :key="set.code" class="card p-4">
+          <router-link :to="{ name: 'SetDetails', params: { setCode: set.code } }" class="block">
+            <img :src="set.icon_svg_uri" :alt="set.name" class="w-12 h-12 mx-auto mb-2" />
+            <h2 class="text-lg font-semibold mb-2">{{ set.name }}</h2>
+            <p class="mb-2">Released: {{ formatDate(set.released_at) }}</p>
+            <div class="progress-container mb-2">
+              <div
+                class="progress-bar"
+                :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
+              ></div>
+            </div>
+            <p class="collection-status font-bold">{{ formatCollectionProgress(set) }}</p>
+          </router-link>
+        </div>
+      </div>
+      <div class="pagination text-center mt-6">
+        <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-4 py-2 mr-2">Previous</button>
+        <span class="px-4 py-2 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button @click="changePage(1)" :disabled="currentPage === totalPages" class="px-4 py-2 ml-2">Next</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+
+export default {
+  name: 'Sets',
+  setup() {
+    const sets = ref([])
+    const filters = ref({ name: '', set_type: '' })
+    const currentPage = ref(1)
+    const totalPages = ref(1)
+    const loading = ref(true)
+    const error = ref(null)
+
+    const fetchSets = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const response = await axios.get('/api/sets', {
+          params: {
+            ...filters.value,
+            page: currentPage.value
+          }
+        })
+        sets.value = response.data.sets
+        totalPages.value = response.data.pages
+      } catch (err) {
+        console.error('Error fetching sets:', err)
+        error.value = 'Failed to load sets'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const changePage = (delta) => {
+      currentPage.value += delta
+      fetchSets()
+    }
+
+    const formatDate = (dateString) => {
+      return dateString ? new Date(dateString).toLocaleDateString() : 'N/A'
+    }
+
+    const formatCollectionProgress = (set) => {
+      if (set.collection_count === 0) {
+        return 'Not Started (0%)'
+      } else if (set.collection_count === set.card_count) {
+        return 'Complete (100%)'
+      } else {
+        return `${set.collection_count}/${set.card_count} (${set.collection_percentage.toFixed(2)}%)`
+      }
+    }
+
+    const getProgressColor = (percentage) => {
+      if (percentage === 0) return '#95a5a6'
+      if (percentage < 25) return '#e74c3c'
+      if (percentage < 50) return '#e67e22'
+      if (percentage < 75) return '#f1c40f'
+      if (percentage < 100) return '#2ecc71'
+      return '#3498db'
+    }
+
+    onMounted(fetchSets)
+
+    return {
+      sets,
+      filters,
+      currentPage,
+      totalPages,
+      loading,
+      error,
+      fetchSets,
+      changePage,
+      formatDate,
+      formatCollectionProgress,
+      getProgressColor
+    }
+  }
+}
+</script>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/App.vue
+================================================================================
+<template>
+  <div id="app">
+    <nav>
+      <router-link to="/">Home</router-link>
+      <router-link to="/collection">Collection</router-link>
+      <router-link to="/kiosk">Kiosk</router-link>
+      <router-link to="/sets">Sets</router-link>
+      <router-link to="/import">Import</router-link>
+    </nav>
+    <router-view/>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'App'
+}
+</script>
+
+<style>
+/* Styles are now handled in main.css */
+</style>
+================================================================================
+
+File: /home/gluth/mtg/frontend/src/main.js
+================================================================================
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+import axios from 'axios'
+
+import './assets/main.css'
+
+const app = createApp(App)
+
+app.use(router)
+
+// Configure Axios
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
+// Make Axios available globally
+app.config.globalProperties.$axios = axios
+
+app.mount('#app')
+================================================================================
+
