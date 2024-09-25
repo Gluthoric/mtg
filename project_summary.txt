@@ -1250,6 +1250,8 @@ module.exports = {
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
+import tailwindcss from 'tailwindcss'
+import autoprefixer from 'autoprefixer'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -1257,6 +1259,14 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+    },
+  },
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss,
+        autoprefixer,
+      ],
     },
   },
   server: {
@@ -1324,6 +1334,10 @@ app.mount('#app')
 == frontend/src/router.js not found ==
 
 == Start of frontend/src/assets/main.css ==
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Define CSS Variables for Dark Mode */
 :root {
   --background-color: #121212;
@@ -1952,216 +1966,430 @@ export default {
 
 == Start of frontend/src/views/CollectionSetCards.vue ==
 <template>
-  <div class="container">
-    <h1 class="text-center mb-2">{{ setName }}</h1>
-    <div v-if="loading" class="loading text-center mt-1">Loading...</div>
-    <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
-    <div v-else>
-      <div class="filters grid grid-cols-1 md:grid-cols-2 gap-1 mb-2">
-        <input
-          v-model="nameFilter"
-          @input="applyFilters"
-          placeholder="Filter by name"
-        />
-        <select v-model="rarityFilter" @change="applyFilters">
-          <option value="">All Rarities</option>
-          <option value="common">Common</option>
-          <option value="uncommon">Uncommon</option>
-          <option value="rare">Rare</option>
-          <option value="mythic">Mythic</option>
-        </select>
+  <div class="min-h-screen bg-gray-900 text-white p-6">
+    <!-- Header Section -->
+    <h1 class="text-4xl font-bold text-center mb-2">Duskmourn: House of Horror</h1>
+    <p class="text-center text-gray-400 mb-4">(Part of Gluthorice's collection)</p>
+
+    <!-- SVG Icon -->
+    <div class="flex justify-center items-center mb-8">
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+        <path d="M2 17L12 22L22 17"/>
+        <path d="M2 12L12 17L22 12"/>
+      </svg>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="text-center mb-8">
+      <h2 class="text-3xl font-bold">{{ collectedCards }}/{{ totalCards }}</h2>
+      <p class="text-sm text-gray-400">({{ collectedCards }} total cards collected)</p>
+      <p class="text-sm text-gray-400">Set value: ${{ setValue.toFixed(2) }}</p>
+    </div>
+
+    <div class="w-full bg-blue-900 h-2 mb-8">
+      <div class="bg-blue-500 h-2" :style="{ width: `${completionPercentage}%` }"></div>
+    </div>
+
+    <!-- Controls Section -->
+    <div class="flex justify-between items-center mb-4">
+      <!-- Pagination Controls -->
+      <div class="flex items-center">
+        <button @click="previousPage" class="mr-2 p-1 bg-gray-700 rounded">
+          <ChevronLeftIcon />
+        </button>
+        <span class="mx-2">{{ currentPage }}</span>
+        <button @click="nextPage" class="ml-2 p-1 bg-gray-700 rounded">
+          <ChevronRightIcon />
+        </button>
       </div>
-      <div class="card-grid grid grid-cols-auto gap-1">
-        <div
-          v-for="card in sortedCards"
-          :key="card.id"
-          class="card"
-          :class="{ 'border-error': isMissing(card) }"
-        >
+
+      <!-- Card Size Slider -->
+      <div class="flex items-center">
+        <span class="mr-2">Card size</span>
+        <input type="range" v-model="cardSize" min="100" max="300" class="w-32" />
+      </div>
+
+      <!-- Cards Per Row Slider -->
+      <div class="flex items-center">
+        <span class="mr-2">Cards per row</span>
+        <input type="range" v-model="cardsPerRow" min="1" max="10" class="w-32" />
+      </div>
+
+      <!-- Settings Button -->
+      <button class="p-1 bg-gray-700 rounded" @click="openSettings">
+        <SettingsIcon />
+      </button>
+    </div>
+
+    <!-- Filters Section (from CollectionSetCards.vue) -->
+    <div class="filters grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <input
+        v-model="nameFilter"
+        @input="applyFilters"
+        placeholder="Filter by name"
+        class="p-2 border rounded bg-gray-800 text-white"
+      />
+      <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded bg-gray-800 text-white">
+        <option value="">All Rarities</option>
+        <option value="common">Common</option>
+        <option value="uncommon">Uncommon</option>
+        <option value="rare">Rare</option>
+        <option value="mythic">Mythic</option>
+      </select>
+    </div>
+
+    <!-- Card Grid -->
+    <div class="grid gap-4" :style="{ gridTemplateColumns: `repeat(${cardsPerRow}, minmax(0, 1fr))` }">
+      <div
+        v-for="card in sortedCards"
+        :key="card.id"
+        class="bg-gray-800 rounded-lg overflow-hidden relative"
+        :class="{ 'border-2 border-red-500': isMissing(card) }"
+        :style="{ width: `${cardSize}px` }"
+      >
+        <!-- Card Image -->
+        <div class="image-container" :style="{ height: `${cardSize}px` }">
           <img
             v-if="getImageUrl(card)"
             :src="getImageUrl(card)"
             :alt="card.name"
-            class="img-responsive"
+            class="w-full h-full object-contain"
             @error="handleImageError($event, card)"
           />
-          <div v-else class="p-2 text-center bg-secondary">No image available</div>
-          <div class="card-info p-1">
-            <h3 class="mb-1">{{ card.name }}</h3>
-            <p class="mb-1">Collector Number: {{ card.collector_number }}</p>
-            <p class="mb-1">Rarity: {{ card.rarity }}</p>
-            <div class="card-quantities grid grid-cols-2 gap-1">
-              <QuantityControl
-                label="Regular"
-                :fieldId="'regular-' + card.id"
-                :value="card.quantity_regular"
-                @update="(val) => updateQuantity(card, 'regular', val)"
+          <div v-else class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500">
+            No image available
+          </div>
+        </div>
+
+        <!-- Card Info -->
+        <div class="p-4">
+          <h3 class="text-lg font-semibold mb-2">{{ card.name }}</h3>
+          <div class="flex justify-between mb-2">
+            <span>Regular: {{ card.quantity_regular }}</span>
+            <span>Foil: {{ card.quantity_foil }}</span>
+          </div>
+          <div class="text-sm text-gray-400">
+            <p>${{ card.price_regular }} (${{ card.price_foil }} foil)</p>
+          </div>
+        </div>
+
+        <!-- Quantity Controls -->
+        <div class="card-quantities grid grid-cols-2 gap-2 p-4">
+          <!-- Regular Quantity Control -->
+          <div class="quantity-control flex flex-col">
+            <label :for="'regular-' + card.id" class="quantity-label mb-1 text-sm font-semibold">
+              Regular
+            </label>
+            <div class="input-wrapper flex border rounded-md overflow-hidden">
+              <input
+                :id="'regular-' + card.id"
+                v-model.number="card.quantity_regular"
+                type="number"
+                min="0"
+                class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-700 text-white"
+                @input="onInput(card, 'regular')"
               />
-              <QuantityControl
-                label="Foil"
-                :fieldId="'foil-' + card.id"
-                :value="card.quantity_foil"
-                @update="(val) => updateQuantity(card, 'foil', val)"
-              />
+              <div class="buttons flex flex-col bg-gray-600 border-l">
+                <button
+                  @click="increment(card, 'regular')"
+                  class="btn increment-btn px-2 py-1 text-sm bg-gray-500 hover:bg-gray-400"
+                  aria-label="Increment Regular Quantity"
+                >
+                  ▲
+                </button>
+                <button
+                  @click="decrement(card, 'regular')"
+                  class="btn decrement-btn px-2 py-1 text-sm bg-gray-500 hover:bg-gray-400"
+                  aria-label="Decrement Regular Quantity"
+                  :disabled="card.quantity_regular === 0"
+                >
+                  ▼
+                </button>
+              </div>
             </div>
           </div>
-          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-error text-white p-1 rounded text-sm font-bold">Missing</div>
+
+          <!-- Foil Quantity Control -->
+          <div class="quantity-control flex flex-col">
+            <label :for="'foil-' + card.id" class="quantity-label mb-1 text-sm font-semibold">
+              Foil
+            </label>
+            <div class="input-wrapper flex border rounded-md overflow-hidden">
+              <input
+                :id="'foil-' + card.id"
+                v-model.number="card.quantity_foil"
+                type="number"
+                min="0"
+                class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-700 text-white"
+                @input="onInput(card, 'foil')"
+              />
+              <div class="buttons flex flex-col bg-gray-600 border-l">
+                <button
+                  @click="increment(card, 'foil')"
+                  class="btn increment-btn px-2 py-1 text-sm bg-gray-500 hover:bg-gray-400"
+                  aria-label="Increment Foil Quantity"
+                >
+                  ▲
+                </button>
+                <button
+                  @click="decrement(card, 'foil')"
+                  class="btn decrement-btn px-2 py-1 text-sm bg-gray-500 hover:bg-gray-400"
+                  aria-label="Decrement Foil Quantity"
+                  :disabled="card.quantity_foil === 0"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Missing Indicator -->
+        <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+          Missing
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { ref, onMounted, watch, computed } from 'vue'
-import axios from 'axios'
-import { useRoute } from 'vue-router'
-import QuantityControl from './QuantityControl.vue' // Adjust the path as needed
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue';
+import { ChevronLeftIcon, ChevronRightIcon, SettingsIcon } from 'lucide-vue-next';
+import axios from 'axios';
+import { useRoute } from 'vue-router';
 
-export default {
-  name: 'CollectionSetCards',
-  components: {
-    QuantityControl
-  },
-  setup() {
-    const route = useRoute()
-    const setCode = ref(route.params.setCode)
-    const setName = ref('')
-    const cards = ref([])
-    const loading = ref(true)
-    const error = ref(null)
-    const nameFilter = ref('')
-    const rarityFilter = ref('')
+// Reactive References
+const route = useRoute();
+const setCode = ref(route.params.setCode);
+const setName = ref('');
+const cards = ref([]);
+const loading = ref(true);
+const error = ref(null);
+const nameFilter = ref('');
+const rarityFilter = ref('');
 
-    const fetchCards = async () => {
-      loading.value = true
-      error.value = null
-      try {
-        const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
-          params: {
-            name: nameFilter.value,
-            rarity: rarityFilter.value
-          }
-        })
-        cards.value = response.data.cards
-        setName.value = cards.value.length > 0 ? cards.value[0].set_name : ''
-      } catch (err) {
-        console.error('Error fetching set cards:', err)
-        error.value = 'Failed to load set cards'
-      } finally {
-        loading.value = false
-      }
+// Control States
+const cardSize = ref(200); // Default card size
+const cardsPerRow = ref(5);
+const currentPage = ref(1); // Assuming pagination
+const collectedCards = ref(0);
+const totalCards = ref(0);
+const setValue = ref(0.0);
+
+// Computed Properties
+const completionPercentage = computed(() => {
+  return totalCards.value > 0 ? (collectedCards.value / totalCards.value) * 100 : 0;
+});
+
+const sortedCards = computed(() => {
+  return cards.value.slice().sort((a, b) => {
+    if (!a.collector_number && !b.collector_number) return 0;
+    if (!a.collector_number) return 1;
+    if (!b.collector_number) return -1;
+
+    const numA = parseInt(a.collector_number, 10);
+    const numB = parseInt(b.collector_number, 10);
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+      return numA - numB;
     }
+    return a.collector_number.localeCompare(b.collector_number);
+  });
+});
 
-    const applyFilters = () => {
-      fetchCards()
-    }
-
-    watch(() => route.params.setCode, (newSetCode) => {
-      setCode.value = newSetCode
-      fetchCards()
-    })
-
-    onMounted(() => {
-      fetchCards()
-    })
-
-    const isMissing = (card) => {
-      return (card.quantity_regular + card.quantity_foil) === 0
-    }
-
-    const sortedCards = computed(() => {
-      return cards.value.slice().sort((a, b) => {
-        if (!a.collector_number && !b.collector_number) return 0;
-        if (!a.collector_number) return 1;
-        if (!b.collector_number) return -1;
-
-        const numA = parseInt(a.collector_number, 10);
-        const numB = parseInt(b.collector_number, 10);
-
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB;
-        }
-        return a.collector_number.localeCompare(b.collector_number);
-      });
+// Fetch Cards Function
+const fetchCards = async () => {
+  loading.value = true;
+  error.value = null;
+  try {
+    const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
+      params: {
+        name: nameFilter.value,
+        rarity: rarityFilter.value,
+        page: currentPage.value,
+      },
     });
+    cards.value = response.data.cards;
+    setName.value = response.data.set_name || 'Set Name';
+    collectedCards.value = response.data.collected_cards || 0;
+    totalCards.value = response.data.total_cards || 0;
+    setValue.value = response.data.set_value || 0.0;
+  } catch (err) {
+    console.error('Error fetching set cards:', err);
+    error.value = 'Failed to load set cards';
+  } finally {
+    loading.value = false;
+  }
+};
 
-    const getImageUrl = (card) => {
-      const imageSizes = ['normal', 'large', 'small', 'png', 'art_crop', 'border_crop'];
+// Watchers
+watch(
+  () => route.params.setCode,
+  (newSetCode) => {
+    setCode.value = newSetCode;
+    fetchCards();
+  }
+);
 
-      if (card.image_uris) {
-        for (const size of imageSizes) {
-          if (card.image_uris[size]) {
-            return card.image_uris[size];
-          }
-        }
+// Lifecycle Hook
+onMounted(() => {
+  fetchCards();
+});
+
+// Methods
+const applyFilters = () => {
+  currentPage.value = 1; // Reset to first page on filter change
+  fetchCards();
+};
+
+const isMissing = (card) => {
+  return card.quantity_regular + card.quantity_foil === 0;
+};
+
+const getImageUrl = (card) => {
+  const imageSizes = ['normal', 'large', 'small', 'png', 'art_crop', 'border_crop'];
+
+  if (card.image_uris) {
+    for (const size of imageSizes) {
+      if (card.image_uris[size]) {
+        return card.image_uris[size];
       }
-
-      if (card.card_faces && card.card_faces[0].image_uris) {
-        for (const size of imageSizes) {
-          if (card.card_faces[0].image_uris[size]) {
-            return card.card_faces[0].image_uris[size];
-          }
-        }
-      }
-
-      console.warn('No image URL found for card:', card.name);
-      return null;
-    }
-
-    const handleImageError = (event, card) => {
-      console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
-      event.target.style.display = 'none';
-      const noImageDiv = event.target.parentNode.querySelector('.bg-secondary');
-      if (noImageDiv) {
-        noImageDiv.style.display = 'block';
-      }
-    }
-
-    const updateQuantity = async (card, type, newValue) => {
-      const updatedCard = { ...card }
-      if (type === 'regular') {
-        updatedCard.quantity_regular = newValue
-      } else if (type === 'foil') {
-        updatedCard.quantity_foil = newValue
-      }
-
-      try {
-        const response = await axios.put(`/api/collection/${card.id}`, {
-          quantity_regular: updatedCard.quantity_regular,
-          quantity_foil: updatedCard.quantity_foil
-        })
-        // Update the local card data
-        const index = cards.value.findIndex(c => c.id === card.id)
-        if (index !== -1) {
-          cards.value[index] = response.data
-        }
-      } catch (err) {
-        console.error('Error updating quantity:', err)
-        alert('Failed to update quantity. Please try again.')
-      }
-    }
-
-    return {
-      setName,
-      cards,
-      loading,
-      error,
-      nameFilter,
-      rarityFilter,
-      applyFilters,
-      isMissing,
-      sortedCards,
-      getImageUrl,
-      handleImageError,
-      updateQuantity
     }
   }
-}
+
+  if (card.card_faces && card.card_faces[0].image_uris) {
+    for (const size of imageSizes) {
+      if (card.card_faces[0].image_uris[size]) {
+        return card.card_faces[0].image_uris[size];
+      }
+    }
+  }
+
+  console.warn('No image URL found for card:', card.name);
+  return null;
+};
+
+const handleImageError = (event, card) => {
+  console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
+  event.target.style.display = 'none';
+  const noImageDiv = event.target.parentNode.querySelector('.bg-gray-200');
+  if (noImageDiv) {
+    noImageDiv.style.display = 'flex';
+  }
+};
+
+const updateQuantity = async (card) => {
+  try {
+    const response = await axios.put(`/api/collection/${card.id}`, {
+      quantity_regular: card.quantity_regular,
+      quantity_foil: card.quantity_foil,
+    });
+    // Update the local card data
+    const index = cards.value.findIndex((c) => c.id === card.id);
+    if (index !== -1) {
+      cards.value[index] = response.data;
+      // Optionally update collectedCards and setValue here
+    }
+  } catch (err) {
+    console.error('Error updating quantity:', err);
+    alert('Failed to update quantity. Please try again.');
+    // Optionally revert the quantity change
+    fetchCards();
+  }
+};
+
+const increment = (card, type) => {
+  if (type === 'regular') {
+    card.quantity_regular += 1;
+  } else if (type === 'foil') {
+    card.quantity_foil += 1;
+  }
+  updateQuantity(card);
+};
+
+const decrement = (card, type) => {
+  if (type === 'regular' && card.quantity_regular > 0) {
+    card.quantity_regular -= 1;
+    updateQuantity(card);
+  } else if (type === 'foil' && card.quantity_foil > 0) {
+    card.quantity_foil -= 1;
+    updateQuantity(card);
+  }
+};
+
+const onInput = (card, type) => {
+  if (type === 'regular') {
+    card.quantity_regular = Math.max(0, parseInt(card.quantity_regular) || 0);
+  } else if (type === 'foil') {
+    card.quantity_foil = Math.max(0, parseInt(card.quantity_foil) || 0);
+  }
+  updateQuantity(card);
+};
+
+const previousPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value -= 1;
+    fetchCards();
+  }
+};
+
+const nextPage = () => {
+  currentPage.value += 1;
+  fetchCards();
+};
+
+const openSettings = () => {
+  // Implement settings modal or functionality
+  alert('Settings clicked');
+};
 </script>
 
 <style scoped>
-/* Component-specific styles can be added here if needed */
+/* Additional Styles */
+.image-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+.quantity-label {
+  font-size: 0.85rem;
+}
+
+.quantity-input {
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.quantity-input::-webkit-inner-spin-button,
+.quantity-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.missing-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.filters input,
+.filters select {
+  background-color: #2d3748; /* Tailwind's bg-gray-800 */
+  color: #fff;
+}
+
+.card-quantities {
+  margin-top: auto;
+}
 </style>
 
 == End of frontend/src/views/CollectionSetCards.vue ==

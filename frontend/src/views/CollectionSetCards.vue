@@ -7,7 +7,7 @@
       <div class="filters grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <input
           v-model="nameFilter"
-          @input="applyFilters"
+          @input="debouncedApplyFilters"
           placeholder="Filter by name"
           class="p-2 border rounded"
         />
@@ -33,12 +33,13 @@
         />
       </div>
 
-      <div class="card-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" :style="gridStyle">
+      <div class="card-grid grid gap-4" :style="gridStyle">
         <div
           v-for="card in sortedCards"
           :key="card.id"
           class="card bg-white shadow-md rounded-lg overflow-hidden relative"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
+          :style="{ width: `${cardSize}px` }"
         >
           <div class="image-container" :style="{ height: `${cardSize}px` }">
             <img
@@ -57,18 +58,73 @@
             <p class="text-sm mb-1">Collector Number: {{ card.collector_number }}</p>
             <p class="text-sm mb-2">Rarity: {{ card.rarity }}</p>
             <div class="card-quantities grid grid-cols-2 gap-2">
-              <QuantityControl
-                label="Regular"
-                :fieldId="'regular-' + card.id"
-                :value="card.quantity_regular"
-                @update="(val) => updateQuantity(card, 'regular', val)"
-              />
-              <QuantityControl
-                label="Foil"
-                :fieldId="'foil-' + card.id"
-                :value="card.quantity_foil"
-                @update="(val) => updateQuantity(card, 'foil', val)"
-              />
+              <!-- Regular Quantity Control -->
+              <div class="quantity-control flex flex-col">
+                <label :for="'regular-' + card.id" class="quantity-label mb-1 text-sm font-semibold">
+                  Regular
+                </label>
+                <div class="input-wrapper flex border rounded-md overflow-hidden">
+                  <input
+                    :id="'regular-' + card.id"
+                    v-model.number="card.quantity_regular"
+                    type="number"
+                    min="0"
+                    class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-100"
+                    @input="onInput(card, 'regular')"
+                  />
+                  <div class="buttons flex flex-col bg-gray-200 border-l">
+                    <button
+                      @click="increment(card, 'regular')"
+                      class="btn increment-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      aria-label="Increment Regular Quantity"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      @click="decrement(card, 'regular')"
+                      class="btn decrement-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      aria-label="Decrement Regular Quantity"
+                      :disabled="card.quantity_regular === 0"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Foil Quantity Control -->
+              <div class="quantity-control flex flex-col">
+                <label :for="'foil-' + card.id" class="quantity-label mb-1 text-sm font-semibold">
+                  Foil
+                </label>
+                <div class="input-wrapper flex border rounded-md overflow-hidden">
+                  <input
+                    :id="'foil-' + card.id"
+                    v-model.number="card.quantity_foil"
+                    type="number"
+                    min="0"
+                    class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-100"
+                    @input="onInput(card, 'foil')"
+                  />
+                  <div class="buttons flex flex-col bg-gray-200 border-l">
+                    <button
+                      @click="increment(card, 'foil')"
+                      class="btn increment-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      aria-label="Increment Foil Quantity"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      @click="decrement(card, 'foil')"
+                      class="btn decrement-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      aria-label="Decrement Foil Quantity"
+                      :disabled="card.quantity_foil === 0"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
@@ -84,13 +140,9 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
-import QuantityControl from './QuantityControl.vue'; // Adjust the path as needed
 
 export default {
   name: 'CollectionSetCards',
-  components: {
-    QuantityControl,
-  },
   setup() {
     const route = useRoute();
     const setCode = ref(route.params.setCode);
@@ -103,6 +155,9 @@ export default {
 
     // Card size slider
     const cardSize = ref(200); // Default card size
+
+    // Debounce timer
+    let debounceTimer = null;
 
     const fetchCards = async () => {
       loading.value = true;
@@ -126,6 +181,14 @@ export default {
 
     const applyFilters = () => {
       fetchCards();
+    };
+
+    // Debounced filter application
+    const debouncedApplyFilters = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchCards();
+      }, 300);
     };
 
     watch(
@@ -186,24 +249,17 @@ export default {
     const handleImageError = (event, card) => {
       console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
       event.target.style.display = 'none';
-      const noImageDiv = event.target.parentNode.querySelector('.bg-secondary');
+      const noImageDiv = event.target.parentNode.querySelector('.bg-gray-200');
       if (noImageDiv) {
-        noImageDiv.style.display = 'block';
+        noImageDiv.style.display = 'flex';
       }
     };
 
-    const updateQuantity = async (card, type, newValue) => {
-      const updatedCard = { ...card };
-      if (type === 'regular') {
-        updatedCard.quantity_regular = newValue;
-      } else if (type === 'foil') {
-        updatedCard.quantity_foil = newValue;
-      }
-
+    const updateQuantity = async (card) => {
       try {
         const response = await axios.put(`/api/collection/${card.id}`, {
-          quantity_regular: updatedCard.quantity_regular,
-          quantity_foil: updatedCard.quantity_foil,
+          quantity_regular: card.quantity_regular,
+          quantity_foil: card.quantity_foil,
         });
         // Update the local card data
         const index = cards.value.findIndex((c) => c.id === card.id);
@@ -216,8 +272,36 @@ export default {
       }
     };
 
+    const increment = (card, type) => {
+      if (type === 'regular') {
+        card.quantity_regular += 1;
+      } else if (type === 'foil') {
+        card.quantity_foil += 1;
+      }
+      updateQuantity(card);
+    };
+
+    const decrement = (card, type) => {
+      if (type === 'regular' && card.quantity_regular > 0) {
+        card.quantity_regular -= 1;
+        updateQuantity(card);
+      } else if (type === 'foil' && card.quantity_foil > 0) {
+        card.quantity_foil -= 1;
+        updateQuantity(card);
+      }
+    };
+
+    const onInput = (card, type) => {
+      if (type === 'regular') {
+        card.quantity_regular = Math.max(0, parseInt(card.quantity_regular) || 0);
+      } else if (type === 'foil') {
+        card.quantity_foil = Math.max(0, parseInt(card.quantity_foil) || 0);
+      }
+      updateQuantity(card);
+    };
+
     const gridStyle = computed(() => ({
-      gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize.value}px, 1fr))`,
+      gridTemplateColumns: `repeat(auto-fit, minmax(${cardSize.value}px, 1fr))`,
     }));
 
     return {
@@ -228,11 +312,14 @@ export default {
       nameFilter,
       rarityFilter,
       applyFilters,
+      debouncedApplyFilters,
       isMissing,
       sortedCards,
       getImageUrl,
       handleImageError,
-      updateQuantity,
+      increment,
+      decrement,
+      onInput,
       cardSize,
       gridStyle,
     };
@@ -259,6 +346,28 @@ export default {
 .image-container {
   width: 100%;
   overflow: hidden;
+}
+
+.quantity-label {
+  font-size: 0.85rem;
+}
+
+.quantity-input {
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.quantity-input::-webkit-inner-spin-button,
+.quantity-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .missing-indicator {
