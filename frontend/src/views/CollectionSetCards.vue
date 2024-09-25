@@ -124,6 +124,9 @@
                     +
                   </button>
                 </div>
+                <div class="price text-xs text-gray-light mt-1">
+                  Price: ${{ card.prices?.usd || 'N/A' }}
+                </div>
               </div>
 
               <!-- Foil Quantity Control -->
@@ -155,6 +158,9 @@
                   >
                     +
                   </button>
+                </div>
+                <div class="price text-xs text-gray-light mt-1">
+                  Price: ${{ card.prices?.usd_foil || 'N/A' }}
                 </div>
               </div>
             </div>
