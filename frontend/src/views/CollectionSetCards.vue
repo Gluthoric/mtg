@@ -50,7 +50,7 @@
           <div class="card-info p-2 flex flex-col">
             <h3 class="text-base font-semibold mb-2 truncate text-primary">{{ card.name }}</h3>
           </div>
-          <div class="image-container" :style="{ height: `${cardSize * 1.4}px` }">
+          <div class="image-container" :style="{ height: `${cardSize * 1.2}px` }">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -62,10 +62,12 @@
               No image available
             </div>
           </div>
-          <div class="card-info p-2 flex flex-col h-full">
-            <p class="text-xs mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
-            <p class="text-xs mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
-            <div class="card-quantities mt-auto">
+          <div class="card-info p-2 flex flex-col">
+            <div class="flex justify-between items-center mb-2">
+              <p class="text-xs text-gray-light">CN: {{ card.collector_number }}</p>
+              <p class="text-xs text-gray-light">{{ card.rarity }}</p>
+            </div>
+            <div class="card-quantities">
               <div class="quantity-control mb-2">
                 <label :for="'regular-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light block">
                   Regular
@@ -349,24 +351,26 @@ export default {
 }
 
 .card-info {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
+  flex-grow: 0;
 }
 
 .card-quantities {
-  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
 }
 
 .image-container {
   width: 100%;
   overflow: hidden;
-  flex-grow: 1;
 }
 
 .card {
   display: flex;
   flex-direction: column;
+}
+
+.quantity-control {
+  width: 48%;
 }
 
 .quantity-label {
