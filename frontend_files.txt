@@ -709,18 +709,18 @@ File: /home/gluth/mtg/frontend/src/views/CollectionSetCards.vue
       </div>
 
       <!-- Cards Grid -->
-      <div class="card-grid grid gap-4" :style="gridStyle">
+      <div class="card-grid grid gap-6" :style="gridStyle">
         <div
           v-for="card in filteredAndSortedCards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
-          :style="{ width: '100%', maxWidth: `${cardSize}px` }"
+          :style="{ width: '100%', maxWidth: `${cardSize * 1.2}px` }"
         >
           <div class="card-info p-2 z-10 bg-dark-200 bg-opacity-80">
             <h3 class="text-base font-semibold truncate text-primary">{{ card.name }}</h3>
           </div>
-          <div class="image-container flex-grow" :style="{ height: `${cardSize * 1.2}px` }">
+          <div class="image-container" :style="{ height: `${cardSize * 1.4}px` }">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -746,7 +746,7 @@ File: /home/gluth/mtg/frontend/src/views/CollectionSetCards.vue
                 <div class="input-wrapper flex items-center justify-center border rounded-md overflow-hidden">
                   <button
                     @click="decrement(card, 'regular')"
-                    class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Regular Quantity"
                     :disabled="card.quantity_regular === 0"
                   >
@@ -757,16 +757,19 @@ File: /home/gluth/mtg/frontend/src/views/CollectionSetCards.vue
                     v-model.number="card.quantity_regular"
                     type="number"
                     min="0"
-                    class="quantity-input w-12 h-8 text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
                     @input="onInput(card, 'regular')"
                   />
                   <button
                     @click="increment(card, 'regular')"
-                    class="btn increment-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    class="btn increment-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Increment Regular Quantity"
                   >
                     +
                   </button>
+                </div>
+                <div class="price text-xs text-gray-light mt-1">
+                  Price: ${{ card.prices?.usd || 'N/A' }}
                 </div>
               </div>
 
@@ -799,6 +802,9 @@ File: /home/gluth/mtg/frontend/src/views/CollectionSetCards.vue
                   >
                     +
                   </button>
+                </div>
+                <div class="price text-xs text-gray-light mt-1">
+                  Price: ${{ card.prices?.usd_foil || 'N/A' }}
                 </div>
               </div>
             </div>
@@ -836,9 +842,9 @@ export default {
     const rarityFilter = ref('');
     const colorFilters = ref([]); // Reactive variable for color filters
     const missingFilter = ref(false);
-    const cardsPerRow = ref(8);
+    const cardsPerRow = ref(6);
     let debounceTimer = null;
-    const cardSize = 150;
+    const cardSize = 180;
 
     const availableColors = ['W', 'U', 'B', 'R', 'G']; // Define available colors
 
@@ -1046,6 +1052,32 @@ export default {
   flex-direction: column;
   transition: transform 0.2s ease-in-out;
   width: 100%;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.card-info {
+  padding: 0.75rem;
+}
+
+.image-container {
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.image-container img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-in-out;
+  width: 100%;
 }
 
 .card:hover {
@@ -1148,6 +1180,19 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
   max-width: 120px;
   margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+}
+
+.quantity-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn {
+  flex-shrink: 0;
+  width: 24px;
+  min-width: 24px;
 }
 
 @media (max-width: 640px) {
