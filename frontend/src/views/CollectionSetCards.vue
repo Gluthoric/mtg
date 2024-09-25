@@ -41,7 +41,7 @@
 
       <div class="card-grid grid gap-4" :style="gridStyle">
         <div
-          v-for="card in sortedCards"
+          v-for="card in filteredAndSortedCards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
@@ -136,7 +136,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, watchEffect } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
 
@@ -163,7 +163,6 @@ export default {
           params: {
             name: nameFilter.value,
             rarity: rarityFilter.value,
-            missing: missingFilter.value,
           },
         });
         cards.value = response.data.cards;
@@ -177,14 +176,18 @@ export default {
     };
 
     const applyFilters = () => {
-      missingFilter.value = false;
       fetchCards();
     };
 
     const toggleMissingFilter = () => {
       missingFilter.value = !missingFilter.value;
-      fetchCards();
     };
+
+    watchEffect(() => {
+      nameFilter.value;
+      rarityFilter.value;
+      fetchCards();
+    });
 
     const debouncedApplyFilters = () => {
       clearTimeout(debounceTimer);
@@ -209,8 +212,10 @@ export default {
       return card.quantity_regular + card.quantity_foil === 0;
     };
 
-    const sortedCards = computed(() => {
-      return cards.value.slice().sort((a, b) => {
+    const filteredAndSortedCards = computed(() => {
+      return cards.value
+        .filter(card => !missingFilter.value || (card.quantity_regular === 0 && card.quantity_foil === 0))
+        .sort((a, b) => {
         if (!a.collector_number && !b.collector_number) return 0;
         if (!a.collector_number) return 1;
         if (!b.collector_number) return -1;
@@ -315,7 +320,7 @@ export default {
       applyFilters,
       debouncedApplyFilters,
       isMissing,
-      sortedCards,
+      filteredAndSortedCards,
       getImageUrl,
       handleImageError,
       increment,
