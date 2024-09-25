@@ -303,8 +303,15 @@ def get_collection_set_cards(set_code):
         if rarity:
             query = query.filter(Card.rarity == rarity)
         if colors:
-            # Use the 'has_any' method for JSONB array fields
-            query = query.filter(Card.colors.has_any(colors))
+            # Validate colors
+            VALID_COLORS = {'W', 'U', 'B', 'R', 'G'}
+            invalid_colors = set(colors) - VALID_COLORS
+            if invalid_colors:
+                return jsonify({"error": f"Invalid colors: {', '.join(invalid_colors)}"}), 400
+
+            # Format colors as a PostgreSQL array literal, e.g., {"U","B"}
+            colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
+            query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
             logger.info(f"Applied color filter: {colors}")
 
         collection = query.paginate(page=page, per_page=per_page, error_out=False)

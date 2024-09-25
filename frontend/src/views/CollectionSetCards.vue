@@ -194,6 +194,7 @@ export default {
     const missingFilter = ref(false);
     const cardsPerRow = ref(8);
     let debounceTimer = null;
+    const cardSize = 150;
 
     const availableColors = ['W', 'U', 'B', 'R', 'G']; // Define available colors
 
@@ -386,9 +387,10 @@ export default {
       gridStyle,
       missingFilter,
       toggleMissingFilter,
-      availableColors,      // New
-      colorFilters,        // New
-      colorClass,          // New
+      availableColors,
+      colorFilters,
+      colorClass,
+      cardSize,
     };
   },
 };
@@ -449,6 +451,15 @@ export default {
 
 .missing-indicator {
   position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: red;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
 }
 
 input[type="range"] {
