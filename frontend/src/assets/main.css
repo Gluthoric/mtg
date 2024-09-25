@@ -6,13 +6,13 @@
 :root {
   --background-color: #121212;
   --text-color: #e0e0e0;
-  --primary-color: #bb86fc;
+  --primary-color: #4299e1;
   --secondary-color: #1f1f1f;
   --border-color: #333333;
-  --input-background: #2c2c2c;
+  --input-background: #2d2d2d;
   --button-background: #333333;
   --button-hover-background: #444444;
-  --link-color: #bb86fc;
+  --link-color: #4299e1;
   --error-color: #f44336;
   --success-color: #4caf50;
 }
@@ -86,10 +86,17 @@ input, select, textarea {
   border: 1px solid var(--border-color);
   padding: 0.5rem;
   border-radius: 4px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-input::placeholder {
-  color: #aaaaaa;
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.5);
+}
+
+input::placeholder, textarea::placeholder {
+  color: #a0aec0;
 }
 
 /* Card Styles */
@@ -100,7 +107,7 @@ input::placeholder {
   padding: 1rem;
   color: var(--text-color);
   transition: transform 0.3s ease;
-  height: auto; /* Let the card content determine the height */
+  height: auto;
   display: flex;
   flex-direction: column;
 }

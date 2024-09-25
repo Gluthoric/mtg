@@ -1,17 +1,17 @@
 <template>
-  <div class="container mx-auto px-4">
-    <h1 class="text-center mb-4 text-2xl font-bold text-blue-600">{{ setName }}</h1>
+  <div class="container mx-auto px-4 bg-dark-300 text-white">
+    <h1 class="text-center mb-4 text-2xl font-bold text-primary">{{ setName }}</h1>
     <div v-if="loading" class="loading text-center mt-4">Loading...</div>
     <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
     <div v-else>
-      <div class="filters grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="filters grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <input
           v-model="nameFilter"
           @input="debouncedApplyFilters"
           placeholder="Filter by name"
-          class="p-2 border rounded"
+          class="p-2 border rounded bg-dark-100 text-white placeholder-gray-medium w-full"
         />
-        <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded">
+        <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded bg-dark-100 text-white w-full">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
           <option value="uncommon">Uncommon</option>
@@ -20,16 +20,15 @@
         </select>
       </div>
 
-      <!-- Slider to Adjust Card Size -->
       <div class="mb-4">
-        <label for="card-size-slider" class="block text-sm font-medium mb-2">Card Size</label>
+        <label for="card-size-slider" class="block text-sm font-medium mb-2 text-gray-light">Card Size</label>
         <input
           id="card-size-slider"
           type="range"
           v-model="cardSize"
-          min="100"
+          min="150"
           max="300"
-          class="w-full"
+          class="w-full bg-dark-100"
         />
       </div>
 
@@ -37,7 +36,7 @@
         <div
           v-for="card in sortedCards"
           :key="card.id"
-          class="card bg-white shadow-md rounded-lg overflow-hidden relative"
+          class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
           :style="{ width: `${cardSize}px` }"
         >
@@ -49,18 +48,17 @@
               class="w-full h-full object-contain"
               @error="handleImageError($event, card)"
             />
-            <div v-else class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500">
+            <div v-else class="w-full h-full flex items-center justify-center bg-dark-100 text-gray-medium">
               No image available
             </div>
           </div>
           <div class="card-info p-4">
-            <h3 class="text-lg font-semibold mb-2 truncate">{{ card.name }}</h3>
-            <p class="text-sm mb-1">Collector Number: {{ card.collector_number }}</p>
-            <p class="text-sm mb-2">Rarity: {{ card.rarity }}</p>
+            <h3 class="text-lg font-semibold mb-2 truncate text-primary">{{ card.name }}</h3>
+            <p class="text-sm mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
+            <p class="text-sm mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
             <div class="card-quantities grid grid-cols-2 gap-2">
-              <!-- Regular Quantity Control -->
               <div class="quantity-control flex flex-col">
-                <label :for="'regular-' + card.id" class="quantity-label mb-1 text-sm font-semibold">
+                <label :for="'regular-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
                   Regular
                 </label>
                 <div class="input-wrapper flex border rounded-md overflow-hidden">
@@ -69,20 +67,20 @@
                     v-model.number="card.quantity_regular"
                     type="number"
                     min="0"
-                    class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-100"
+                    class="quantity-input flex-1 p-1 text-center border-none outline-none bg-dark-100 text-white text-sm"
                     @input="onInput(card, 'regular')"
                   />
-                  <div class="buttons flex flex-col bg-gray-200 border-l">
+                  <div class="buttons flex flex-col bg-dark-200 border-l border-dark-400">
                     <button
                       @click="increment(card, 'regular')"
-                      class="btn increment-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      class="btn increment-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
                       aria-label="Increment Regular Quantity"
                     >
                       ▲
                     </button>
                     <button
                       @click="decrement(card, 'regular')"
-                      class="btn decrement-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      class="btn decrement-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
                       aria-label="Decrement Regular Quantity"
                       :disabled="card.quantity_regular === 0"
                     >
@@ -91,10 +89,8 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Foil Quantity Control -->
               <div class="quantity-control flex flex-col">
-                <label :for="'foil-' + card.id" class="quantity-label mb-1 text-sm font-semibold">
+                <label :for="'foil-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
                   Foil
                 </label>
                 <div class="input-wrapper flex border rounded-md overflow-hidden">
@@ -103,20 +99,20 @@
                     v-model.number="card.quantity_foil"
                     type="number"
                     min="0"
-                    class="quantity-input flex-1 p-2 text-center border-none outline-none bg-gray-100"
+                    class="quantity-input flex-1 p-1 text-center border-none outline-none bg-dark-100 text-white text-sm"
                     @input="onInput(card, 'foil')"
                   />
-                  <div class="buttons flex flex-col bg-gray-200 border-l">
+                  <div class="buttons flex flex-col bg-dark-200 border-l border-dark-400">
                     <button
                       @click="increment(card, 'foil')"
-                      class="btn increment-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      class="btn increment-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
                       aria-label="Increment Foil Quantity"
                     >
                       ▲
                     </button>
                     <button
                       @click="decrement(card, 'foil')"
-                      class="btn decrement-btn px-2 py-1 text-sm bg-gray-300 hover:bg-gray-400"
+                      class="btn decrement-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
                       aria-label="Decrement Foil Quantity"
                       :disabled="card.quantity_foil === 0"
                     >
@@ -152,11 +148,7 @@ export default {
     const error = ref(null);
     const nameFilter = ref('');
     const rarityFilter = ref('');
-
-    // Card size slider
-    const cardSize = ref(200); // Default card size
-
-    // Debounce timer
+    const cardSize = ref(200);
     let debounceTimer = null;
 
     const fetchCards = async () => {
@@ -183,7 +175,6 @@ export default {
       fetchCards();
     };
 
-    // Debounced filter application
     const debouncedApplyFilters = () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
@@ -249,7 +240,7 @@ export default {
     const handleImageError = (event, card) => {
       console.error('Image failed to load for card:', card.name, 'URL:', event.target.src);
       event.target.style.display = 'none';
-      const noImageDiv = event.target.parentNode.querySelector('.bg-gray-200');
+      const noImageDiv = event.target.parentNode.querySelector('.bg-dark-100');
       if (noImageDiv) {
         noImageDiv.style.display = 'flex';
       }
@@ -261,7 +252,6 @@ export default {
           quantity_regular: card.quantity_regular,
           quantity_foil: card.quantity_foil,
         });
-        // Update the local card data
         const index = cards.value.findIndex((c) => c.id === card.id);
         if (index !== -1) {
           cards.value[index] = response.data;
@@ -301,7 +291,7 @@ export default {
     };
 
     const gridStyle = computed(() => ({
-      gridTemplateColumns: `repeat(auto-fit, minmax(${cardSize.value}px, 1fr))`,
+      gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize.value}px, 1fr))`,
     }));
 
     return {
@@ -331,6 +321,11 @@ export default {
 .card {
   display: flex;
   flex-direction: column;
+  transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+  transform: scale(1.02);
 }
 
 .card-info {
@@ -349,7 +344,7 @@ export default {
 }
 
 .quantity-label {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
 .quantity-input {
@@ -374,7 +369,37 @@ export default {
   position: absolute;
 }
 
-.bg-secondary {
-  background-color: #f2f2f2;
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: #4a5568;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  border-radius: 5px;
+}
+
+input[type="range"]:hover {
+  opacity: 1;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #4299e1;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #4299e1;
+  cursor: pointer;
+  border-radius: 50%;
 }
 </style>
