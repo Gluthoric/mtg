@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from config import Config
 from database import db
@@ -18,14 +18,16 @@ redis_client = redis.Redis(host='localhost', port=6379, db=0)
 def get_api_stats(app):
     def _get_stats():
         cache_key = "api_stats"
-        cached_data = app.redis_client.get(cache_key)
+        force_refresh = request.args.get('refresh', '').lower() == 'true'
 
-        if cached_data:
-            return app.response_class(
-                response=cached_data,
-                status=200,
-                mimetype='application/json'
-            )
+        if not force_refresh:
+            cached_data = app.redis_client.get(cache_key)
+            if cached_data:
+                return app.response_class(
+                    response=cached_data,
+                    status=200,
+                    mimetype='application/json'
+                )
 
         try:
             # Collection stats
@@ -83,7 +85,7 @@ def get_api_stats(app):
             }
 
             serialized_data = orjson.dumps(result)
-            app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
+            app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
             return app.response_class(
                 response=serialized_data,

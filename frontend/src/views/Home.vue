@@ -71,22 +71,24 @@ export default {
     })
     let refreshInterval
 
-    const fetchStats = async () => {
+    const fetchStats = async (forceRefresh = false) => {
       try {
-        const response = await axios.get('/api/stats')
-        stats.value = response.data // Set the entire response as stats
+        const response = await axios.get('/api/stats', {
+          params: { refresh: forceRefresh }
+        })
+        stats.value = response.data
       } catch (error) {
         console.error('Failed to fetch stats:', error)
       }
     }
 
     const refreshStats = () => {
-      fetchStats()
+      fetchStats(true)
     }
 
     onMounted(() => {
       fetchStats()
-      refreshInterval = setInterval(fetchStats, 300000) // Refresh every 5 minutes
+      refreshInterval = setInterval(() => fetchStats(), 300000) // Refresh every 5 minutes
     })
 
     onUnmounted(() => {
