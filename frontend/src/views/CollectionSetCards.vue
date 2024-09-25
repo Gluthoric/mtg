@@ -33,8 +33,8 @@
           id="card-size-slider"
           type="range"
           v-model="cardSize"
-          min="200"
-          max="300"
+          min="250"
+          max="400"
           class="w-full bg-dark-100"
         />
       </div>
@@ -50,7 +50,7 @@
           <div class="card-info p-2 flex flex-col">
             <h3 class="text-base font-semibold mb-2 truncate text-primary">{{ card.name }}</h3>
           </div>
-          <div class="image-container" :style="{ height: `${cardSize * 1.2}px` }">
+          <div class="image-container" :style="{ height: `${cardSize * 1.4}px` }">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -154,7 +154,7 @@ export default {
     const nameFilter = ref('');
     const rarityFilter = ref('');
     const missingFilter = ref(false);
-    const cardSize = ref(250);
+    const cardSize = ref(300);
     let debounceTimer = null;
 
     const fetchCards = async () => {
