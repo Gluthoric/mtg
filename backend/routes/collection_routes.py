@@ -277,60 +277,47 @@ def get_collection_stats():
 
 @collection_routes.route('/collection/sets/<string:set_code>/cards', methods=['GET'])
 def get_collection_set_cards(set_code):
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 300, type=int)
     name = request.args.get('name', '', type=str)
     rarity = request.args.get('rarity', '', type=str)
-
-    # Retrieve both 'colors' and 'colors[]' to handle different frontend implementations
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
 
-    cache_key = f"collection_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name}:rarity:{rarity}:colors:{','.join(colors)}"
-    cached_data = current_app.redis_client.get(cache_key)
-
-    if cached_data:
-        return current_app.response_class(
-            response=cached_data,
-            status=200,
-            mimetype='application/json'
-        )
-
     try:
-        query = Collection.query.join(Card).join(Set).filter(Set.code == set_code)
+        query = Card.query.outerjoin(Collection).join(Set).filter(Set.code == set_code)
 
         if name:
             query = query.filter(Card.name.ilike(f'%{name}%'))
         if rarity:
             query = query.filter(Card.rarity == rarity)
         if colors:
-            # Validate colors
             VALID_COLORS = {'W', 'U', 'B', 'R', 'G'}
             invalid_colors = set(colors) - VALID_COLORS
             if invalid_colors:
                 return jsonify({"error": f"Invalid colors: {', '.join(invalid_colors)}"}), 400
 
-            # Format colors as a PostgreSQL array literal, e.g., {"U","B"}
             colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
             query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
-            logger.info(f"Applied color filter: {colors}")
 
-        collection = query.paginate(page=page, per_page=per_page, error_out=False)
+        # Log the SQL query
+        logger.info(f"Executing query: {query}")
+
+        cards = query.all()
+
+        # Log the number of cards returned
+        logger.info(f"Number of cards returned: {len(cards)}")
 
         result = {
-            'cards': serialize_collection(collection.items),
-            'total': collection.total,
-            'pages': collection.pages,
-            'current_page': page
+            'cards': [{
+                **card.to_dict(),
+                'quantity_regular': card.collection.quantity_regular if card.collection else 0,
+                'quantity_foil': card.collection.quantity_foil if card.collection else 0
+            } for card in cards],
+            'total': len(cards),
         }
 
-        serialized_data = orjson.dumps(result)
-        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+        # Log the first few cards for debugging
+        logger.info(f"First 5 cards: {result['cards'][:5]}")
 
-        return current_app.response_class(
-            response=serialized_data,
-            status=200,
-            mimetype='application/json'
-        )
+        return jsonify(result), 200
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
