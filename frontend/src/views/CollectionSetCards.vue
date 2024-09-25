@@ -26,7 +26,7 @@
           id="card-size-slider"
           type="range"
           v-model="cardSize"
-          min="150"
+          min="200"
           max="300"
           class="w-full bg-dark-100"
         />
@@ -38,7 +38,7 @@
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
-          :style="{ width: `${cardSize}px` }"
+          :style="{ width: '100%', maxWidth: `${cardSize}px` }"
         >
           <div class="image-container" :style="{ height: `${cardSize}px` }">
             <img
@@ -52,73 +52,69 @@
               No image available
             </div>
           </div>
-          <div class="card-info p-4">
-            <h3 class="text-lg font-semibold mb-2 truncate text-primary">{{ card.name }}</h3>
-            <p class="text-sm mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
-            <p class="text-sm mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
-            <div class="card-quantities grid grid-cols-2 gap-2">
-              <div class="quantity-control flex flex-col">
+          <div class="card-info p-2">
+            <h3 class="text-base font-semibold mb-1 truncate text-primary">{{ card.name }}</h3>
+            <p class="text-xs mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
+            <p class="text-xs mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
+            <div class="card-quantities flex justify-between gap-1">
+              <div class="quantity-control flex flex-col flex-1">
                 <label :for="'regular-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
                   Regular
                 </label>
-                <div class="input-wrapper flex border rounded-md overflow-hidden">
+                <div class="input-wrapper flex items-center border rounded-md overflow-hidden">
+                  <button
+                    @click="decrement(card, 'regular')"
+                    class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    aria-label="Decrement Regular Quantity"
+                    :disabled="card.quantity_regular === 0"
+                  >
+                    –
+                  </button>
                   <input
                     :id="'regular-' + card.id"
                     v-model.number="card.quantity_regular"
                     type="number"
                     min="0"
-                    class="quantity-input flex-1 p-1 text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    class="quantity-input w-12 h-8 text-center border-none outline-none bg-dark-100 text-white text-sm"
                     @input="onInput(card, 'regular')"
                   />
-                  <div class="buttons flex flex-col bg-dark-200 border-l border-dark-400">
-                    <button
-                      @click="increment(card, 'regular')"
-                      class="btn increment-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
-                      aria-label="Increment Regular Quantity"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      @click="decrement(card, 'regular')"
-                      class="btn decrement-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
-                      aria-label="Decrement Regular Quantity"
-                      :disabled="card.quantity_regular === 0"
-                    >
-                      ▼
-                    </button>
-                  </div>
+                  <button
+                    @click="increment(card, 'regular')"
+                    class="btn increment-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    aria-label="Increment Regular Quantity"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
-              <div class="quantity-control flex flex-col">
+              <div class="quantity-control flex flex-col flex-1">
                 <label :for="'foil-' + card.id" class="quantity-label mb-1 text-xs font-semibold text-gray-light">
                   Foil
                 </label>
-                <div class="input-wrapper flex border rounded-md overflow-hidden">
+                <div class="input-wrapper flex items-center border rounded-md overflow-hidden">
+                  <button
+                    @click="decrement(card, 'foil')"
+                    class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    aria-label="Decrement Foil Quantity"
+                    :disabled="card.quantity_foil === 0"
+                  >
+                    –
+                  </button>
                   <input
                     :id="'foil-' + card.id"
                     v-model.number="card.quantity_foil"
                     type="number"
                     min="0"
-                    class="quantity-input flex-1 p-1 text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    class="quantity-input w-12 h-8 text-center border-none outline-none bg-dark-100 text-white text-sm"
                     @input="onInput(card, 'foil')"
                   />
-                  <div class="buttons flex flex-col bg-dark-200 border-l border-dark-400">
-                    <button
-                      @click="increment(card, 'foil')"
-                      class="btn increment-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
-                      aria-label="Increment Foil Quantity"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      @click="decrement(card, 'foil')"
-                      class="btn decrement-btn px-1 py-0.5 text-xs bg-dark-300 hover:bg-dark-400"
-                      aria-label="Decrement Foil Quantity"
-                      :disabled="card.quantity_foil === 0"
-                    >
-                      ▼
-                    </button>
-                  </div>
+                  <button
+                    @click="increment(card, 'foil')"
+                    class="btn increment-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
+                    aria-label="Increment Foil Quantity"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>
@@ -148,7 +144,7 @@ export default {
     const error = ref(null);
     const nameFilter = ref('');
     const rarityFilter = ref('');
-    const cardSize = ref(200);
+    const cardSize = ref(250);
     let debounceTimer = null;
 
     const fetchCards = async () => {
