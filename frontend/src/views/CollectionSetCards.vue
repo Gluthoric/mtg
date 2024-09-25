@@ -65,18 +65,18 @@
       </div>
 
       <!-- Cards Grid -->
-      <div class="card-grid grid gap-4" :style="gridStyle">
+      <div class="card-grid grid gap-6" :style="gridStyle">
         <div
           v-for="card in filteredAndSortedCards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
-          :style="{ width: '100%', maxWidth: `${cardSize}px` }"
+          :style="{ width: '100%', maxWidth: `${cardSize * 1.2}px` }"
         >
           <div class="card-info p-2 z-10 bg-dark-200 bg-opacity-80">
             <h3 class="text-base font-semibold truncate text-primary">{{ card.name }}</h3>
           </div>
-          <div class="image-container flex-grow" :style="{ height: `${cardSize * 1.2}px` }">
+          <div class="image-container" :style="{ height: `${cardSize * 1.4}px` }">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -192,9 +192,9 @@ export default {
     const rarityFilter = ref('');
     const colorFilters = ref([]); // Reactive variable for color filters
     const missingFilter = ref(false);
-    const cardsPerRow = ref(8);
+    const cardsPerRow = ref(6);
     let debounceTimer = null;
-    const cardSize = 150;
+    const cardSize = 180;
 
     const availableColors = ['W', 'U', 'B', 'R', 'G']; // Define available colors
 
@@ -397,6 +397,32 @@ export default {
 </script>
 
 <style scoped>
+.card {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-in-out;
+  width: 100%;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.card-info {
+  padding: 0.75rem;
+}
+
+.image-container {
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.image-container img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
 .card {
   display: flex;
   flex-direction: column;
