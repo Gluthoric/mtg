@@ -130,7 +130,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isMissing(card)" class="missing-indicator absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+          <div v-if="isMissing(card)" class="missing-indicator absolute top-1 right-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow">
             Missing
           </div>
         </div>
