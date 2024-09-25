@@ -28,15 +28,17 @@
       </div>
 
       <div class="mb-4">
-        <label for="card-size-slider" class="block text-sm font-medium mb-2 text-gray-light">Card Size</label>
+        <label for="cards-per-row-slider" class="block text-sm font-medium mb-2 text-gray-light">Cards per row</label>
         <input
-          id="card-size-slider"
+          id="cards-per-row-slider"
           type="range"
-          v-model="cardSize"
-          min="250"
-          max="400"
+          v-model="cardsPerRow"
+          min="5"
+          max="12"
+          step="1"
           class="w-full bg-dark-100"
         />
+        <div class="text-sm text-gray-light mt-1">{{ cardsPerRow }} cards per row</div>
       </div>
 
       <div class="card-grid grid gap-4" :style="gridStyle">
@@ -156,7 +158,7 @@ export default {
     const nameFilter = ref('');
     const rarityFilter = ref('');
     const missingFilter = ref(false);
-    const cardSize = ref(300);
+    const cardsPerRow = ref(8);
     let debounceTimer = null;
 
     const fetchCards = async () => {
@@ -311,7 +313,7 @@ export default {
     };
 
     const gridStyle = computed(() => ({
-      gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize.value}px, 1fr))`,
+      gridTemplateColumns: `repeat(${cardsPerRow.value}, 1fr)`,
     }));
 
     return {
@@ -330,7 +332,7 @@ export default {
       increment,
       decrement,
       onInput,
-      cardSize,
+      cardsPerRow,
       gridStyle,
       missingFilter,
       toggleMissingFilter,
@@ -344,6 +346,7 @@ export default {
   display: flex;
   flex-direction: column;
   transition: transform 0.2s ease-in-out;
+  width: 100%;
 }
 
 .card:hover {
@@ -362,11 +365,7 @@ export default {
 .image-container {
   width: 100%;
   overflow: hidden;
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
+  aspect-ratio: 5 / 7;
 }
 
 .quantity-control {
