@@ -5,12 +5,15 @@
     <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
     <div v-else>
       <div class="filters grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <!-- Name Filter -->
         <input
           v-model="nameFilter"
           @input="debouncedApplyFilters"
           placeholder="Filter by name"
           class="p-2 border rounded bg-dark-100 text-white placeholder-gray-medium w-full"
         />
+
+        <!-- Rarity Filter -->
         <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded bg-dark-100 text-white w-full">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
@@ -18,6 +21,8 @@
           <option value="rare">Rare</option>
           <option value="mythic">Mythic</option>
         </select>
+
+        <!-- Color Filter -->
         <div class="color-filter">
           <label class="block text-sm font-medium mb-2 text-gray-light">Colors</label>
           <div class="flex flex-wrap gap-2">
@@ -33,6 +38,8 @@
             </label>
           </div>
         </div>
+
+        <!-- Missing Filter Button -->
         <button
           @click="toggleMissingFilter"
           class="p-2 border rounded bg-dark-100 text-white w-full hover:bg-dark-200"
@@ -42,6 +49,7 @@
         </button>
       </div>
 
+      <!-- Cards Per Row Slider -->
       <div class="mb-4">
         <label for="cards-per-row-slider" class="block text-sm font-medium mb-2 text-gray-light">Cards per row</label>
         <input
@@ -56,6 +64,7 @@
         <div class="text-sm text-gray-light mt-1">{{ cardsPerRow }} cards per row</div>
       </div>
 
+      <!-- Cards Grid -->
       <div class="card-grid grid gap-4" :style="gridStyle">
         <div
           v-for="card in filteredAndSortedCards"
@@ -85,6 +94,7 @@
               <p class="text-xs text-gray-light">{{ card.rarity }}</p>
             </div>
             <div class="card-quantities flex flex-col space-y-2">
+              <!-- Regular Quantity Control -->
               <div class="quantity-control">
                 <label :for="'regular-' + card.id" class="quantity-label text-xs font-semibold text-gray-light block mb-1">
                   Regular
@@ -115,6 +125,8 @@
                   </button>
                 </div>
               </div>
+
+              <!-- Foil Quantity Control -->
               <div class="quantity-control">
                 <label :for="'foil-' + card.id" class="quantity-label text-xs font-semibold text-gray-light block mb-1">
                   Foil
@@ -152,14 +164,20 @@
           </div>
         </div>
       </div>
+
+      <!-- Handle No Cards Matching Filters -->
+      <div v-if="filteredAndSortedCards.length === 0" class="text-center text-gray-light">
+        No cards match the selected filters.
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, watch, computed, watchEffect } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
+import qs from 'qs';  // Import qs for query string serialization
 
 export default {
   name: 'CollectionSetCards',
@@ -172,12 +190,12 @@ export default {
     const error = ref(null);
     const nameFilter = ref('');
     const rarityFilter = ref('');
-    const colorFilters = ref([]);
+    const colorFilters = ref([]); // Reactive variable for color filters
     const missingFilter = ref(false);
     const cardsPerRow = ref(8);
     let debounceTimer = null;
 
-    const availableColors = ['W', 'U', 'B', 'R', 'G'];
+    const availableColors = ['W', 'U', 'B', 'R', 'G']; // Define available colors
 
     const fetchCards = async () => {
       loading.value = true;
@@ -186,10 +204,13 @@ export default {
         const params = {
           name: nameFilter.value,
           rarity: rarityFilter.value,
-          colors: colorFilters.value,
+          colors: colorFilters.value, // Send colors as array
         };
 
-        const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, { params });
+        const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
+          params,
+          paramsSerializer: params => qs.stringify(params, { arrayFormat: 'repeat' }) // Serialize as colors=W&colors=U
+        });
         cards.value = response.data.cards;
         setName.value = cards.value.length > 0 ? cards.value[0].set_name : '';
       } catch (err) {
@@ -365,9 +386,9 @@ export default {
       gridStyle,
       missingFilter,
       toggleMissingFilter,
-      availableColors,
-      colorFilters,
-      colorClass,
+      availableColors,      // New
+      colorFilters,        // New
+      colorClass,          // New
     };
   },
 };

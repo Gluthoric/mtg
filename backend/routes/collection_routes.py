@@ -281,7 +281,9 @@ def get_collection_set_cards(set_code):
     per_page = request.args.get('per_page', 300, type=int)
     name = request.args.get('name', '', type=str)
     rarity = request.args.get('rarity', '', type=str)
-    colors = request.args.getlist('colors')  # Changed from 'colors[]' to 'colors'
+
+    # Retrieve both 'colors' and 'colors[]' to handle different frontend implementations
+    colors = request.args.getlist('colors') + request.args.getlist('colors[]')
 
     cache_key = f"collection_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name}:rarity:{rarity}:colors:{','.join(colors)}"
     cached_data = current_app.redis_client.get(cache_key)
@@ -301,10 +303,9 @@ def get_collection_set_cards(set_code):
         if rarity:
             query = query.filter(Card.rarity == rarity)
         if colors:
-            logger.info(f"Filtering by colors: {colors}")
-            query = query.filter(Card.colors.op('?|')(colors))
-        else:
-            logger.info("No color filter applied.")
+            # Use the 'has_any' method for JSONB array fields
+            query = query.filter(Card.colors.has_any(colors))
+            logger.info(f"Applied color filter: {colors}")
 
         collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
