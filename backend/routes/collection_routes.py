@@ -281,8 +281,9 @@ def get_collection_set_cards(set_code):
     per_page = request.args.get('per_page', 300, type=int)
     name = request.args.get('name', '', type=str)
     rarity = request.args.get('rarity', '', type=str)
+    colors = request.args.getlist('colors')  # Changed from 'colors[]' to 'colors'
 
-    cache_key = f"collection_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name}:rarity:{rarity}"
+    cache_key = f"collection_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name}:rarity:{rarity}:colors:{','.join(colors)}"
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
@@ -292,30 +293,40 @@ def get_collection_set_cards(set_code):
             mimetype='application/json'
         )
 
-    query = Collection.query.join(Card).join(Set).filter(Set.code == set_code)
+    try:
+        query = Collection.query.join(Card).join(Set).filter(Set.code == set_code)
 
-    if name:
-        query = query.filter(Card.name.ilike(f'%{name}%'))
-    if rarity:
-        query = query.filter(Card.rarity == rarity)
+        if name:
+            query = query.filter(Card.name.ilike(f'%{name}%'))
+        if rarity:
+            query = query.filter(Card.rarity == rarity)
+        if colors:
+            logger.info(f"Filtering by colors: {colors}")
+            query = query.filter(Card.colors.op('?|')(colors))
+        else:
+            logger.info("No color filter applied.")
 
-    collection = query.paginate(page=page, per_page=per_page, error_out=False)
+        collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    result = {
-        'cards': serialize_collection(collection.items),
-        'total': collection.total,
-        'pages': collection.pages,
-        'current_page': page
-    }
+        result = {
+            'cards': serialize_collection(collection.items),
+            'total': collection.total,
+            'pages': collection.pages,
+            'current_page': page
+        }
 
-    serialized_data = orjson.dumps(result)
-    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+        serialized_data = orjson.dumps(result)
+        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
-    return current_app.response_class(
-        response=serialized_data,
-        status=200,
-        mimetype='application/json'
-    )
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
+    except Exception as e:
+        error_message = f"An unexpected error occurred: {str(e)}"
+        logger.exception(error_message)
+        return jsonify({"error": error_message}), 500
 
 @collection_routes.route('/collection/import_csv', methods=['POST'])
 def import_csv():

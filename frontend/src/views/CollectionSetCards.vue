@@ -4,7 +4,7 @@
     <div v-if="loading" class="loading text-center mt-4">Loading...</div>
     <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
     <div v-else>
-      <div class="filters grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+      <div class="filters grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <input
           v-model="nameFilter"
           @input="debouncedApplyFilters"
@@ -18,6 +18,21 @@
           <option value="rare">Rare</option>
           <option value="mythic">Mythic</option>
         </select>
+        <div class="color-filter">
+          <label class="block text-sm font-medium mb-2 text-gray-light">Colors</label>
+          <div class="flex flex-wrap gap-2">
+            <label v-for="color in availableColors" :key="color" class="flex items-center">
+              <input
+                type="checkbox"
+                :value="color"
+                v-model="colorFilters"
+                @change="applyFilters"
+                class="mr-1"
+              />
+              <span :class="colorClass(color)" class="capitalize">{{ color }}</span>
+            </label>
+          </div>
+        </div>
         <button
           @click="toggleMissingFilter"
           class="p-2 border rounded bg-dark-100 text-white w-full hover:bg-dark-200"
@@ -157,20 +172,24 @@ export default {
     const error = ref(null);
     const nameFilter = ref('');
     const rarityFilter = ref('');
+    const colorFilters = ref([]);
     const missingFilter = ref(false);
     const cardsPerRow = ref(8);
     let debounceTimer = null;
+
+    const availableColors = ['W', 'U', 'B', 'R', 'G'];
 
     const fetchCards = async () => {
       loading.value = true;
       error.value = null;
       try {
-        const response = await axios.get(`/api/sets/${setCode.value}/cards`, {
-          params: {
-            name: nameFilter.value,
-            rarity: rarityFilter.value,
-          },
-        });
+        const params = {
+          name: nameFilter.value,
+          rarity: rarityFilter.value,
+          colors: colorFilters.value,
+        };
+
+        const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, { params });
         cards.value = response.data.cards;
         setName.value = cards.value.length > 0 ? cards.value[0].set_name : '';
       } catch (err) {
@@ -188,12 +207,6 @@ export default {
     const toggleMissingFilter = () => {
       missingFilter.value = !missingFilter.value;
     };
-
-    watchEffect(() => {
-      nameFilter.value;
-      rarityFilter.value;
-      fetchCards();
-    });
 
     const debouncedApplyFilters = () => {
       clearTimeout(debounceTimer);
@@ -220,20 +233,25 @@ export default {
 
     const filteredAndSortedCards = computed(() => {
       return cards.value
-        .filter(card => !missingFilter.value || (card.quantity_regular === 0 && card.quantity_foil === 0))
+        .filter(card => {
+          if (missingFilter.value) {
+            return card.quantity_regular === 0 && card.quantity_foil === 0;
+          }
+          return true;
+        })
         .sort((a, b) => {
-        if (!a.collector_number && !b.collector_number) return 0;
-        if (!a.collector_number) return 1;
-        if (!b.collector_number) return -1;
+          if (!a.collector_number && !b.collector_number) return 0;
+          if (!a.collector_number) return 1;
+          if (!b.collector_number) return -1;
 
-        const numA = parseInt(a.collector_number, 10);
-        const numB = parseInt(b.collector_number, 10);
+          const numA = parseInt(a.collector_number, 10);
+          const numB = parseInt(b.collector_number, 10);
 
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB;
-        }
-        return a.collector_number.localeCompare(b.collector_number);
-      });
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+          }
+          return a.collector_number.localeCompare(b.collector_number);
+        });
     });
 
     const getImageUrl = (card) => {
@@ -316,6 +334,17 @@ export default {
       gridTemplateColumns: `repeat(${cardsPerRow.value}, 1fr)`,
     }));
 
+    const colorClass = (color) => {
+      const colorMap = {
+        W: 'text-white',
+        U: 'text-blue-500',
+        B: 'text-black',
+        R: 'text-red-500',
+        G: 'text-green-500',
+      };
+      return colorMap[color] || 'text-gray-500';
+    };
+
     return {
       setName,
       cards,
@@ -336,6 +365,9 @@ export default {
       gridStyle,
       missingFilter,
       toggleMissingFilter,
+      availableColors,
+      colorFilters,
+      colorClass,
     };
   },
 };
@@ -450,5 +482,22 @@ input[type="range"]::-moz-range-thumb {
   .quantity-control {
     margin-bottom: 0.5rem;
   }
+}
+
+/* New styles for color labels */
+.text-white {
+  color: white;
+}
+.text-blue-500 {
+  color: #4299e1; /* Tailwind CSS blue-500 */
+}
+.text-black {
+  color: black;
+}
+.text-red-500 {
+  color: #f56565; /* Tailwind CSS red-500 */
+}
+.text-green-500 {
+  color: #48bb78; /* Tailwind CSS green-500 */
 }
 </style>
