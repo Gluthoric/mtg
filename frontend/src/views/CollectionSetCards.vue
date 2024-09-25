@@ -18,6 +18,13 @@
           <option value="rare">Rare</option>
           <option value="mythic">Mythic</option>
         </select>
+        <button
+          @click="toggleMissingFilter"
+          class="p-2 border rounded bg-dark-100 text-white w-full hover:bg-dark-200"
+          :class="{ 'bg-blue-600': missingFilter }"
+        >
+          {{ missingFilter ? 'Show All Cards' : 'Show Missing Cards' }}
+        </button>
       </div>
 
       <div class="mb-4">
@@ -144,6 +151,7 @@ export default {
     const error = ref(null);
     const nameFilter = ref('');
     const rarityFilter = ref('');
+    const missingFilter = ref(false);
     const cardSize = ref(250);
     let debounceTimer = null;
 
@@ -155,6 +163,7 @@ export default {
           params: {
             name: nameFilter.value,
             rarity: rarityFilter.value,
+            missing: missingFilter.value,
           },
         });
         cards.value = response.data.cards;
@@ -168,6 +177,12 @@ export default {
     };
 
     const applyFilters = () => {
+      missingFilter.value = false;
+      fetchCards();
+    };
+
+    const toggleMissingFilter = () => {
+      missingFilter.value = !missingFilter.value;
       fetchCards();
     };
 
@@ -308,6 +323,8 @@ export default {
       onInput,
       cardSize,
       gridStyle,
+      missingFilter,
+      toggleMissingFilter,
     };
   },
 };
