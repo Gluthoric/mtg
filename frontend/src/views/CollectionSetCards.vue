@@ -47,7 +47,10 @@
           :class="{ 'border-2 border-red-500': isMissing(card) }"
           :style="{ width: '100%', maxWidth: `${cardSize}px` }"
         >
-          <div class="image-container" :style="{ height: `${cardSize}px` }">
+          <div class="card-info p-2 flex flex-col">
+            <h3 class="text-base font-semibold mb-2 truncate text-primary">{{ card.name }}</h3>
+          </div>
+          <div class="image-container" :style="{ height: `${cardSize * 1.2}px` }">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -60,7 +63,6 @@
             </div>
           </div>
           <div class="card-info p-2 flex flex-col h-full">
-            <h3 class="text-base font-semibold mb-1 truncate text-primary">{{ card.name }}</h3>
             <p class="text-xs mb-1 text-gray-light">Collector Number: {{ card.collector_number }}</p>
             <p class="text-xs mb-2 text-gray-light">Rarity: {{ card.rarity }}</p>
             <div class="card-quantities mt-auto">
@@ -359,6 +361,12 @@ export default {
 .image-container {
   width: 100%;
   overflow: hidden;
+  flex-grow: 1;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
 }
 
 .quantity-label {
