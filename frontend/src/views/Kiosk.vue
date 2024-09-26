@@ -137,6 +137,81 @@ export default {
 </script>
 
 <style scoped>
+.controls {
+  background-color: var(--secondary-color);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+input, select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+}
+
+input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+.set-types-container {
+  margin-top: 1rem;
+}
+
+.set-types-container h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.set-types-container .grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 768px) {
+  .set-types-container .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .set-types-container .grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.set-types-container label {
+  display: flex;
+  align-items: center;
+}
+
+.set-types-container input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.set-types-container span {
+  text-transform: capitalize;
+}
+
 .card {
   padding: 1rem;
   background-color: var(--secondary-color);
