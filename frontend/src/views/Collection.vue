@@ -1,20 +1,6 @@
 <template>
   <div class="container">
     <h1 class="text-center mb-2">My Collection</h1>
-    <div v-if="stats" class="collection-stats card grid grid-cols-3 mb-2">
-      <div class="stat">
-        <h2>Total Cards</h2>
-        <p>{{ stats.total_cards }}</p>
-      </div>
-      <div class="stat">
-        <h2>Unique Cards</h2>
-        <p>{{ stats.unique_cards }}</p>
-      </div>
-      <div class="stat">
-        <h2>Total Value</h2>
-        <p>${{ stats.total_value.toFixed(2) }}</p>
-      </div>
-    </div>
     <SetListControls
       :setTypes="setTypes"
       :totalPages="totalPages"
@@ -68,7 +54,6 @@ export default {
   },
   setup() {
     const sets = ref([])
-    const stats = ref(null)
     const loading = ref(true)
     const error = ref(null)
     const filters = ref({})
@@ -80,16 +65,6 @@ export default {
       'core', 'expansion', 'masters', 'draft_innovation', 'funny',
       'starter', 'box', 'promo', 'token', 'memorabilia'
     ])
-
-    const fetchStats = async () => {
-      try {
-        const response = await axios.get('/api/collection/stats')
-        stats.value = response.data
-      } catch (err) {
-        console.error('Error fetching collection stats:', err)
-        error.value = 'Failed to load collection stats'
-      }
-    }
 
     const fetchSets = async () => {
       loading.value = true
@@ -151,13 +126,11 @@ export default {
     }
 
     onMounted(() => {
-      fetchStats()
       fetchSets()
     })
 
     return {
       sets,
-      stats,
       loading,
       error,
       filters,
