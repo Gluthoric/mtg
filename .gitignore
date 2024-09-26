@@ -107,3 +107,4 @@ venv/
 data/scryfall_json/default-cards.json
 backend/scryfall_default_cards.json
 .aider*
+notes/scryfall_default_cards.json
