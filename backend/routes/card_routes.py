@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, jsonify, request, current_app
 from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.sql import func, asc, desc, text
-from sqlalchemy import or_, distinct
+from sqlalchemy import or_, distinct, Float
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.card import Card
 from models.set import Set

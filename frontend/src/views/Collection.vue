@@ -75,15 +75,14 @@ export default {
     const sets = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const filters = ref({})
+    const filters = ref({
+      set_type: ['core', 'expansion', 'masters', 'draft_innovation', 'funny']
+    })
     const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
     const perPage = ref(20)
-    const setTypes = ref([
-      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
-      'starter', 'box', 'promo', 'token', 'memorabilia'
-    ])
+    const setTypes = ref(['core', 'expansion', 'masters', 'draft_innovation', 'funny'])
 
     const fetchSets = async () => {
       loading.value = true
@@ -109,7 +108,16 @@ export default {
     }
 
     const updateFilters = (newFilters) => {
-      filters.value = { ...filters.value, ...newFilters }
+      if (newFilters.set_type) {
+        // If set_type is an empty array, remove it from filters
+        if (newFilters.set_type.length === 0) {
+          delete filters.value.set_type
+        } else {
+          filters.value.set_type = newFilters.set_type
+        }
+      } else {
+        filters.value = { ...filters.value, ...newFilters }
+      }
       currentPage.value = 1
       fetchSets()
     }
