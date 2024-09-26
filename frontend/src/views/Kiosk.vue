@@ -19,13 +19,13 @@
           </div>
 
           <!-- Set code and name in a compact format -->
-          <h3>{{ set.code.toUpperCase() }} - {{ set.name }}</h3>
+          <h3 class="text-center">{{ set.code.toUpperCase() }} - {{ set.name }}</h3>
 
           <!-- Display the Kiosk card count -->
-          <p>Kiosk: {{ set.kiosk_count }}</p>
+          <p class="text-center">Kiosk: {{ set.kiosk_count }}</p>
 
           <!-- Display the total value of cards in the set -->
-          <p>Value: ${{ set.total_value !== null && set.total_value !== undefined ? set.total_value.toFixed(2) : 'N/A' }}</p>
+          <p class="text-center">Value: ${{ set.total_value !== null && set.total_value !== undefined ? set.total_value.toFixed(2) : 'N/A' }}</p>
         </router-link>
       </div>
     </div>
