@@ -578,7 +578,7 @@ File: /home/gluth/mtg/backend/routes/collection_routes.py
 ================================================================================
 import pandas as pd
 from flask import Blueprint, jsonify, request, current_app
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.sql import func, asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.collection import Collection
@@ -664,6 +664,14 @@ def get_collection_sets():
 
         logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
+        # Subquery to calculate collection_count per set_code
+        subquery = db.session.query(
+            Card.set_code.label('set_code'),
+            func.count(Collection.card_id).label('collection_count')
+        ).outerjoin(Collection, Collection.card_id == Card.id
+        ).group_by(Card.set_code).subquery()
+
+        # Main query to fetch sets with their collection counts
         query = db.session.query(
             Set.id,
             Set.code,
@@ -674,20 +682,8 @@ def get_collection_sets():
             Set.digital,
             Set.foil_only,
             Set.icon_svg_uri,
-            func.count(Collection.card_id).label('collection_count')
-        ).outerjoin(Card, Card.set_code == Set.code
-        ).outerjoin(Collection, Collection.card_id == Card.id
-        ).group_by(
-            Set.id,
-            Set.code,
-            Set.name,
-            Set.released_at,
-            Set.set_type,
-            Set.card_count,
-            Set.digital,
-            Set.foil_only,
-            Set.icon_svg_uri
-        )
+            func.coalesce(subquery.c.collection_count, 0).label('collection_count')
+        ).outerjoin(subquery, Set.code == subquery.c.set_code)
 
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
@@ -703,7 +699,7 @@ def get_collection_sets():
             return jsonify({"error": error_message}), 400
 
         if sort_by == 'collection_count':
-            sort_column = func.count(Collection.card_id)
+            sort_column = subquery.c.collection_count
         else:
             sort_column = getattr(Set, sort_by)
 
@@ -860,8 +856,24 @@ def get_collection_set_cards(set_code):
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
 
     try:
-        query = Card.query.outerjoin(Collection).join(Set).filter(Set.code == set_code)
+        # Build the query with only required columns using model attributes
+        query = Card.query.options(
+            load_only(
+                Card.id,
+                Card.name,
+                Card.image_uris,
+                Card.collector_number,
+                Card.prices,
+                Card.rarity,
+                Card.set_name,
+            ),
+            joinedload(Card.collection).load_only(
+                Collection.quantity_regular,
+                Collection.quantity_foil
+            )
+        ).join(Set).filter(Set.code == set_code)
 
+        # Apply filters
         if name:
             query = query.filter(Card.name.ilike(f'%{name}%'))
         if rarity:
@@ -872,28 +884,28 @@ def get_collection_set_cards(set_code):
             if invalid_colors:
                 return jsonify({"error": f"Invalid colors: {', '.join(invalid_colors)}"}), 400
 
+            # Use JSONB array contains operator '?|'
             colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
             query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
 
-        # Log the SQL query
-        logger.info(f"Executing query: {query}")
-
+        # Execute the query
         cards = query.all()
 
-        # Log the number of cards returned
-        logger.info(f"Number of cards returned: {len(cards)}")
-
+        # Prepare the response
         result = {
             'cards': [{
-                **card.to_dict(),
+                'id': card.id,
+                'name': card.name,
+                'image_uris': card.image_uris,
+                'collector_number': card.collector_number,
+                'prices': card.prices,
+                'rarity': card.rarity,
+                'set_name': card.set_name,
                 'quantity_regular': card.collection.quantity_regular if card.collection else 0,
                 'quantity_foil': card.collection.quantity_foil if card.collection else 0
             } for card in cards],
             'total': len(cards),
         }
-
-        # Log the first few cards for debugging
-        logger.info(f"First 5 cards: {result['cards'][:5]}")
 
         return jsonify(result), 200
     except Exception as e:
