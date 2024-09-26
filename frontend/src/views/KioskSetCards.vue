@@ -4,66 +4,12 @@
     <div v-if="loading" class="loading text-center mt-4">Loading...</div>
     <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
     <div v-else>
-      <div class="controls bg-secondary p-4 rounded-lg shadow-md mb-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Name Filter -->
-          <div class="filter-section">
-            <input
-              v-model="nameFilter"
-              @input="debouncedApplyFilters"
-              placeholder="Search by name"
-              class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <!-- Rarity Filter -->
-          <div class="filter-section">
-            <select 
-              v-model="rarityFilter" 
-              @change="applyFilters"
-              class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">All Rarities</option>
-              <option value="common">Common</option>
-              <option value="uncommon">Uncommon</option>
-              <option value="rare">Rare</option>
-              <option value="mythic">Mythic</option>
-            </select>
-          </div>
-
-          <!-- Color Filter -->
-          <div class="filter-section">
-            <label class="block text-sm font-medium mb-2">Colors</label>
-            <div class="flex flex-wrap gap-2">
-              <label v-for="color in availableColors" :key="color" class="flex items-center">
-                <input
-                  type="checkbox"
-                  :value="color"
-                  v-model="colorFilters"
-                  @change="applyFilters"
-                  class="mr-1"
-                />
-                <span :class="colorClass(color)" class="capitalize">{{ color }}</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Cards Per Row Slider -->
-          <div class="filter-section">
-            <label for="cards-per-row-slider" class="block text-sm font-medium mb-2">Cards per row</label>
-            <input
-              id="cards-per-row-slider"
-              type="range"
-              v-model="cardsPerRow"
-              min="5"
-              max="12"
-              step="1"
-              class="w-full"
-            />
-            <div class="text-sm mt-1">{{ cardsPerRow }} cards per row</div>
-          </div>
-        </div>
-      </div>
+      <CardListControls
+        :filters="filters"
+        :cardsPerRow="cardsPerRow"
+        @update-filters="updateFilters"
+        @update-cards-per-row="updateCardsPerRow"
+      />
 
       <!-- Cards Grid -->
       <div class="card-grid grid gap-6" :style="gridStyle">
@@ -180,9 +126,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import CardListControls from '../components/CardListControls.vue'
 
 export default {
   name: 'KioskSetCards',
+  components: {
+    CardListControls
+  },
   setup() {
     const route = useRoute()
     const setCode = route.params.setCode
@@ -190,12 +140,14 @@ export default {
     const cards = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const nameFilter = ref('')
-    const rarityFilter = ref('')
-    const colorFilters = ref([])
+    const filters = ref({
+      name: '',
+      rarity: '',
+      colors: [],
+      missing: false
+    })
     const cardsPerRow = ref(6)
     const cardSize = 180
-    const availableColors = ['W', 'U', 'B', 'R', 'G']
 
     const fetchCards = async () => {
       loading.value = true
@@ -216,11 +168,13 @@ export default {
       }
     }
 
-    const applyFilters = () => {
-      // Filtering is now handled client-side
+    const updateFilters = (newFilters) => {
+      filters.value = { ...filters.value, ...newFilters }
     }
 
-    const debouncedApplyFilters = debounce(applyFilters, 300)
+    const updateCardsPerRow = (newCardsPerRow) => {
+      cardsPerRow.value = newCardsPerRow
+    }
 
     const updateQuantity = async (card, type, delta = 0) => {
       const newQuantity = type === 'regular'
@@ -282,36 +236,13 @@ export default {
       }
     }
 
-    const colorClass = (color) => {
-      const colorMap = {
-        W: 'text-white',
-        U: 'text-blue-500',
-        B: 'text-black',
-        R: 'text-red-500',
-        G: 'text-green-500',
-      }
-      return colorMap[color] || 'text-gray-500'
-    }
-
-    function debounce(func, wait) {
-      let timeout
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout)
-          func(...args)
-        }
-        clearTimeout(timeout)
-        timeout = setTimeout(later, wait)
-      }
-    }
-
     const filteredAndSortedCards = computed(() => {
       return cards.value
         .filter(card => {
-          const nameMatch = card.name.toLowerCase().includes(nameFilter.value.toLowerCase())
-          const rarityMatch = !rarityFilter.value || card.rarity === rarityFilter.value
-          const colorMatch = colorFilters.value.length === 0 ||
-            (card.colors && card.colors.some(color => colorFilters.value.includes(color)))
+          const nameMatch = card.name.toLowerCase().includes(filters.value.name.toLowerCase())
+          const rarityMatch = !filters.value.rarity || card.rarity === filters.value.rarity
+          const colorMatch = filters.value.colors.length === 0 ||
+            (card.colors && card.colors.some(color => filters.value.colors.includes(color)))
           return nameMatch && rarityMatch && colorMatch
         })
         .sort((a, b) => {
@@ -338,18 +269,14 @@ export default {
       cards,
       loading,
       error,
-      nameFilter,
-      rarityFilter,
-      colorFilters,
-      applyFilters,
-      debouncedApplyFilters,
+      filters,
+      updateFilters,
       updateQuantity,
       cardsPerRow,
+      updateCardsPerRow,
       gridStyle,
       getImageUrl,
       handleImageError,
-      availableColors,
-      colorClass,
       cardSize,
       filteredAndSortedCards,
     }
