@@ -50,13 +50,13 @@
                     @click="updateQuantity(card, 'regular', -1)"
                     class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Regular Quantity"
-                    :disabled="card.quantity.quantity_regular === 0"
+                    :disabled="card.quantity_regular === 0"
                   >
                     –
                   </button>
                   <input
                     :id="'regular-' + card.id"
-                    v-model.number="card.quantity.quantity_regular"
+                    v-model.number="card.quantity_regular"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
@@ -85,13 +85,13 @@
                     @click="updateQuantity(card, 'foil', -1)"
                     class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Foil Quantity"
-                    :disabled="card.quantity.quantity_foil === 0"
+                    :disabled="card.quantity_foil === 0"
                   >
                     –
                   </button>
                   <input
                     :id="'foil-' + card.id"
-                    v-model.number="card.quantity.quantity_foil"
+                    v-model.number="card.quantity_foil"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
@@ -178,21 +178,21 @@ export default {
 
     const updateQuantity = async (card, type, delta = 0) => {
       const newQuantity = type === 'regular'
-        ? card.quantity.quantity_regular + delta
-        : card.quantity.quantity_foil + delta
+        ? card.quantity_regular + delta
+        : card.quantity_foil + delta
 
       if (newQuantity < 0) return
 
       try {
         await axios.put(`/api/kiosk/${card.id}`, {
-          quantity_regular: type === 'regular' ? newQuantity : card.quantity.quantity_regular,
-          quantity_foil: type === 'foil' ? newQuantity : card.quantity.quantity_foil
+          quantity_regular: type === 'regular' ? newQuantity : card.quantity_regular,
+          quantity_foil: type === 'foil' ? newQuantity : card.quantity_foil
         })
 
         if (type === 'regular') {
-          card.quantity.quantity_regular = newQuantity
+          card.quantity_regular = newQuantity
         } else {
-          card.quantity.quantity_foil = newQuantity
+          card.quantity_foil = newQuantity
         }
       } catch (err) {
         console.error('Error updating card quantity:', err)

@@ -99,8 +99,8 @@ def get_collection():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return current_app.response_class(
-            response=cached_data,
+        return app.response_class(
+            response=cached_data.decode(),
             status=200,
             mimetype='application/json'
         )
@@ -121,7 +121,7 @@ def get_collection():
         'current_page': page
     }
 
-    serialized_data = orjson.dumps(result)
+    serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
     return current_app.response_class(
@@ -144,8 +144,8 @@ def get_collection_sets():
         cached_data = current_app.redis_client.get(cache_key)
 
         if cached_data:
-            return current_app.response_class(
-                response=cached_data,
+            return app.response_class(
+                response=cached_data.decode(),
                 status=200,
                 mimetype='application/json'
             )
@@ -228,7 +228,7 @@ def get_collection_sets():
             'current_page': paginated_sets.page
         }
 
-        serialized_data = orjson.dumps(response)
+        serialized_data = orjson.dumps(response).decode()
         current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
         logger.info(f"Returning response with {len(sets_list)} sets")
@@ -269,7 +269,7 @@ def update_collection(card_id):
     })
 
     return current_app.response_class(
-        response=orjson.dumps(card_data),
+        response=orjson.dumps(card_data).decode(),
         status=200,
         mimetype='application/json'
     )
@@ -280,8 +280,8 @@ def get_collection_stats():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return current_app.response_class(
-            response=cached_data,
+        return app.response_class(
+            response=cached_data.decode(),
             status=200,
             mimetype='application/json'
         )
@@ -306,10 +306,10 @@ def get_collection_stats():
             'total_value': round(total_value, 2)
         }
 
-        serialized_data = orjson.dumps(result)
+        serialized_data = orjson.dumps(result).decode()
         current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
 
-        return current_app.response_class(
+        return app.response_class(
             response=serialized_data,
             status=200,
             mimetype='application/json'
@@ -477,8 +477,8 @@ def get_kiosk():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return current_app.response_class(
-            response=cached_data,
+        return app.response_class(
+            response=cached_data.decode(),
             status=200,
             mimetype='application/json'
         )
@@ -492,10 +492,10 @@ def get_kiosk():
         'current_page': page
     }
 
-    serialized_data = orjson.dumps(result)
+    serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
-    return current_app.response_class(
+    return app.response_class(
         response=serialized_data,
         status=200,
         mimetype='application/json'
@@ -512,8 +512,8 @@ def get_kiosk_sets():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return current_app.response_class(
-            response=cached_data,
+        return app.response_class(
+            response=cached_data.decode(),
             status=200,
             mimetype='application/json'
         )
@@ -551,10 +551,10 @@ def get_kiosk_sets():
         'current_page': page
     }
 
-    serialized_data = orjson.dumps(result)
+    serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 600, serialized_data)  # Cache for 10 minutes
 
-    return current_app.response_class(
+    return app.response_class(
         response=serialized_data,
         status=200,
         mimetype='application/json'
@@ -573,8 +573,8 @@ def get_kiosk_set_cards(set_code):
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return current_app.response_class(
-            response=cached_data,
+        return app.response_class(
+            response=cached_data.decode(),
             status=200,
             mimetype='application/json'
         )
@@ -608,10 +608,10 @@ def get_kiosk_set_cards(set_code):
         'current_page': page
     }
 
-    serialized_data = orjson.dumps(result)
+    serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
-    return current_app.response_class(
+    return app.response_class(
         response=serialized_data,
         status=200,
         mimetype='application/json'
@@ -644,8 +644,8 @@ def update_kiosk(card_id):
         'quantity_foil': card.quantity_kiosk_foil
     })
 
-    return current_app.response_class(
-        response=orjson.dumps(card_data),
+    return app.response_class(
+        response=orjson.dumps(card_data).decode(),
         status=200,
         mimetype='application/json'
     )
@@ -656,8 +656,8 @@ def get_kiosk_stats():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return current_app.response_class(
-            response=cached_data,
+        return app.response_class(
+            response=cached_data.decode(),
             status=200,
             mimetype='application/json'
         )
@@ -682,10 +682,10 @@ def get_kiosk_stats():
             'total_value': round(total_value, 2)
         }
 
-        serialized_data = orjson.dumps(result)
+        serialized_data = orjson.dumps(result).decode()
         current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
 
-        return current_app.response_class(
+        return app.response_class(
             response=serialized_data,
             status=200,
             mimetype='application/json'

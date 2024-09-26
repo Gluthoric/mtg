@@ -54,9 +54,6 @@ from flask_cors import CORS
 from config import Config
 from database import db
 from routes import register_routes
-from routes.set_routes import set_routes
-from routes.kiosk_routes import kiosk_routes
-from routes.collection_routes import collection_routes
 from models.card import Card
 from sqlalchemy.sql import func, text
 import redis
@@ -156,9 +153,6 @@ def create_app():
 
     # Register routes
     register_routes(app)
-    app.register_blueprint(set_routes, url_prefix='/api')
-    app.register_blueprint(kiosk_routes, url_prefix='/api')
-    app.register_blueprint(collection_routes, url_prefix='/api')
 
     # Add Redis client to app context
     app.redis_client = redis_client
@@ -407,6 +401,7 @@ File: /home/gluth/mtg/backend/models/set.py
 ================================================================================
 from database import db
 from models.card import Card
+from sqlalchemy.sql import func  # Add this import at the top
 
 class Set(db.Model):
     __tablename__ = 'sets'
@@ -443,7 +438,7 @@ class Set(db.Model):
 
     def get_collection_count(self):
         # Count the number of unique cards in the collection for this set
-        return db.session.query(db.func.count(Card.id)) \
+        return db.session.query(func.count(Card.id)) \
             .filter(Card.set_code == self.code) \
             .filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)) \
             .scalar() or 0
@@ -454,16 +449,12 @@ File: /home/gluth/mtg/backend/routes/__init__.py
 from flask import Blueprint
 from .card_routes import card_routes
 from .set_routes import set_routes
-from .collection_routes import collection_routes
-from .kiosk_routes import kiosk_routes
 
 def register_routes(app):
     api = Blueprint('api', __name__, url_prefix='/api')
 
     api.register_blueprint(card_routes)
     api.register_blueprint(set_routes)
-    api.register_blueprint(collection_routes)
-    api.register_blueprint(kiosk_routes)
 
     app.register_blueprint(api)
 
@@ -1331,9 +1322,8 @@ def get_set_cards(set_code):
     name_filter = request.args.get('name', '', type=str)
     rarity_filter = request.args.get('rarity', '', type=str)
 
-    # Eagerly load related 'collection' and 'set' data to optimize queries
+    # Eagerly load related 'set' data to optimize queries
     query = Card.query.options(
-        joinedload(Card.collection),
         joinedload(Card.set)
     ).filter(Card.set_code == set_code)
 
@@ -1353,8 +1343,8 @@ def get_set_cards(set_code):
             'id': card.id,
             'name': card.name,
             'rarity': card.rarity,
-            'quantity_regular': card.collection.quantity_regular if card.collection else 0,
-            'quantity_foil': card.collection.quantity_foil if card.collection else 0,
+            'quantity_regular': card.quantity_collection_regular,
+            'quantity_foil': card.quantity_collection_foil,
             'set_name': card.set.name if card.set else '',
             'set_code': card.set_code,
             'collector_number': card.collector_number,
