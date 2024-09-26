@@ -1,17 +1,18 @@
 <template>
-  <div class="container">
-    <h1 class="text-center mb-2">My Collection</h1>
+  <div class="container mx-auto px-4 bg-dark-300 text-white">
+    <h1 class="text-center mb-4 text-2xl font-bold text-primary">My Collection</h1>
     <SetListControls
       :setTypes="setTypes"
       :totalPages="totalPages"
       @update-filters="updateFilters"
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
+      class="controls bg-secondary p-4 rounded-lg shadow-md mb-4"
     />
     <div v-if="loading" class="loading text-center mt-1">Loading...</div>
     <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
-    <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
-      <div v-for="set in sets" :key="set.code" class="card">
+    <div v-else-if="sets && sets.length > 0" class="set-grid grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <div v-for="set in sets" :key="set.code" class="card bg-secondary p-4 rounded-lg shadow-md transition-transform hover:scale-105">
         <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
           <!-- Set icon displayed at the top -->
           <div class="set-icon">
@@ -40,10 +41,22 @@
     <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
       <p>No sets found in your collection.</p>
     </div>
-    <div class="pagination text-center mt-2">
-      <button @click="changePage(-1)" :disabled="currentPage === 1">Previous</button>
-      <span class="p-1">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button @click="changePage(1)" :disabled="currentPage === totalPages">Next</button>
+    <div class="pagination flex justify-center items-center mt-4 space-x-4">
+      <button 
+        @click="changePage(-1)" 
+        :disabled="currentPage === 1"
+        class="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Previous
+      </button>
+      <span class="text-lg font-semibold">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button 
+        @click="changePage(1)" 
+        :disabled="currentPage === totalPages"
+        class="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
     </div>
   </div>
 </template>
