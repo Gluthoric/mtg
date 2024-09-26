@@ -37,8 +37,14 @@
           <h3 class="text-lg font-semibold mb-2 text-primary">{{ card.name }}</h3>
           <p class="mb-1"><span class="font-medium text-gray-medium">Rarity:</span> {{ card.rarity }}</p>
           <p class="mb-1"><span class="font-medium text-gray-medium">Collector Number:</span> {{ card.collector_number }}</p>
-          <p v-if="card.collection" class="mb-1"><span class="font-medium text-gray-medium">In Collection:</span> {{ card.collection.quantity_regular + card.collection.quantity_foil }}</p>
-          <p v-if="card.kiosk"><span class="font-medium text-gray-medium">In Kiosk:</span> {{ card.kiosk.quantity_regular + card.kiosk.quantity_foil }}</p>
+          <p v-if="card.quantity_regular + card.quantity_foil > 0" class="mb-1">
+            <span class="font-medium text-gray-medium">In Collection:</span>
+            {{ card.quantity_regular + card.quantity_foil }}
+          </p>
+          <p v-if="card.quantity_kiosk_regular + card.quantity_kiosk_foil > 0">
+            <span class="font-medium text-gray-medium">In Kiosk:</span>
+            {{ card.quantity_kiosk_regular + card.quantity_kiosk_foil }}
+          </p>
         </div>
       </div>
     </div>

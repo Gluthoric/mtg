@@ -18,12 +18,12 @@
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
-          :style="{ width: '100%', maxWidth: `${cardSize * 1.2}px` }"
+          :style="{ width: '100%' }"
         >
           <div class="card-info p-2 z-10 bg-dark-200 bg-opacity-80">
             <h3 class="text-base font-semibold truncate text-primary">{{ card.name }}</h3>
           </div>
-          <div class="image-container" :style="{ height: `${cardSize * 1.4}px` }">
+          <div class="image-container">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -152,7 +152,6 @@ export default {
       missing: false
     });
     const cardsPerRow = ref(6);
-    const cardSize = 180;
 
     const fetchCards = async () => {
       loading.value = true;
@@ -168,7 +167,7 @@ export default {
           paramsSerializer: params => qs.stringify(params, { arrayFormat: 'repeat' }) // Serialize as colors=W&colors=U
         });
         cards.value = response.data.cards;
-        setName.value = cards.value.length > 0 ? cards.value[0].set_name : '';
+        setName.value = response.data.set_name;
       } catch (err) {
         console.error('Error fetching set cards:', err);
         error.value = 'Failed to load set cards';
@@ -257,16 +256,24 @@ export default {
       }
     };
 
-    const updateQuantity = async (card) => {
+    const updateQuantity = async (card, type, delta = 0) => {
+      let newQuantity;
+      if (type === 'regular') {
+        newQuantity = card.quantity_regular + delta;
+        if (newQuantity < 0) return;
+      } else if (type === 'foil') {
+        newQuantity = card.quantity_foil + delta;
+        if (newQuantity < 0) return;
+      } else {
+        return;
+      }
+
       try {
-        const response = await axios.put(`/api/collection/${card.id}`, {
-          quantity_regular: card.quantity_regular,
-          quantity_foil: card.quantity_foil,
-        });
-        const index = cards.value.findIndex((c) => c.id === card.id);
-        if (index !== -1) {
-          cards.value[index] = response.data;
-        }
+        const payload = type === 'regular' 
+          ? { quantity_regular: newQuantity, quantity_foil: card.quantity_foil }
+          : { quantity_regular: card.quantity_regular, quantity_foil: newQuantity };
+        const response = await axios.put(`/api/collection/${card.id}`, payload);
+        Object.assign(card, response.data); // Update card data
       } catch (err) {
         console.error('Error updating quantity:', err);
         alert('Failed to update quantity. Please try again.');
@@ -274,22 +281,11 @@ export default {
     };
 
     const increment = (card, type) => {
-      if (type === 'regular') {
-        card.quantity_regular += 1;
-      } else if (type === 'foil') {
-        card.quantity_foil += 1;
-      }
-      updateQuantity(card);
+      updateQuantity(card, type, 1);
     };
 
     const decrement = (card, type) => {
-      if (type === 'regular' && card.quantity_regular > 0) {
-        card.quantity_regular -= 1;
-        updateQuantity(card);
-      } else if (type === 'foil' && card.quantity_foil > 0) {
-        card.quantity_foil -= 1;
-        updateQuantity(card);
-      }
+      updateQuantity(card, type, -1);
     };
 
     const onInput = (card, type) => {
@@ -298,7 +294,8 @@ export default {
       } else if (type === 'foil') {
         card.quantity_foil = Math.max(0, parseInt(card.quantity_foil) || 0);
       }
-      updateQuantity(card);
+      // Immediately update the backend
+      updateQuantity(card, type);
     };
 
     const gridStyle = computed(() => ({
@@ -321,8 +318,7 @@ export default {
       onInput,
       cardsPerRow,
       updateCardsPerRow,
-      gridStyle,
-      cardSize,
+      gridStyle
     };
   },
 };
@@ -348,18 +344,13 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  aspect-ratio: 5 / 7;
 }
 
 .image-container img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-}
-.card {
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease-in-out;
-  width: 100%;
 }
 
 .card:hover {
@@ -375,14 +366,8 @@ export default {
   justify-content: space-between;
 }
 
-.image-container {
-  width: 100%;
-  overflow: hidden;
-  aspect-ratio: 5 / 7;
-}
-
 .quantity-control {
-  width: 48%;
+  width: 100%;
 }
 
 .quantity-label {
@@ -452,10 +437,6 @@ input[type="range"]::-moz-range-thumb {
   background: #4299e1;
   cursor: pointer;
   border-radius: 50%;
-}
-
-.quantity-control {
-  width: 100%;
 }
 
 .input-wrapper {

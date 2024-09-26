@@ -9,12 +9,23 @@ from models.card import Card
 from models.set import Set
 from database import db
 import orjson
+from decimal import Decimal
 
 card_routes = Blueprint('card_routes', __name__)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def convert_decimals(obj):
+    if isinstance(obj, list):
+        return [convert_decimals(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
 
 def serialize_cards(cards, quantity_type='collection'):
     if quantity_type == 'collection':
@@ -99,7 +110,7 @@ def get_collection():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return app.response_class(
+        return current_app.response_class(
             response=cached_data.decode(),
             status=200,
             mimetype='application/json'
@@ -130,6 +141,7 @@ def get_collection():
         mimetype='application/json'
     )
 
+
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
@@ -144,7 +156,7 @@ def get_collection_sets():
         cached_data = current_app.redis_client.get(cache_key)
 
         if cached_data:
-            return app.response_class(
+            return current_app.response_class(
                 response=cached_data.decode(),
                 status=200,
                 mimetype='application/json'
@@ -221,12 +233,18 @@ def get_collection_sets():
                 'collection_percentage': collection_percentage
             })
 
+        # Convert Decimal objects to float
+        sets_list = convert_decimals(sets_list)
+
         response = {
             'sets': sets_list,
             'total': paginated_sets.total,
             'pages': paginated_sets.pages,
             'current_page': paginated_sets.page
         }
+
+        # Convert any remaining Decimal objects in the response
+        response = convert_decimals(response)
 
         serialized_data = orjson.dumps(response).decode()
         current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
@@ -280,7 +298,7 @@ def get_collection_stats():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return app.response_class(
+        return current_app.response_class(
             response=cached_data.decode(),
             status=200,
             mimetype='application/json'
@@ -309,7 +327,7 @@ def get_collection_stats():
         serialized_data = orjson.dumps(result).decode()
         current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
 
-        return app.response_class(
+        return current_app.response_class(
             response=serialized_data,
             status=200,
             mimetype='application/json'
@@ -477,7 +495,7 @@ def get_kiosk():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return app.response_class(
+        return current_app.response_class(
             response=cached_data.decode(),
             status=200,
             mimetype='application/json'
@@ -495,11 +513,12 @@ def get_kiosk():
     serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
-    return app.response_class(
+    return current_app.response_class(
         response=serialized_data,
         status=200,
         mimetype='application/json'
     )
+
 
 @card_routes.route('/kiosk/sets', methods=['GET'])
 def get_kiosk_sets():
@@ -512,7 +531,7 @@ def get_kiosk_sets():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return app.response_class(
+        return current_app.response_class(
             response=cached_data.decode(),
             status=200,
             mimetype='application/json'
@@ -554,7 +573,7 @@ def get_kiosk_sets():
     serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 600, serialized_data)  # Cache for 10 minutes
 
-    return app.response_class(
+    return current_app.response_class(
         response=serialized_data,
         status=200,
         mimetype='application/json'
@@ -573,7 +592,7 @@ def get_kiosk_set_cards(set_code):
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return app.response_class(
+        return current_app.response_class(
             response=cached_data.decode(),
             status=200,
             mimetype='application/json'
@@ -611,7 +630,7 @@ def get_kiosk_set_cards(set_code):
     serialized_data = orjson.dumps(result).decode()
     current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
 
-    return app.response_class(
+    return current_app.response_class(
         response=serialized_data,
         status=200,
         mimetype='application/json'
@@ -644,7 +663,7 @@ def update_kiosk(card_id):
         'quantity_foil': card.quantity_kiosk_foil
     })
 
-    return app.response_class(
+    return current_app.response_class(
         response=orjson.dumps(card_data).decode(),
         status=200,
         mimetype='application/json'
@@ -656,7 +675,7 @@ def get_kiosk_stats():
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
-        return app.response_class(
+        return current_app.response_class(
             response=cached_data.decode(),
             status=200,
             mimetype='application/json'
@@ -685,7 +704,7 @@ def get_kiosk_stats():
         serialized_data = orjson.dumps(result).decode()
         current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
 
-        return app.response_class(
+        return current_app.response_class(
             response=serialized_data,
             status=200,
             mimetype='application/json'

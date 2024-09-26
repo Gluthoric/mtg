@@ -17,12 +17,11 @@
           v-for="card in filteredAndSortedCards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
-          :style="{ width: '100%', maxWidth: `${cardSize * 1.2}px` }"
         >
           <div class="card-info p-2 z-10 bg-dark-200 bg-opacity-80">
             <h3 class="text-base font-semibold truncate text-primary">{{ card.name }}</h3>
           </div>
-          <div class="image-container" :style="{ height: `${cardSize * 1.4}px` }">
+          <div class="image-container">
             <img
               v-if="getImageUrl(card)"
               :src="getImageUrl(card)"
@@ -135,7 +134,7 @@ export default {
   },
   setup() {
     const route = useRoute()
-    const setCode = route.params.setCode
+    const setCode = ref(route.params.setCode)
     const setName = ref('')
     const cards = ref([])
     const loading = ref(true)
@@ -147,13 +146,12 @@ export default {
       missing: false
     })
     const cardsPerRow = ref(6)
-    const cardSize = 180
 
     const fetchCards = async () => {
       loading.value = true
       error.value = null
       try {
-        const response = await axios.get(`/api/kiosk/sets/${setCode}/cards`, {
+        const response = await axios.get(`/api/kiosk/sets/${setCode.value}/cards`, {
           params: {
             per_page: 1000 // Request a large number of cards
           }
@@ -177,26 +175,26 @@ export default {
     }
 
     const updateQuantity = async (card, type, delta = 0) => {
-      const newQuantity = type === 'regular'
-        ? card.quantity_regular + delta
-        : card.quantity_foil + delta
-
-      if (newQuantity < 0) return
+      let newQuantity
+      if (type === 'regular') {
+        newQuantity = card.quantity_regular + delta
+        if (newQuantity < 0) return
+      } else if (type === 'foil') {
+        newQuantity = card.quantity_foil + delta
+        if (newQuantity < 0) return
+      } else {
+        return
+      }
 
       try {
-        await axios.put(`/api/kiosk/${card.id}`, {
-          quantity_regular: type === 'regular' ? newQuantity : card.quantity_regular,
-          quantity_foil: type === 'foil' ? newQuantity : card.quantity_foil
-        })
-
-        if (type === 'regular') {
-          card.quantity_regular = newQuantity
-        } else {
-          card.quantity_foil = newQuantity
-        }
+        const payload = type === 'regular' 
+          ? { quantity_regular: newQuantity, quantity_foil: card.quantity_foil }
+          : { quantity_regular: card.quantity_regular, quantity_foil: newQuantity }
+        const response = await axios.put(`/api/kiosk/${card.id}`, payload)
+        Object.assign(card, response.data) // Update card data
       } catch (err) {
-        console.error('Error updating card quantity:', err)
-        error.value = 'Failed to update card quantity'
+        console.error('Error updating quantity:', err)
+        alert('Failed to update quantity. Please try again.')
       }
     }
 
@@ -243,7 +241,8 @@ export default {
           const rarityMatch = !filters.value.rarity || card.rarity === filters.value.rarity
           const colorMatch = filters.value.colors.length === 0 ||
             (card.colors && card.colors.some(color => filters.value.colors.includes(color)))
-          return nameMatch && rarityMatch && colorMatch
+          const missingMatch = !filters.value.missing || (card.quantity_regular === 0 && card.quantity_foil === 0)
+          return nameMatch && rarityMatch && colorMatch && missingMatch
         })
         .sort((a, b) => {
           if (!a.collector_number && !b.collector_number) return 0
@@ -277,10 +276,9 @@ export default {
       gridStyle,
       getImageUrl,
       handleImageError,
-      cardSize,
       filteredAndSortedCards,
     }
-  }
+  },
 }
 </script>
 
@@ -304,6 +302,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  aspect-ratio: 5 / 7;
 }
 
 .image-container img {
@@ -316,29 +315,59 @@ export default {
   transform: scale(1.02);
 }
 
+.card-quantities {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .quantity-control {
   width: 100%;
 }
 
+.quantity-label {
+  font-size: 0.75rem;
+}
+
 .input-wrapper {
-  width: 100%;
-  max-width: 120px;
-  margin: 0 auto;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  align-items: center;
 }
 
 .quantity-input {
   flex: 1;
-  min-width: 0;
+  text-align: center;
+  border: none;
+  outline: none;
+  background-color: var(--input-background);
+  color: var(--text-color);
 }
 
 .btn {
   flex-shrink: 0;
   width: 24px;
-  min-width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--button-background);
+  color: var(--text-color);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
+.btn:hover:not(:disabled) {
+  background-color: var(--button-hover-background);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
 @media (max-width: 640px) {
   .card-quantities {
     flex-direction: column;
@@ -347,21 +376,5 @@ export default {
   .quantity-control {
     margin-bottom: 0.5rem;
   }
-}
-
-.text-white {
-  color: white;
-}
-.text-blue-500 {
-  color: #4299e1; /* Tailwind CSS blue-500 */
-}
-.text-black {
-  color: black;
-}
-.text-red-500 {
-  color: #f56565; /* Tailwind CSS red-500 */
-}
-.text-green-500 {
-  color: #48bb78; /* Tailwind CSS green-500 */
 }
 </style>
