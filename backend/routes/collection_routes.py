@@ -278,21 +278,20 @@ def get_collection_set_cards(set_code):
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
 
     try:
-        # Build the query with only required columns
+        # Build the query with only required columns using model attributes
         query = Card.query.options(
             load_only(
-                'id',
-                'name',
-                'image_uris',
-                'card_faces',
-                'collector_number',
-                'prices',
-                'rarity',
-                'set_name',
+                Card.id,
+                Card.name,
+                Card.image_uris,
+                Card.collector_number,
+                Card.prices,
+                Card.rarity,
+                Card.set_name,
             ),
             joinedload(Card.collection).load_only(
-                'quantity_regular',
-                'quantity_foil'
+                Collection.quantity_regular,
+                Collection.quantity_foil
             )
         ).join(Set).filter(Set.code == set_code)
 
@@ -320,7 +319,6 @@ def get_collection_set_cards(set_code):
                 'id': card.id,
                 'name': card.name,
                 'image_uris': card.image_uris,
-                'card_faces': card.card_faces,
                 'collector_number': card.collector_number,
                 'prices': card.prices,
                 'rarity': card.rarity,
