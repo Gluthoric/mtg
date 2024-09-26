@@ -59,9 +59,8 @@ def get_set_cards(set_code):
     name_filter = request.args.get('name', '', type=str)
     rarity_filter = request.args.get('rarity', '', type=str)
 
-    # Eagerly load related 'collection' and 'set' data to optimize queries
+    # Eagerly load related 'set' data to optimize queries
     query = Card.query.options(
-        joinedload(Card.collection),
         joinedload(Card.set)
     ).filter(Card.set_code == set_code)
 
@@ -81,8 +80,8 @@ def get_set_cards(set_code):
             'id': card.id,
             'name': card.name,
             'rarity': card.rarity,
-            'quantity_regular': card.collection.quantity_regular if card.collection else 0,
-            'quantity_foil': card.collection.quantity_foil if card.collection else 0,
+            'quantity_regular': card.quantity_collection_regular,
+            'quantity_foil': card.quantity_collection_foil,
             'set_name': card.set.name if card.set else '',
             'set_code': card.set_code,
             'collector_number': card.collector_number,

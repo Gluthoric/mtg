@@ -3,9 +3,6 @@ from flask_cors import CORS
 from config import Config
 from database import db
 from routes import register_routes
-from routes.set_routes import set_routes
-from routes.kiosk_routes import kiosk_routes
-from routes.collection_routes import collection_routes
 from models.card import Card
 from sqlalchemy.sql import func, text
 import redis
@@ -105,9 +102,6 @@ def create_app():
 
     # Register routes
     register_routes(app)
-    app.register_blueprint(set_routes, url_prefix='/api')
-    app.register_blueprint(kiosk_routes, url_prefix='/api')
-    app.register_blueprint(collection_routes, url_prefix='/api')
 
     # Add Redis client to app context
     app.redis_client = redis_client
