@@ -7,14 +7,14 @@
       <div class="filters grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <!-- Name Filter -->
         <input
-          v-model="filters.name"
-          @input="debouncedFetchCards"
+          v-model="nameFilter"
+          @input="debouncedApplyFilters"
           placeholder="Filter by name"
           class="p-2 border rounded bg-dark-100 text-white placeholder-gray-medium w-full"
         />
 
         <!-- Rarity Filter -->
-        <select v-model="filters.rarity" @change="fetchCards" class="p-2 border rounded bg-dark-100 text-white w-full">
+        <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded bg-dark-100 text-white w-full">
           <option value="">All Rarities</option>
           <option value="common">Common</option>
           <option value="uncommon">Uncommon</option>
@@ -31,7 +31,7 @@
                 type="checkbox"
                 :value="color"
                 v-model="colorFilters"
-                @change="fetchCards"
+                @change="applyFilters"
                 class="mr-1"
               />
               <span :class="colorClass(color)" class="capitalize">{{ color }}</span>
@@ -58,7 +58,7 @@
       <!-- Cards Grid -->
       <div class="card-grid grid gap-6" :style="gridStyle">
         <div
-          v-for="card in cards"
+          v-for="card in filteredAndSortedCards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
           :style="{ width: '100%', maxWidth: `${cardSize * 1.2}px` }"
@@ -114,6 +114,9 @@
                     +
                   </button>
                 </div>
+                <div class="price text-xs text-gray-light mt-1">
+                  Price: ${{ card.prices?.usd || 'N/A' }}
+                </div>
               </div>
 
               <!-- Foil Quantity Control -->
@@ -146,23 +149,25 @@
                     +
                   </button>
                 </div>
+                <div class="price text-xs text-gray-light mt-1">
+                  Price: ${{ card.prices?.usd_foil || 'N/A' }}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="pagination text-center mt-6">
-        <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-4 py-2 mr-2">Previous</button>
-        <span class="px-4 py-2 bg-secondary rounded">Page {{ currentPage }} of {{ totalPages }}</span>
-        <button @click="changePage(1)" :disabled="currentPage === totalPages" class="px-4 py-2 ml-2">Next</button>
+      <!-- Handle No Cards Matching Filters -->
+      <div v-if="filteredAndSortedCards.length === 0" class="text-center text-gray-light">
+        No cards match the selected filters.
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
@@ -175,11 +180,9 @@ export default {
     const cards = ref([])
     const loading = ref(true)
     const error = ref(null)
-    const filters = ref({ name: '', rarity: '' })
+    const nameFilter = ref('')
+    const rarityFilter = ref('')
     const colorFilters = ref([])
-    const sorting = ref({ sortBy: 'name', sortOrder: 'asc' })
-    const currentPage = ref(1)
-    const totalPages = ref(1)
     const cardsPerRow = ref(6)
     const cardSize = 180
     const availableColors = ['W', 'U', 'B', 'R', 'G']
@@ -190,16 +193,11 @@ export default {
       try {
         const response = await axios.get(`/api/kiosk/sets/${setCode}/cards`, {
           params: {
-            ...filters.value,
-            ...sorting.value,
-            colors: colorFilters.value,
-            page: currentPage.value
+            per_page: 1000 // Request a large number of cards
           }
         })
         cards.value = response.data.cards
         setName.value = response.data.set_name
-        totalPages.value = response.data.pages
-        currentPage.value = response.data.current_page
       } catch (err) {
         console.error('Error fetching kiosk set cards:', err)
         error.value = 'Failed to load kiosk set cards'
@@ -208,7 +206,11 @@ export default {
       }
     }
 
-    const debouncedFetchCards = debounce(fetchCards, 300)
+    const applyFilters = () => {
+      // Filtering is now handled client-side
+    }
+
+    const debouncedApplyFilters = debounce(applyFilters, 300)
 
     const updateQuantity = async (card, type, delta = 0) => {
       const newQuantity = type === 'regular'
@@ -231,14 +233,6 @@ export default {
       } catch (err) {
         console.error('Error updating card quantity:', err)
         error.value = 'Failed to update card quantity'
-      }
-    }
-
-    const changePage = (delta) => {
-      const newPage = currentPage.value + delta
-      if (newPage >= 1 && newPage <= totalPages.value) {
-        currentPage.value = newPage
-        fetchCards()
       }
     }
 
@@ -301,12 +295,31 @@ export default {
       }
     }
 
-    onMounted(() => {
-      fetchCards()
+    const filteredAndSortedCards = computed(() => {
+      return cards.value
+        .filter(card => {
+          const nameMatch = card.name.toLowerCase().includes(nameFilter.value.toLowerCase())
+          const rarityMatch = !rarityFilter.value || card.rarity === rarityFilter.value
+          const colorMatch = colorFilters.value.length === 0 ||
+            (card.colors && card.colors.some(color => colorFilters.value.includes(color)))
+          return nameMatch && rarityMatch && colorMatch
+        })
+        .sort((a, b) => {
+          if (!a.collector_number && !b.collector_number) return 0
+          if (!a.collector_number) return 1
+          if (!b.collector_number) return -1
+
+          const numA = parseInt(a.collector_number, 10)
+          const numB = parseInt(b.collector_number, 10)
+
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB
+          }
+          return a.collector_number.localeCompare(b.collector_number)
+        })
     })
 
-    watch([filters, colorFilters, sorting], () => {
-      currentPage.value = 1
+    onMounted(() => {
       fetchCards()
     })
 
@@ -315,14 +328,11 @@ export default {
       cards,
       loading,
       error,
-      filters,
+      nameFilter,
+      rarityFilter,
       colorFilters,
-      sorting,
-      currentPage,
-      totalPages,
-      fetchCards,
-      debouncedFetchCards,
-      changePage,
+      applyFilters,
+      debouncedApplyFilters,
       updateQuantity,
       cardsPerRow,
       gridStyle,
@@ -331,6 +341,7 @@ export default {
       availableColors,
       colorClass,
       cardSize,
+      filteredAndSortedCards,
     }
   }
 }
@@ -399,5 +410,21 @@ export default {
   .quantity-control {
     margin-bottom: 0.5rem;
   }
+}
+
+.text-white {
+  color: white;
+}
+.text-blue-500 {
+  color: #4299e1; /* Tailwind CSS blue-500 */
+}
+.text-black {
+  color: black;
+}
+.text-red-500 {
+  color: #f56565; /* Tailwind CSS red-500 */
+}
+.text-green-500 {
+  color: #48bb78; /* Tailwind CSS green-500 */
 }
 </style>
