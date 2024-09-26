@@ -1,6 +1,6 @@
 import pandas as pd
 from flask import Blueprint, jsonify, request, current_app
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.sql import func, asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.collection import Collection
@@ -278,8 +278,25 @@ def get_collection_set_cards(set_code):
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
 
     try:
-        query = Card.query.outerjoin(Collection).join(Set).filter(Set.code == set_code)
+        # Build the query with only required columns
+        query = Card.query.options(
+            load_only(
+                'id',
+                'name',
+                'image_uris',
+                'card_faces',
+                'collector_number',
+                'prices',
+                'rarity',
+                'set_name',
+            ),
+            joinedload(Card.collection).load_only(
+                'quantity_regular',
+                'quantity_foil'
+            )
+        ).join(Set).filter(Set.code == set_code)
 
+        # Apply filters
         if name:
             query = query.filter(Card.name.ilike(f'%{name}%'))
         if rarity:
@@ -290,28 +307,29 @@ def get_collection_set_cards(set_code):
             if invalid_colors:
                 return jsonify({"error": f"Invalid colors: {', '.join(invalid_colors)}"}), 400
 
+            # Use JSONB array contains operator '?|'
             colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
             query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
 
-        # Log the SQL query
-        logger.info(f"Executing query: {query}")
-
+        # Execute the query
         cards = query.all()
 
-        # Log the number of cards returned
-        logger.info(f"Number of cards returned: {len(cards)}")
-
+        # Prepare the response
         result = {
             'cards': [{
-                **card.to_dict(),
+                'id': card.id,
+                'name': card.name,
+                'image_uris': card.image_uris,
+                'card_faces': card.card_faces,
+                'collector_number': card.collector_number,
+                'prices': card.prices,
+                'rarity': card.rarity,
+                'set_name': card.set_name,
                 'quantity_regular': card.collection.quantity_regular if card.collection else 0,
                 'quantity_foil': card.collection.quantity_foil if card.collection else 0
             } for card in cards],
             'total': len(cards),
         }
-
-        # Log the first few cards for debugging
-        logger.info(f"First 5 cards: {result['cards'][:5]}")
 
         return jsonify(result), 200
     except Exception as e:
