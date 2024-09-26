@@ -7,6 +7,7 @@
       @update-filters="updateFilters"
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
+      class="controls bg-secondary p-4 rounded-lg shadow-md mb-4"
     />
     <div v-if="loading" class="loading text-center mt-1">Loading...</div>
     <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
