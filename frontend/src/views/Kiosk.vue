@@ -1,4 +1,3 @@
-<!-- Kiosk.vue -->
 <template>
   <div class="container">
     <h1 class="text-center mb-2">Kiosk Inventory</h1>
@@ -14,21 +13,19 @@
     <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
       <div v-for="set in sets" :key="set.code" class="card">
         <router-link :to="{ name: 'KioskSetCards', params: { setCode: set.code } }">
+          <!-- Set icon displayed at the top -->
           <div class="set-icon">
             <img :src="set.icon_svg_uri" :alt="set.name" />
           </div>
-          <h3>{{ set.name }}</h3>
-          <p>Code: {{ set.code }}</p>
-          <p>Type: {{ set.set_type }}</p>
-          <p>Released: {{ formatDate(set.released_at) }}</p>
-          <p>Kiosk Cards: {{ set.kiosk_count }} / {{ set.card_count }}</p>
-          <p>Completion: {{ Math.round(set.kiosk_percentage) }}%</p>
-          <div class="progress-container">
-            <div
-              class="progress-bar"
-              :style="{ width: `${set.kiosk_percentage}%`, backgroundColor: getProgressColor(set.kiosk_percentage) }"
-            ></div>
-          </div>
+
+          <!-- Set code and name in a compact format -->
+          <h3>{{ set.code.toUpperCase() }} - {{ set.name }}</h3>
+
+          <!-- Display the Kiosk card count -->
+          <p>Kiosk: {{ set.kiosk_count }}</p>
+
+          <!-- Display the total value of cards in the set -->
+          <p>Value: ${{ set.total_value !== null && set.total_value !== undefined ? set.total_value.toFixed(2) : 'N/A' }}</p>
         </router-link>
       </div>
     </div>
@@ -42,6 +39,7 @@
     </div>
   </div>
 </template>
+
 
 <script>
 import { ref, onMounted } from 'vue'
@@ -115,17 +113,6 @@ export default {
       }
     }
 
-    const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleDateString()
-    }
-
-    const getProgressColor = (percentage) => {
-      if (percentage < 25) return '#f44336'
-      if (percentage < 50) return '#ff9800'
-      if (percentage < 75) return '#ffc107'
-      return '#4caf50'
-    }
-
     onMounted(() => {
       fetchSets()
     })
@@ -143,15 +130,25 @@ export default {
       updateFilters,
       updateSorting,
       updatePerPage,
-      changePage,
-      formatDate,
-      getProgressColor
+      changePage
     }
   }
 }
 </script>
 
 <style scoped>
+.card {
+  padding: 1rem;
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: transform 0.3s ease;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
 .set-icon {
   width: 50px;
   height: 50px;
