@@ -227,10 +227,22 @@ def get_collection_sets():
             }
             collection_count = row.collection_count
             collection_percentage = (collection_count / row.card_count) * 100 if row.card_count else 0
+
+            # Calculate total_value for the set
+            total_value_query = db.session.query(
+                func.sum(
+                    (func.cast((Card.prices['usd'].astext).cast(Float), Float) * Card.quantity_collection_regular) +
+                    (func.cast((Card.prices['usd_foil'].astext).cast(Float), Float) * Card.quantity_collection_foil)
+                )
+            ).filter(Card.set_code == row.code)
+
+            total_value = total_value_query.scalar() or 0.0
+
             sets_list.append({
                 **set_data,
                 'collection_count': collection_count,
-                'collection_percentage': collection_percentage
+                'collection_percentage': collection_percentage,
+                'total_value': round(total_value, 2)
             })
 
         # Convert Decimal objects to float
@@ -259,6 +271,8 @@ def get_collection_sets():
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
         return jsonify({"error": error_message}), 500
+
+# The rest of the code remains unchanged...
 
 @card_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
@@ -537,47 +551,71 @@ def get_kiosk_sets():
             mimetype='application/json'
         )
 
-    kiosk_sets = db.session.query(Set).\
-        join(Card, Card.set_code == Set.code).\
-        filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
-        distinct()
-
-    if sort_order == 'desc':
-        kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
-    else:
-        kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
-
-    paginated_sets = kiosk_sets.paginate(page=page, per_page=per_page, error_out=False)
-
-    sets_data = []
-    for set_obj in paginated_sets.items:
-        set_dict = set_obj.to_dict()
-
-        kiosk_count = db.session.query(func.count(distinct(Card.id))).\
-            filter(Card.set_code == set_obj.code).\
+    try:
+        kiosk_sets = db.session.query(Set).\
+            join(Card, Card.set_code == Set.code).\
             filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
-            scalar()
+            distinct()
 
-        set_dict['kiosk_count'] = kiosk_count
-        set_dict['kiosk_percentage'] = (kiosk_count / set_obj.card_count) * 100 if set_obj.card_count > 0 else 0
+        if sort_order == 'desc':
+            kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
+        else:
+            kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
 
-        sets_data.append(set_dict)
+        paginated_sets = kiosk_sets.paginate(page=page, per_page=per_page, error_out=False)
 
-    result = {
-        'sets': sets_data,
-        'total': paginated_sets.total,
-        'pages': paginated_sets.pages,
-        'current_page': page
-    }
+        sets_data = []
+        for set_obj in paginated_sets.items:
+            set_dict = set_obj.to_dict()
 
-    serialized_data = orjson.dumps(result).decode()
-    current_app.redis_client.setex(cache_key, 600, serialized_data)  # Cache for 10 minutes
+            kiosk_count = db.session.query(func.count(distinct(Card.id))).\
+                filter(Card.set_code == set_obj.code).\
+                filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
+                scalar()
 
-    return current_app.response_class(
-        response=serialized_data,
-        status=200,
-        mimetype='application/json'
-    )
+            kiosk_percentage = (kiosk_count / set_obj.card_count) * 100 if set_obj.card_count > 0 else 0
+
+            # Calculate total_value for the set
+            total_value_query = db.session.query(
+                func.sum(
+                    (func.cast((Card.prices['usd'].astext).cast(Float), Float) * Card.quantity_kiosk_regular) +
+                    (func.cast((Card.prices['usd_foil'].astext).cast(Float), Float) * Card.quantity_kiosk_foil)
+                )
+            ).filter(Card.set_code == set_obj.code)
+
+            total_value = total_value_query.scalar() or 0.0
+
+            set_dict['kiosk_count'] = kiosk_count
+            set_dict['kiosk_percentage'] = kiosk_percentage
+            set_dict['total_value'] = round(total_value, 2)
+
+            sets_data.append(set_dict)
+
+        # Convert Decimal objects to float
+        sets_data = convert_decimals(sets_data)
+
+        response = {
+            'sets': sets_data,
+            'total': paginated_sets.total,
+            'pages': paginated_sets.pages,
+            'current_page': paginated_sets.page
+        }
+
+        # Convert any remaining Decimal objects in the response
+        response = convert_decimals(response)
+
+        serialized_data = orjson.dumps(response).decode()
+        current_app.redis_client.setex(cache_key, 600, serialized_data)  # Cache for 10 minutes
+
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
+    except Exception as e:
+        error_message = f"An unexpected error occurred: {str(e)}"
+        logger.exception(error_message)
+        return jsonify({"error": error_message}), 500
 
 @card_routes.route('/kiosk/sets/<string:set_code>/cards', methods=['GET'])
 def get_kiosk_set_cards(set_code):
