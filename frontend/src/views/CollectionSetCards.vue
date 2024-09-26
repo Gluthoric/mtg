@@ -4,64 +4,76 @@
     <div v-if="loading" class="loading text-center mt-4">Loading...</div>
     <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>
     <div v-else>
-      <div class="filters grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <!-- Name Filter -->
-        <input
-          v-model="nameFilter"
-          @input="debouncedApplyFilters"
-          placeholder="Filter by name"
-          class="p-2 border rounded bg-dark-100 text-white placeholder-gray-medium w-full"
-        />
+      <div class="controls bg-secondary p-4 rounded-lg shadow-md mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Name Filter -->
+          <div class="filter-section">
+            <input
+              v-model="nameFilter"
+              @input="debouncedApplyFilters"
+              placeholder="Search by name"
+              class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
 
-        <!-- Rarity Filter -->
-        <select v-model="rarityFilter" @change="applyFilters" class="p-2 border rounded bg-dark-100 text-white w-full">
-          <option value="">All Rarities</option>
-          <option value="common">Common</option>
-          <option value="uncommon">Uncommon</option>
-          <option value="rare">Rare</option>
-          <option value="mythic">Mythic</option>
-        </select>
+          <!-- Rarity Filter -->
+          <div class="filter-section">
+            <select 
+              v-model="rarityFilter" 
+              @change="applyFilters"
+              class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All Rarities</option>
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+              <option value="mythic">Mythic</option>
+            </select>
+          </div>
 
-        <!-- Color Filter -->
-        <div class="color-filter">
-          <label class="block text-sm font-medium mb-2 text-gray-light">Colors</label>
-          <div class="flex flex-wrap gap-2">
-            <label v-for="color in availableColors" :key="color" class="flex items-center">
-              <input
-                type="checkbox"
-                :value="color"
-                v-model="colorFilters"
-                @change="applyFilters"
-                class="mr-1"
-              />
-              <span :class="colorClass(color)" class="capitalize">{{ color }}</span>
-            </label>
+          <!-- Color Filter -->
+          <div class="filter-section">
+            <label class="block text-sm font-medium mb-2">Colors</label>
+            <div class="flex flex-wrap gap-2">
+              <label v-for="color in availableColors" :key="color" class="flex items-center">
+                <input
+                  type="checkbox"
+                  :value="color"
+                  v-model="colorFilters"
+                  @change="applyFilters"
+                  class="mr-1"
+                />
+                <span :class="colorClass(color)" class="capitalize">{{ color }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Missing Filter Button -->
+          <div class="filter-section">
+            <button
+              @click="toggleMissingFilter"
+              class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              :class="{ 'bg-blue-600': missingFilter }"
+            >
+              {{ missingFilter ? 'Show All Cards' : 'Show Missing Cards' }}
+            </button>
+          </div>
+
+          <!-- Cards Per Row Slider -->
+          <div class="filter-section">
+            <label for="cards-per-row-slider" class="block text-sm font-medium mb-2">Cards per row</label>
+            <input
+              id="cards-per-row-slider"
+              type="range"
+              v-model="cardsPerRow"
+              min="5"
+              max="12"
+              step="1"
+              class="w-full"
+            />
+            <div class="text-sm mt-1">{{ cardsPerRow }} cards per row</div>
           </div>
         </div>
-
-        <!-- Missing Filter Button -->
-        <button
-          @click="toggleMissingFilter"
-          class="p-2 border rounded bg-dark-100 text-white w-full hover:bg-dark-200"
-          :class="{ 'bg-blue-600': missingFilter }"
-        >
-          {{ missingFilter ? 'Show All Cards' : 'Show Missing Cards' }}
-        </button>
-      </div>
-
-      <!-- Cards Per Row Slider -->
-      <div class="mb-4">
-        <label for="cards-per-row-slider" class="block text-sm font-medium mb-2 text-gray-light">Cards per row</label>
-        <input
-          id="cards-per-row-slider"
-          type="range"
-          v-model="cardsPerRow"
-          min="5"
-          max="12"
-          step="1"
-          class="w-full bg-dark-100"
-        />
-        <div class="text-sm text-gray-light mt-1">{{ cardsPerRow }} cards per row</div>
       </div>
 
       <!-- Cards Grid -->
