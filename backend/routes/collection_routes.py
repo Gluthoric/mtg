@@ -86,6 +86,7 @@ def get_collection_sets():
 
         logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
+        # Optimized query with integrated aggregation for collection_count
         query = db.session.query(
             Set.id,
             Set.code,
@@ -96,20 +97,10 @@ def get_collection_sets():
             Set.digital,
             Set.foil_only,
             Set.icon_svg_uri,
-            func.count(Collection.card_id).label('collection_count')
-        ).outerjoin(Card, Card.set_code == Set.code
+            func.coalesce(func.count(Collection.card_id), 0).label('collection_count')
+        ).outerjoin(Card, Set.code == Card.set_code
         ).outerjoin(Collection, Collection.card_id == Card.id
-        ).group_by(
-            Set.id,
-            Set.code,
-            Set.name,
-            Set.released_at,
-            Set.set_type,
-            Set.card_count,
-            Set.digital,
-            Set.foil_only,
-            Set.icon_svg_uri
-        )
+        ).group_by(Set.id)
 
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
@@ -125,7 +116,7 @@ def get_collection_sets():
             return jsonify({"error": error_message}), 400
 
         if sort_by == 'collection_count':
-            sort_column = func.count(Collection.card_id)
+            sort_column = 'collection_count'
         else:
             sort_column = getattr(Set, sort_by)
 
