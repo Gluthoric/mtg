@@ -7,22 +7,27 @@
       @update-filters="updateFilters"
       @update-sorting="updateSorting"
       @update-per-page="updatePerPage"
-      class="controls bg-secondary p-4 rounded-lg shadow-md mb-4"
     />
     <div v-if="loading" class="loading text-center mt-1">Loading...</div>
     <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
     <div v-else-if="sets && sets.length > 0" class="set-grid grid grid-cols-auto">
       <div v-for="set in sets" :key="set.code" class="card">
         <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
+          <!-- Set icon displayed at the top -->
           <div class="set-icon">
             <img :src="set.icon_svg_uri" :alt="set.name" />
           </div>
-          <h3>{{ set.name }}</h3>
-          <p>Code: {{ set.code }}</p>
-          <p>Type: {{ set.set_type }}</p>
-          <p>Released: {{ formatDate(set.released_at) }}</p>
-          <p>Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
-          <p>Completion: {{ Math.round(set.collection_percentage) }}%</p>
+
+          <!-- Set code and name in a compact format -->
+          <h3 class="text-center">{{ set.code.toUpperCase() }} - {{ set.name }}</h3>
+
+          <!-- Display the Collection card count -->
+          <p class="text-center">Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
+
+          <!-- Display the completion percentage -->
+          <p class="text-center">Completion: {{ Math.round(set.collection_percentage) }}%</p>
+
+          <!-- Add a progress bar for visual representation -->
           <div class="progress-container">
             <div
               class="progress-bar"
@@ -152,8 +157,52 @@ export default {
 </script>
 
 <style scoped>
-.collection-stats .stat {
-  text-align: center;
+.controls {
+  background-color: var(--secondary-color);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+input, select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+}
+
+input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+.card {
+  padding: 1rem;
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: transform 0.3s ease;
+}
+
+.card:hover {
+  transform: scale(1.02);
 }
 
 .set-icon {
@@ -166,5 +215,18 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.progress-container {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.progress-bar {
+  height: 8px;
+  transition: width 0.3s ease;
 }
 </style>
