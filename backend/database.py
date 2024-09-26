@@ -7,5 +7,3 @@ db = SQLAlchemy()
 # Import models here to avoid circular imports
 from models.card import Card
 from models.set import Set
-from models.collection import Collection
-from models.kiosk import Kiosk

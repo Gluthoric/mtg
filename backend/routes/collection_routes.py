@@ -3,9 +3,7 @@ from flask import Blueprint, jsonify, request, current_app
 from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.sql import func, asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from models.collection import Collection
 from models.card import Card
-from models.kiosk import Kiosk
 from models.set import Set
 from database import db
 import time
@@ -18,12 +16,12 @@ collection_routes = Blueprint('collection_routes', __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def serialize_collection(collection_items):
+def serialize_collection(cards):
     return [{
-        **item.card.to_dict(),
-        'quantity_regular': item.quantity_regular,
-        'quantity_foil': item.quantity_foil
-    } for item in collection_items]
+        **card.to_dict(),
+        'quantity_regular': card.quantity_collection_regular,
+        'quantity_foil': card.quantity_collection_foil
+    } for card in cards]
 
 @collection_routes.route('/collection', methods=['GET'])
 def get_collection():
@@ -41,10 +39,12 @@ def get_collection():
             mimetype='application/json'
         )
 
-    query = Collection.query.join(Card).join(Set)
+    query = Card.query.join(Set)
 
     if set_code:
         query = query.filter(Set.code == set_code)
+
+    query = query.filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0))
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -89,8 +89,7 @@ def get_collection_sets():
         # Subquery to calculate collection_count per set_code
         subquery = db.session.query(
             Card.set_code.label('set_code'),
-            func.count(Collection.card_id).label('collection_count')
-        ).outerjoin(Collection, Collection.card_id == Card.id
+            func.sum(Card.quantity_collection_regular + Card.quantity_collection_foil).label('collection_count')
         ).group_by(Card.set_code).subquery()
 
         # Main query to fetch sets with their collection counts
@@ -183,14 +182,12 @@ def update_collection(card_id):
     quantity_regular = data.get('quantity_regular', 0)
     quantity_foil = data.get('quantity_foil', 0)
 
-    collection_item = Collection.query.filter_by(card_id=card_id).first()
+    card = Card.query.get(card_id)
+    if not card:
+        return jsonify({"error": "Card not found."}), 404
 
-    if collection_item:
-        collection_item.quantity_regular = quantity_regular
-        collection_item.quantity_foil = quantity_foil
-    else:
-        collection_item = Collection(card_id=card_id, quantity_regular=quantity_regular, quantity_foil=quantity_foil)
-        db.session.add(collection_item)
+    card.quantity_collection_regular = quantity_regular
+    card.quantity_collection_foil = quantity_foil
 
     db.session.commit()
 
@@ -199,14 +196,10 @@ def update_collection(card_id):
     current_app.redis_client.delete("collection_sets:*")
     current_app.redis_client.delete("collection_stats")
 
-    card = Card.query.filter_by(id=card_id).first()
-    if not card:
-        return jsonify({"error": "Card not found."}), 404
-
     card_data = card.to_dict()
     card_data.update({
-        'quantity_regular': collection_item.quantity_regular,
-        'quantity_foil': collection_item.quantity_foil
+        'quantity_regular': card.quantity_collection_regular,
+        'quantity_foil': card.quantity_collection_foil
     })
 
     return current_app.response_class(
@@ -214,19 +207,6 @@ def update_collection(card_id):
         status=200,
         mimetype='application/json'
     )
-
-@collection_routes.route('/collection/<string:card_id>', methods=['DELETE'])
-def remove_from_collection(card_id):
-    collection_item = Collection.query.filter_by(card_id=card_id).first_or_404()
-    db.session.delete(collection_item)
-    db.session.commit()
-
-    # Invalidate related caches
-    current_app.redis_client.delete("collection:*")
-    current_app.redis_client.delete("collection_sets:*")
-    current_app.redis_client.delete("collection_stats")
-
-    return '', 204
 
 @collection_routes.route('/collection/stats', methods=['GET'])
 def get_collection_stats():
@@ -241,16 +221,16 @@ def get_collection_stats():
                 mimetype='application/json'
             )
 
-        total_cards = db.session.query(func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
-        unique_cards = Collection.query.count()
+        total_cards = db.session.query(func.sum(Card.quantity_collection_regular + Card.quantity_collection_foil)).scalar() or 0
+        unique_cards = Card.query.filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)).count()
 
         total_value_query = text("""
             SELECT SUM(
-                (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * collections.quantity_regular) +
-                (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * collections.quantity_foil)
+                (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * quantity_collection_regular) +
+                (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * quantity_collection_foil)
             )
-            FROM collections
-            JOIN cards ON cards.id = collections.card_id
+            FROM cards
+            WHERE quantity_collection_regular > 0 OR quantity_collection_foil > 0
         """)
         total_value = db.session.execute(total_value_query).scalar() or 0
 
@@ -288,10 +268,8 @@ def get_collection_set_cards(set_code):
                 Card.prices,
                 Card.rarity,
                 Card.set_name,
-            ),
-            joinedload(Card.collection).load_only(
-                Collection.quantity_regular,
-                Collection.quantity_foil
+                Card.quantity_collection_regular,
+                Card.quantity_collection_foil
             )
         ).join(Set).filter(Set.code == set_code)
 
@@ -323,8 +301,8 @@ def get_collection_set_cards(set_code):
                 'prices': card.prices,
                 'rarity': card.rarity,
                 'set_name': card.set_name,
-                'quantity_regular': card.collection.quantity_regular if card.collection else 0,
-                'quantity_foil': card.collection.quantity_foil if card.collection else 0
+                'quantity_regular': card.quantity_collection_regular,
+                'quantity_foil': card.quantity_collection_foil
             } for card in cards],
             'total': len(cards),
         }
@@ -415,62 +393,9 @@ def process_csv_row(row, index):
     if not card:
         raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
 
-    collection_item = Collection.query.filter_by(card_id=card.id).first()
-    kiosk_item = Kiosk.query.filter_by(card_id=card.id).first()
-
     if foil_status:
-        handle_foil_card(card, quantity, collection_item, kiosk_item)
+        card.quantity_collection_foil += quantity
     else:
-        handle_non_foil_card(card, quantity, collection_item, kiosk_item)
+        card.quantity_collection_regular += quantity
 
-def handle_foil_card(card, quantity, collection_item, kiosk_item):
-    if collection_item and collection_item.quantity_foil > 0:
-        if kiosk_item:
-            kiosk_item.quantity_foil += quantity
-        else:
-            kiosk_item = Kiosk(card_id=card.id, quantity_foil=quantity)
-            db.session.add(kiosk_item)
-    else:
-        to_collection = 1 if quantity >= 1 else 0
-        to_kiosk = quantity - to_collection
-
-        if to_collection > 0:
-            if collection_item:
-                collection_item.quantity_foil += to_collection
-            else:
-                collection_item = Collection(card_id=card.id, quantity_foil=to_collection)
-                db.session.add(collection_item)
-
-        if to_kiosk > 0:
-            if kiosk_item:
-                kiosk_item.quantity_foil += to_kiosk
-            else:
-                kiosk_item = Kiosk(card_id=card.id, quantity_foil=to_kiosk)
-                db.session.add(kiosk_item)
-
-def handle_non_foil_card(card, quantity, collection_item, kiosk_item):
-    has_collection_copy = collection_item and (collection_item.quantity_regular > 0 or collection_item.quantity_foil > 0)
-
-    if not has_collection_copy:
-        to_collection = 1 if quantity >= 1 else 0
-        to_kiosk = quantity - to_collection
-
-        if to_collection > 0:
-            if collection_item:
-                collection_item.quantity_regular += to_collection
-            else:
-                collection_item = Collection(card_id=card.id, quantity_regular=to_collection)
-                db.session.add(collection_item)
-
-        if to_kiosk > 0:
-            if kiosk_item:
-                kiosk_item.quantity_regular += to_kiosk
-            else:
-                kiosk_item = Kiosk(card_id=card.id, quantity_regular=to_kiosk)
-                db.session.add(kiosk_item)
-    else:
-        if kiosk_item:
-            kiosk_item.quantity_regular += quantity
-        else:
-            kiosk_item = Kiosk(card_id=card.id, quantity_regular=quantity)
-            db.session.add(kiosk_item)
+    db.session.add(card)

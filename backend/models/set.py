@@ -1,5 +1,4 @@
 from database import db
-from models.collection import Collection
 from models.card import Card
 
 class Set(db.Model):
@@ -37,7 +36,7 @@ class Set(db.Model):
 
     def get_collection_count(self):
         # Count the number of unique cards in the collection for this set
-        return db.session.query(db.func.count(Collection.card_id)) \
-            .join(Card, Card.id == Collection.card_id) \
+        return db.session.query(db.func.count(Card.id)) \
             .filter(Card.set_code == self.code) \
+            .filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)) \
             .scalar() or 0

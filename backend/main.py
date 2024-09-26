@@ -6,8 +6,6 @@ from routes import register_routes
 from routes.set_routes import set_routes
 from routes.kiosk_routes import kiosk_routes
 from routes.collection_routes import collection_routes
-from models.collection import Collection
-from models.kiosk import Kiosk
 from models.card import Card
 from sqlalchemy.sql import func, text
 import redis
@@ -31,38 +29,38 @@ def get_api_stats(app):
 
         try:
             # Collection stats
-            collection_total = db.session.query(func.sum(Collection.quantity_regular + Collection.quantity_foil)).scalar() or 0
-            collection_unique = Collection.query.count()
+            collection_total = db.session.query(func.sum(Card.quantity_collection_regular + Card.quantity_collection_foil)).scalar() or 0
+            collection_unique = Card.query.filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)).count()
 
             collection_value_query = text("""
                 SELECT SUM(
-                    (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * collections.quantity_regular) +
-                    (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * collections.quantity_foil)
+                    (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * quantity_collection_regular) +
+                    (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * quantity_collection_foil)
                 )
-                FROM collections
-                JOIN cards ON cards.id = collections.card_id
+                FROM cards
+                WHERE quantity_collection_regular > 0 OR quantity_collection_foil > 0
             """)
             collection_value = db.session.execute(collection_value_query).scalar() or 0
 
             # Kiosk stats
-            kiosk_total = db.session.query(func.sum(Kiosk.quantity_regular + Kiosk.quantity_foil)).scalar() or 0
-            kiosk_unique = Kiosk.query.count()
+            kiosk_total = db.session.query(func.sum(Card.quantity_kiosk_regular + Card.quantity_kiosk_foil)).scalar() or 0
+            kiosk_unique = Card.query.filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).count()
 
             kiosk_value_query = text("""
                 SELECT SUM(
-                    (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * kiosk.quantity_regular) +
-                    (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * kiosk.quantity_foil)
+                    (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * quantity_kiosk_regular) +
+                    (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * quantity_kiosk_foil)
                 )
-                FROM kiosk
-                JOIN cards ON cards.id = kiosk.card_id
+                FROM cards
+                WHERE quantity_kiosk_regular > 0 OR quantity_kiosk_foil > 0
             """)
             kiosk_value = db.session.execute(kiosk_value_query).scalar() or 0
 
             # Total stats
             total_cards = collection_total + kiosk_total
-            total_unique = db.session.query(Card).filter(
-                (Card.id.in_(db.session.query(Collection.card_id))) |
-                (Card.id.in_(db.session.query(Kiosk.card_id)))
+            total_unique = Card.query.filter(
+                (Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0) |
+                (Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)
             ).count()
             total_value = collection_value + kiosk_value
 

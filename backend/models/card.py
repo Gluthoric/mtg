@@ -18,7 +18,7 @@ class Card(db.Model):
     layout = db.Column(db.Text)
     highres_image = db.Column(db.Boolean)
     image_status = db.Column(db.Text)
-    image_uris = db.Column(JSONB)  # Now correctly mapped to JSONB
+    image_uris = db.Column(JSONB)
     mana_cost = db.Column(db.Text)
     cmc = db.Column(db.Float)
     type_line = db.Column(db.Text, index=True)
@@ -56,10 +56,14 @@ class Card(db.Model):
     related_uris = db.Column(JSONB)
     purchase_uris = db.Column(JSONB)
 
+    # New quantity fields
+    quantity_collection_regular = db.Column(db.BigInteger, default=0)
+    quantity_collection_foil = db.Column(db.BigInteger, default=0)
+    quantity_kiosk_regular = db.Column(db.BigInteger, default=0)
+    quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
+
     # Relationships
     set = db.relationship('Set', back_populates='cards')
-    collection = db.relationship('Collection', back_populates='card', uselist=False, cascade='all, delete-orphan')
-    kiosk = db.relationship('Kiosk', back_populates='card', uselist=False, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -76,6 +80,8 @@ class Card(db.Model):
             'colors': self.colors,
             'image_uris': self.image_uris if self.image_uris else {},
             'prices': self.prices,
-            'collection': self.collection.to_dict() if self.collection else None,
-            'kiosk': self.kiosk.to_dict() if self.kiosk else None
+            'quantity_collection_regular': self.quantity_collection_regular,
+            'quantity_collection_foil': self.quantity_collection_foil,
+            'quantity_kiosk_regular': self.quantity_kiosk_regular,
+            'quantity_kiosk_foil': self.quantity_kiosk_foil
         }

@@ -1,5 +1,4 @@
 from flask import Blueprint, jsonify, request, current_app
-from models.kiosk import Kiosk
 from models.card import Card
 from models.set import Set
 from database import db
@@ -13,7 +12,7 @@ def serialize_sets(sets):
     return [set_obj.to_dict() for set_obj in sets]
 
 def serialize_cards(cards):
-    return [{**card.to_dict(), 'quantity': kiosk_item.to_dict()} for card, kiosk_item in cards]
+    return [{**card.to_dict(), 'quantity_regular': card.quantity_kiosk_regular, 'quantity_foil': card.quantity_kiosk_foil} for card in cards]
 
 @kiosk_routes.route('/kiosk', methods=['GET'])
 def get_kiosk():
@@ -30,13 +29,10 @@ def get_kiosk():
             mimetype='application/json'
         )
 
-    kiosk = Kiosk.query.join(Card).paginate(page=page, per_page=per_page, error_out=False)
+    kiosk = Card.query.filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).paginate(page=page, per_page=per_page, error_out=False)
 
     result = {
-        'kiosk': [
-            {**item.card.to_dict(), 'quantity': item.to_dict()}
-            for item in kiosk.items
-        ],
+        'kiosk': serialize_cards(kiosk.items),
         'total': kiosk.total,
         'pages': kiosk.pages,
         'current_page': page
@@ -70,8 +66,7 @@ def get_kiosk_sets():
 
     kiosk_sets = db.session.query(Set).\
         join(Card, Card.set_code == Set.code).\
-        join(Kiosk, Kiosk.card_id == Card.id).\
-        filter((Kiosk.quantity_regular > 0) | (Kiosk.quantity_foil > 0)).\
+        filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
         distinct()
 
     if sort_order == 'desc':
@@ -86,9 +81,8 @@ def get_kiosk_sets():
         set_dict = set_obj.to_dict()
 
         kiosk_count = db.session.query(func.count(distinct(Card.id))).\
-            join(Kiosk, Kiosk.card_id == Card.id).\
             filter(Card.set_code == set_obj.code).\
-            filter((Kiosk.quantity_regular > 0) | (Kiosk.quantity_foil > 0)).\
+            filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
             scalar()
 
         set_dict['kiosk_count'] = kiosk_count
@@ -131,10 +125,9 @@ def get_kiosk_set_cards(set_code):
             mimetype='application/json'
         )
 
-    query = db.session.query(Card, Kiosk).\
-        join(Kiosk, Kiosk.card_id == Card.id).\
+    query = Card.query.\
         filter(Card.set_code == set_code).\
-        filter((Kiosk.quantity_regular > 0) | (Kiosk.quantity_foil > 0))
+        filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0))
 
     if name_filter:
         query = query.filter(Card.name.ilike(f'%{name_filter}%'))
@@ -148,11 +141,7 @@ def get_kiosk_set_cards(set_code):
 
     paginated_cards = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    cards_data = []
-    for card, kiosk_item in paginated_cards.items:
-        card_dict = card.to_dict()
-        card_dict['quantity'] = kiosk_item.to_dict()
-        cards_data.append(card_dict)
+    cards_data = serialize_cards(paginated_cards.items)
 
     set_name = Set.query.filter_by(code=set_code).first().name
 
@@ -179,41 +168,25 @@ def update_kiosk(card_id):
     quantity_regular = data.get('quantity_regular', 0)
     quantity_foil = data.get('quantity_foil', 0)
 
-    kiosk_item = Kiosk.query.filter_by(card_id=card_id).first()
+    card = Card.query.get(card_id)
+    if not card:
+        return jsonify({"error": "Card not found."}), 404
 
-    if kiosk_item:
-        kiosk_item.quantity_regular = quantity_regular
-        kiosk_item.quantity_foil = quantity_foil
-    else:
-        kiosk_item = Kiosk(card_id=card_id, quantity_regular=quantity_regular, quantity_foil=quantity_foil)
-        db.session.add(kiosk_item)
+    card.quantity_kiosk_regular = quantity_regular
+    card.quantity_kiosk_foil = quantity_foil
 
     db.session.commit()
 
     # Invalidate related caches
     current_app.redis_client.delete("kiosk:*")
     current_app.redis_client.delete("kiosk_sets:*")
-    current_app.redis_client.delete(f"kiosk_set_cards:{kiosk_item.card.set_code}:*")
+    current_app.redis_client.delete(f"kiosk_set_cards:{card.set_code}:*")
 
     return current_app.response_class(
-        response=orjson.dumps(kiosk_item.to_dict()),
+        response=orjson.dumps(card.to_dict()),
         status=200,
         mimetype='application/json'
     )
-
-@kiosk_routes.route('/kiosk/<string:card_id>', methods=['DELETE'])
-def remove_from_kiosk(card_id):
-    kiosk_item = Kiosk.query.filter_by(card_id=card_id).first_or_404()
-    set_code = kiosk_item.card.set_code
-    db.session.delete(kiosk_item)
-    db.session.commit()
-
-    # Invalidate related caches
-    current_app.redis_client.delete("kiosk:*")
-    current_app.redis_client.delete("kiosk_sets:*")
-    current_app.redis_client.delete(f"kiosk_set_cards:{set_code}:*")
-
-    return '', 204
 
 @kiosk_routes.route('/kiosk/stats', methods=['GET'])
 def get_kiosk_stats():
@@ -228,16 +201,16 @@ def get_kiosk_stats():
         )
 
     try:
-        total_cards = db.session.query(func.sum(Kiosk.quantity_regular + Kiosk.quantity_foil)).scalar() or 0
-        unique_cards = Kiosk.query.count()
+        total_cards = db.session.query(func.sum(Card.quantity_kiosk_regular + Card.quantity_kiosk_foil)).scalar() or 0
+        unique_cards = Card.query.filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).count()
 
         total_value_query = text("""
             SELECT SUM(
-                (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * kiosk.quantity_regular) +
-                (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * kiosk.quantity_foil)
+                (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * quantity_kiosk_regular) +
+                (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * quantity_kiosk_foil)
             )
-            FROM kiosk
-            JOIN cards ON cards.id = kiosk.card_id
+            FROM cards
+            WHERE quantity_kiosk_regular > 0 OR quantity_kiosk_foil > 0
         """)
         total_value = db.session.execute(total_value_query).scalar() or 0
 
