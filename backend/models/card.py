@@ -69,7 +69,6 @@ class Card(db.Model):
 
     # Relationships
     set = db.relationship('Set', back_populates='cards')
-    collection_count = db.relationship('SetCollectionCount', back_populates='set', uselist=False)
 
     def to_dict(self):
         return {

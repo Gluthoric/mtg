@@ -2,6 +2,8 @@ from database import db
 from models.card import Card
 from models.set_collection_count import SetCollectionCount
 from sqlalchemy.sql import func
+from sqlalchemy.orm import joinedload
+from datetime import datetime
 
 class Set(db.Model):
     __tablename__ = 'sets'
@@ -18,7 +20,7 @@ class Set(db.Model):
 
     # Relationships
     cards = db.relationship('Card', back_populates='set')
-    collection_count = db.relationship('SetCollectionCount', uselist=False, backref='set', lazy='joined')
+    collection_count = db.relationship('SetCollectionCount', uselist=False, back_populates='set', lazy='joined')
 
     def to_dict(self):
         # Ensure collection_count is already loaded

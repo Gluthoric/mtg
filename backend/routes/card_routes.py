@@ -176,9 +176,14 @@ def get_collection():
 
 from collections import defaultdict
 
+from collections import defaultdict
+from sqlalchemy.orm import with_loader_criteria
+from sqlalchemy.sql import asc, desc
+
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
+        # Extract query parameters
         name = request.args.get('name', type=str)
         set_types = request.args.getlist('set_type[]')
         page = request.args.get('page', 1, type=int)
@@ -186,6 +191,7 @@ def get_collection_sets():
         sort_by = request.args.get('sort_by', 'released_at', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
+        # Construct cache key
         cache_key = f"collection_sets:name:{name}:set_type:{','.join(set_types)}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
         cached_data = current_app.redis_client.get(cache_key)
 
@@ -198,26 +204,31 @@ def get_collection_sets():
 
         logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
-        # Main query to fetch sets with their collection counts and total value
-        query = db.session.query(
-            Set.id,
-            Set.code,
-            Set.name,
-            Set.released_at,
-            Set.set_type,
-            Set.card_count,
-            Set.digital,
-            Set.foil_only,
-            Set.icon_svg_uri,
-            func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count'),
-            func.sum(
-                (func.cast(func.coalesce(Card.prices['usd'].astext, '0'), Float) * Card.quantity_collection_regular) +
-                (func.cast(func.coalesce(Card.prices['usd_foil'].astext, '0'), Float) * Card.quantity_collection_foil)
-            ).label('total_value')
-        ).outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
-         .outerjoin(Card, Set.code == Card.set_code)\
-         .group_by(Set.id, SetCollectionCount.collection_count)
+        # Define valid sort fields and prevent SQL injection
+        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
+        if sort_by not in valid_sort_fields:
+            error_message = f"Invalid sort_by field: {sort_by}"
+            logger.error(error_message)
+            return jsonify({"error": error_message}), 400
 
+        # Determine sort column
+        if sort_by == 'collection_count':
+            sort_column = SetCollectionCount.collection_count
+        else:
+            sort_column = getattr(Set, sort_by)
+
+        # Apply sort order
+        order_func = desc if sort_order.lower() == 'desc' else asc
+
+        # Build the main query to return Set instances
+        query = db.session.query(Set)\
+            .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
+            .options(
+                subqueryload(Set.cards),  # Eagerly load related cards
+                joinedload(Set.collection_count)  # Eagerly load collection_count
+            )
+
+        # Apply filters
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
             logger.info(f"Applied filter: Set.name ilike '%{name}%'")
@@ -226,79 +237,52 @@ def get_collection_sets():
             logger.info(f"Applied filter: Set.set_type IN {set_types}")
         else:
             # Use the partial index for relevant set types if no specific set_types are provided
-            query = query.filter(Set.set_type.in_(['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']))
+            default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
+            query = query.filter(Set.set_type.in_(default_set_types))
             logger.info("Applied filter: Using partial index for relevant set types")
 
-        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
-        if sort_by not in valid_sort_fields:
-            error_message = f"Invalid sort_by field: {sort_by}"
-            logger.error(error_message)
-            return jsonify({"error": error_message}), 400
+        # Apply sorting
+        query = query.order_by(order_func(sort_column))
 
-        if sort_by == 'collection_count':
-            sort_column = SetCollectionCount.collection_count
-        else:
-            sort_column = getattr(Set, sort_by)
-
-        if sort_order.lower() == 'asc':
-            query = query.order_by(asc(sort_column))
-            logger.info(f"Sorting by {sort_by} in ascending order")
-        else:
-            query = query.order_by(desc(sort_column))
-            logger.info(f"Sorting by {sort_by} in descending order")
-
-        # Eager load variant cards
-        query = query.options(
-            subqueryload(Set.cards).filter(
-                or_(
-                    Card.frame_effects.contains(['showcase']),
-                    Card.frame_effects.contains(['extendedart']),
-                    Card.promo_types.contains(['fracturefoil']),
-                    Card.frame_effects.contains(['borderless']),
-                    Card.promo_types.contains(['promo'])
-                )
-            )
-        )
-
+        # Execute the query with pagination
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
         sets_list = []
-        for row in paginated_sets.items:
-            set_data = {
-                'id': row.id,
-                'code': row.code,
-                'name': row.name,
-                'released_at': row.released_at,
-                'set_type': row.set_type,
-                'card_count': row.card_count,
-                'digital': row.digital,
-                'foil_only': row.foil_only,
-                'icon_svg_uri': row.icon_svg_uri,
-                'collection_count': row.collection_count,
-                'collection_percentage': (row.collection_count / row.card_count) * 100 if row.card_count else 0,
-                'total_value': round(row.total_value or 0, 2),
-                'variants': defaultdict(list)
-            }
+        for set_instance in paginated_sets.items:
+            set_data = set_instance.to_dict()
+            set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
+            set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
 
-            # Categorize variant cards
-            for card in row.cards:
+            # Compute total_value and variants
+            total_value = 0.0
+            variants = defaultdict(list)
+            for card in set_instance.cards:
+                usd_price = float(card.prices.get('usd') or 0.0) if card.prices else 0.0
+                usd_foil_price = float(card.prices.get('usd_foil') or 0.0) if card.prices else 0.0
+                total_value += (usd_price * card.quantity_collection_regular) + (usd_foil_price * card.quantity_collection_foil)
+
+                # Categorize variant cards
                 if card.frame_effects and 'showcase' in card.frame_effects:
-                    set_data['variants']['Showcases'].append(card.to_dict())
+                    category = 'Showcases'
                 elif card.frame_effects and 'extendedart' in card.frame_effects:
-                    set_data['variants']['Extended Art'].append(card.to_dict())
+                    category = 'Extended Art'
                 elif card.promo_types and 'fracturefoil' in card.promo_types:
-                    set_data['variants']['Fracture Foils'].append(card.to_dict())
+                    category = 'Fracture Foils'
                 elif card.frame_effects and 'borderless' in card.frame_effects:
-                    set_data['variants']['Borderless Cards'].append(card.to_dict())
+                    category = 'Borderless Cards'
                 elif card.promo_types and 'promo' in card.promo_types:
-                    set_data['variants']['Promos'].append(card.to_dict())
+                    category = 'Promos'
                 else:
-                    set_data['variants']['Art Variants'].append(card.to_dict())
+                    category = 'Art Variants'
+                variants[category].append(card.to_dict())
+
+            set_data['total_value'] = round(total_value, 2)
+            set_data['variants'] = variants
 
             sets_list.append(set_data)
 
-        # Convert Decimal objects to float
+        # Convert Decimal objects to float if needed
         sets_list = convert_decimals(sets_list)
 
         response = {

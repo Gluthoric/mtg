@@ -1,0 +1,1041 @@
+diff --git a/backend/models/card.py b/backend/models/card.py
+index f0d2805..f793914 100644
+--- a/backend/models/card.py
++++ b/backend/models/card.py
+@@ -69,7 +69,6 @@ class Card(db.Model):
+ 
+     # Relationships
+     set = db.relationship('Set', back_populates='cards')
+-    collection_count = db.relationship('SetCollectionCount', back_populates='set', uselist=False)
+ 
+     def to_dict(self):
+         return {
+diff --git a/backend/models/set.py b/backend/models/set.py
+index 6f97c43..f1888a6 100644
+--- a/backend/models/set.py
++++ b/backend/models/set.py
+@@ -2,6 +2,8 @@ from database import db
+ from models.card import Card
+ from models.set_collection_count import SetCollectionCount
+ from sqlalchemy.sql import func
++from sqlalchemy.orm import joinedload
++from datetime import datetime
+ 
+ class Set(db.Model):
+     __tablename__ = 'sets'
+@@ -18,7 +20,7 @@ class Set(db.Model):
+ 
+     # Relationships
+     cards = db.relationship('Card', back_populates='set')
+-    collection_count = db.relationship('SetCollectionCount', uselist=False, backref='set', lazy='joined')
++    collection_count = db.relationship('SetCollectionCount', uselist=False, back_populates='set', lazy='joined')
+ 
+     def to_dict(self):
+         # Ensure collection_count is already loaded
+diff --git a/backend/models/set_collection_count.py b/backend/models/set_collection_count.py
+index b930f72..5204001 100644
+--- a/backend/models/set_collection_count.py
++++ b/backend/models/set_collection_count.py
+@@ -3,7 +3,7 @@ from database import db
+ class SetCollectionCount(db.Model):
+     __tablename__ = 'set_collection_counts'
+ 
+-    set_code = db.Column(db.Text, db.ForeignKey('sets.code'), primary_key=True)
++    set_code = db.Column(db.Text, db.ForeignKey('sets.code', ondelete='CASCADE'), primary_key=True)
+     collection_count = db.Column(db.Integer, nullable=False)
+ 
+     # Relationship
+diff --git a/backend/routes/card_routes.py b/backend/routes/card_routes.py
+index 3ebc3fe..12ad5de 100644
+--- a/backend/routes/card_routes.py
++++ b/backend/routes/card_routes.py
+@@ -176,6 +176,10 @@ def get_collection():
+ 
+ from collections import defaultdict
+ 
++from collections import defaultdict
++from sqlalchemy.orm import with_loader_criteria
++from sqlalchemy.sql import asc, desc
++
+ @card_routes.route('/collection/sets', methods=['GET'])
+ def get_collection_sets():
+     try:
+@@ -198,7 +202,26 @@ def get_collection_sets():
+ 
+         logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+ 
+-        # Main query to fetch sets with their collection counts and total value
++        # Define valid sort fields and prevent SQL injection by limiting to allowed fields
++        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
++        if sort_by not in valid_sort_fields:
++            error_message = f"Invalid sort_by field: {sort_by}"
++            logger.error(error_message)
++            return jsonify({"error": error_message}), 400
++
++        # Determine sort column
++        if sort_by == 'collection_count':
++            sort_column = SetCollectionCount.collection_count
++        else:
++            sort_column = getattr(Set, sort_by)
++
++        # Apply sort order
++        if sort_order.lower() == 'asc':
++            order_func = asc
++        else:
++            order_func = desc
++
++        # Build the main query
+         query = db.session.query(
+             Set.id,
+             Set.code,
+@@ -210,14 +233,20 @@ def get_collection_sets():
+             Set.foil_only,
+             Set.icon_svg_uri,
+             func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count'),
+-            func.sum(
+-                (func.cast(func.coalesce(Card.prices['usd'].astext, '0'), Float) * Card.quantity_collection_regular) +
+-                (func.cast(func.coalesce(Card.prices['usd_foil'].astext, '0'), Float) * Card.quantity_collection_foil)
++            func.coalesce(
++                db.session.query(
++                    func.sum(
++                        (func.cast(func.coalesce(Card.prices['usd'].astext, '0'), Float) * Card.quantity_collection_regular) +
++                        (func.cast(func.coalesce(Card.prices['usd_foil'].astext, '0'), Float) * Card.quantity_collection_foil)
++                    )
++                ).filter(Card.set_code == Set.code),
++                0.0
+             ).label('total_value')
+         ).outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
+          .outerjoin(Card, Set.code == Card.set_code)\
+          .group_by(Set.id, SetCollectionCount.collection_count)
+ 
++        # Apply filters
+         if name:
+             query = query.filter(Set.name.ilike(f'%{name}%'))
+             logger.info(f"Applied filter: Set.name ilike '%{name}%'")
+@@ -226,50 +255,51 @@ def get_collection_sets():
+             logger.info(f"Applied filter: Set.set_type IN {set_types}")
+         else:
+             # Use the partial index for relevant set types if no specific set_types are provided
+-            query = query.filter(Set.set_type.in_(['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']))
++            default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
++            query = query.filter(Set.set_type.in_(default_set_types))
+             logger.info("Applied filter: Using partial index for relevant set types")
+ 
+-        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
+-        if sort_by not in valid_sort_fields:
+-            error_message = f"Invalid sort_by field: {sort_by}"
+-            logger.error(error_message)
+-            return jsonify({"error": error_message}), 400
++        # Apply sorting
++        query = query.order_by(order_func(sort_column))
+ 
+-        if sort_by == 'collection_count':
+-            sort_column = SetCollectionCount.collection_count
+-        else:
+-            sort_column = getattr(Set, sort_by)
+-
+-        if sort_order.lower() == 'asc':
+-            query = query.order_by(asc(sort_column))
+-            logger.info(f"Sorting by {sort_by} in ascending order")
+-        else:
+-            query = query.order_by(desc(sort_column))
+-            logger.info(f"Sorting by {sort_by} in descending order")
+-
+-        # Eager load variant cards
++        # Apply eager loading without filters
+         query = query.options(
+-            subqueryload(Set.cards).filter(
+-                or_(
+-                    Card.frame_effects.contains(['showcase']),
+-                    Card.frame_effects.contains(['extendedart']),
+-                    Card.promo_types.contains(['fracturefoil']),
+-                    Card.frame_effects.contains(['borderless']),
+-                    Card.promo_types.contains(['promo'])
+-                )
+-            )
++            subqueryload(Set.cards)
+         )
+ 
++        # Execute the query with pagination
+         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
+         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
+ 
+         sets_list = []
++        set_codes = [row.code for row in paginated_sets.items]
++
++        # Fetch all cards for the paginated sets
++        cards = Card.query.filter(Card.set_code.in_(set_codes)).all()
++
++        # Group cards by set and variant category
++        set_to_variants = defaultdict(lambda: defaultdict(list))
++        for card in cards:
++            if card.frame_effects and 'showcase' in card.frame_effects:
++                category = 'Showcases'
++            elif card.frame_effects and 'extendedart' in card.frame_effects:
++                category = 'Extended Art'
++            elif card.promo_types and 'fracturefoil' in card.promo_types:
++                category = 'Fracture Foils'
++            elif card.frame_effects and 'borderless' in card.frame_effects:
++                category = 'Borderless Cards'
++            elif card.promo_types and 'promo' in card.promo_types:
++                category = 'Promos'
++            else:
++                category = 'Art Variants'
++            set_to_variants[card.set_code][category].append(card)
++
+         for row in paginated_sets.items:
+             set_data = {
+                 'id': row.id,
+                 'code': row.code,
+                 'name': row.name,
+-                'released_at': row.released_at,
++                'released_at': row.released_at.isoformat() if row.released_at else None,
+                 'set_type': row.set_type,
+                 'card_count': row.card_count,
+                 'digital': row.digital,
+@@ -278,23 +308,12 @@ def get_collection_sets():
+                 'collection_count': row.collection_count,
+                 'collection_percentage': (row.collection_count / row.card_count) * 100 if row.card_count else 0,
+                 'total_value': round(row.total_value or 0, 2),
+-                'variants': defaultdict(list)
++                'variants': {}
+             }
+ 
+-            # Categorize variant cards
+-            for card in row.cards:
+-                if card.frame_effects and 'showcase' in card.frame_effects:
+-                    set_data['variants']['Showcases'].append(card.to_dict())
+-                elif card.frame_effects and 'extendedart' in card.frame_effects:
+-                    set_data['variants']['Extended Art'].append(card.to_dict())
+-                elif card.promo_types and 'fracturefoil' in card.promo_types:
+-                    set_data['variants']['Fracture Foils'].append(card.to_dict())
+-                elif card.frame_effects and 'borderless' in card.frame_effects:
+-                    set_data['variants']['Borderless Cards'].append(card.to_dict())
+-                elif card.promo_types and 'promo' in card.promo_types:
+-                    set_data['variants']['Promos'].append(card.to_dict())
+-                else:
+-                    set_data['variants']['Art Variants'].append(card.to_dict())
++            # Add variant information
++            for category, variant_cards in set_to_variants[row.code].items():
++                set_data['variants'][category] = [card.to_dict() for card in variant_cards]
+ 
+             sets_list.append(set_data)
+ 
+diff --git a/backend/routes/set_routes.py b/backend/routes/set_routes.py
+index e096081..99f849b 100644
+--- a/backend/routes/set_routes.py
++++ b/backend/routes/set_routes.py
+@@ -1,129 +1,213 @@
+-from flask import Blueprint, jsonify, request
++from flask import Blueprint, jsonify, request, current_app
+ from models.set import Set
+ from models.card import Card
++from models.set_collection_count import SetCollectionCount
+ from database import db
+ from sqlalchemy import asc, desc
+-from sqlalchemy.orm import joinedload
++from sqlalchemy.orm import joinedload, subqueryload
++from sqlalchemy.exc import SQLAlchemyError
++from collections import defaultdict
++from decimal import Decimal
++import orjson
++import logging
+ 
+ set_routes = Blueprint('set_routes', __name__)
++logger = logging.getLogger(__name__)
++
++def convert_decimals(obj):
++    if isinstance(obj, list):
++        return [convert_decimals(item) for item in obj]
++    elif isinstance(obj, dict):
++        return {k: convert_decimals(v) for k, v in obj.items()}
++    elif isinstance(obj, Decimal):
++        return float(obj)
++    else:
++        return obj
+ 
+ @set_routes.route('/sets', methods=['GET'])
+ def get_all_sets():
+     try:
+         # Extract query parameters
+-        name = request.args.get('name', type=str, default='')
+-        set_type = request.args.get('set_type', type=str, default='')
+-        sort_by = request.args.get('sort_by', type=str, default='released_at')
+-        sort_order = request.args.get('sort_order', type=str, default='desc')
+-        page = request.args.get('page', type=int, default=1)
+-        per_page = request.args.get('per_page', type=int, default=20)
++        name = request.args.get('name', type=str)
++        set_types = request.args.getlist('set_type[]')
++        page = request.args.get('page', 1, type=int)
++        per_page = request.args.get('per_page', 20, type=int)
++        sort_by = request.args.get('sort_by', 'released_at', type=str)
++        sort_order = request.args.get('sort_order', 'desc', type=str)
++
++        # Construct cache key
++        cache_key = f"collection_sets:name:{name}:set_type:{','.join(set_types)}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
++        cached_data = current_app.redis_client.get(cache_key)
++
++        if cached_data:
++            return current_app.response_class(
++                response=cached_data.decode(),
++                status=200,
++                mimetype='application/json'
++            )
++
++        logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
++
++        # Define valid sort fields and prevent SQL injection
++        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
++        if sort_by not in valid_sort_fields:
++            error_message = f"Invalid sort_by field: {sort_by}"
++            logger.error(error_message)
++            return jsonify({"error": error_message}), 400
++
++        # Determine sort column
++        if sort_by == 'collection_count':
++            sort_column = SetCollectionCount.collection_count
++        else:
++            sort_column = getattr(Set, sort_by)
++
++        # Apply sort order
++        order_func = desc if sort_order.lower() == 'desc' else asc
+ 
+-        query = Set.query.options(joinedload(Set.collection_count))
++        # Build the main query to return Set instances
++        query = Set.query
+ 
+         # Apply filters
+         if name:
+             query = query.filter(Set.name.ilike(f'%{name}%'))
+-        if set_type:
+-            query = query.filter(Set.set_type == set_type)
++            logger.info(f"Applied filter: Set.name ilike '%{name}%'")
++        if set_types:
++            query = query.filter(Set.set_type.in_(set_types))
++            logger.info(f"Applied filter: Set.set_type IN {set_types}")
++        else:
++            # Use the partial index for relevant set types if no specific set_types are provided
++            default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
++            query = query.filter(Set.set_type.in_(default_set_types))
++            logger.info("Applied filter: Using partial index for relevant set types")
+ 
+         # Apply sorting
+-        if sort_order.lower() == 'asc':
+-            query = query.order_by(asc(getattr(Set, sort_by)))
++        if sort_by == 'collection_count':
++            query = query.outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
++                .order_by(order_func(SetCollectionCount.collection_count))
+         else:
+-            query = query.order_by(desc(getattr(Set, sort_by)))
++            query = query.order_by(order_func(getattr(Set, sort_by)))
+ 
+-        # Apply pagination
++        # Execute the query with pagination
+         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
+-
+-        sets = [set.to_dict() for set in paginated_sets.items]
+-
+-        return jsonify({
+-            'sets': sets,
++        logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
++
++        sets_list = []
++
++        for set_obj in paginated_sets.items:
++            # Get collection count for the set
++            collection_count = db.session.query(SetCollectionCount.collection_count)\
++                .filter(SetCollectionCount.set_code == set_obj.code)\
++                .scalar() or 0
++            # Compute collection_percentage
++            collection_percentage = (collection_count / set_obj.card_count) * 100 if set_obj.card_count else 0
++
++            # Prepare the set data
++            set_data = set_obj.to_dict()
++            set_data['collection_count'] = collection_count or 0
++            set_data['collection_percentage'] = collection_percentage
++
++            # Compute total_value and variants in a separate query
++            cards = Card.query.filter(Card.set_code == set_obj.code).all()
++            total_value = 0.0
++            variants = defaultdict(list)
++            for card in cards:
++                usd_price = float(card.prices.get('usd', 0)) if card.prices and 'usd' in card.prices else 0.0
++                usd_foil_price = float(card.prices.get('usd_foil', 0)) if card.prices and 'usd_foil' in card.prices else 0.0
++                total_value += (usd_price * card.quantity_collection_regular) + (usd_foil_price * card.quantity_collection_foil)
++
++                # Categorize variant cards
++                if card.frame_effects and 'showcase' in card.frame_effects:
++                    category = 'Showcases'
++                elif card.frame_effects and 'extendedart' in card.frame_effects:
++                    category = 'Extended Art'
++                elif card.promo_types and 'fracturefoil' in card.promo_types:
++                    category = 'Fracture Foils'
++                elif card.frame_effects and 'borderless' in card.frame_effects:
++                    category = 'Borderless Cards'
++                elif card.promo_types and 'promo' in card.promo_types:
++                    category = 'Promos'
++                else:
++                    category = 'Art Variants'
++                variants[category].append(card.to_dict())
++
++            set_data['total_value'] = round(total_value, 2)
++            set_data['variants'] = variants
++
++            sets_list.append(set_data)
++
++        # Convert Decimal objects to float if needed
++        sets_list = convert_decimals(sets_list)
++
++        response = {
++            'sets': sets_list,
+             'total': paginated_sets.total,
+             'pages': paginated_sets.pages,
+             'current_page': paginated_sets.page
+-        }), 200
+-    except AttributeError:
+-        return jsonify({"error": f"Invalid sort_by field: {sort_by}"}), 400
++        }
++
++        # Convert any remaining Decimal objects in the response
++        response = convert_decimals(response)
++
++        serialized_data = orjson.dumps(response).decode()
++        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
++
++        logger.info(f"Returning response with {len(sets_list)} sets")
++        return current_app.response_class(
++            response=serialized_data,
++            status=200,
++            mimetype='application/json'
++        )
++    except ValueError as ve:
++        logger.error(f"ValueError in get_all_sets: {str(ve)}")
++        return jsonify({"error": str(ve)}), 400
++    except SQLAlchemyError as sae:
++        logger.error(f"SQLAlchemyError in get_all_sets: {str(sae)}")
++        return jsonify({"error": "A database error occurred."}), 500
+     except Exception as e:
+-        return jsonify({"error": str(e)}), 500
++        logger.exception(f"Unexpected error in get_all_sets: {str(e)}")
++        return jsonify({"error": "An unexpected error occurred."}), 500
+ 
+ @set_routes.route('/sets/<string:set_code>', methods=['GET'])
+ def get_set(set_code):
+-    set_instance = Set.query.filter_by(code=set_code).first_or_404()
+-    return jsonify(set_instance.to_dict()), 200
++    try:
++        set_instance = Set.query.filter_by(code=set_code).first_or_404()
++        return jsonify(set_instance.to_dict()), 200
++    except Exception as e:
++        logger.exception(f"Error in get_set: {str(e)}")
++        return jsonify({"error": "An error occurred while fetching the set."}), 500
+ 
+ @set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
+ def get_set_cards(set_code):
+-    # Extract filter parameters
+-    name_filter = request.args.get('name', '', type=str)
+-    rarity_filter = request.args.get('rarity', '', type=str)
+-
+-    # Eagerly load related 'set' data to optimize queries
+-    query = Card.query.options(
+-        joinedload(Card.set)
+-    ).filter(Card.set_code == set_code)
+-
+-    # Apply filters based on query parameters
+-    if name_filter:
+-        query = query.filter(Card.name.ilike(f'%{name_filter}%'))
+-    if rarity_filter:
+-        query = query.filter(Card.rarity == rarity_filter)
+-
+-    # Fetch all matching cards without pagination
+-    cards = query.all()
+-
+-    # Serialize card data
+-    cards_data = []
+-    for card in cards:
+-        card_dict = {
+-            'id': card.id,
+-            'name': card.name,
+-            'rarity': card.rarity,
+-            'quantity_regular': card.quantity_collection_regular,
+-            'quantity_foil': card.quantity_collection_foil,
+-            'set_name': card.set.name if card.set else '',
+-            'set_code': card.set_code,
+-            'collector_number': card.collector_number,
+-            'mana_cost': card.mana_cost,
+-            'cmc': card.cmc,
+-            'type_line': card.type_line,
+-            'oracle_text': card.oracle_text,
+-            'colors': card.colors,
+-            'color_identity': card.color_identity,
+-            'keywords': card.keywords,
+-            'legalities': card.legalities,
+-            'reserved': card.reserved,
+-            'foil': card.foil,
+-            'nonfoil': card.nonfoil,
+-            'full_art': card.full_art,
+-            'textless': card.textless,
+-            'promo': card.promo,
+-            'reprint': card.reprint,
+-            'variation': card.variation,
+-            'artist': card.artist,
+-            'frame': card.frame,
+-            'border_color': card.border_color,
+-            'released_at': card.released_at,
+-            'prices': card.prices,
++    try:
++        # Extract filter parameters
++        name_filter = request.args.get('name', '', type=str)
++        rarity_filter = request.args.get('rarity', '', type=str)
++
++        # Eagerly load related 'set' data to optimize queries
++        query = Card.query.options(
++            joinedload(Card.set)
++        ).filter(Card.set_code == set_code)
++
++        # Apply filters based on query parameters
++        if name_filter:
++            query = query.filter(Card.name.ilike(f'%{name_filter}%'))
++        if rarity_filter:
++            query = query.filter(Card.rarity == rarity_filter)
++
++        # Fetch all matching cards without pagination
++        cards = query.all()
++
++        # Serialize card data
++        cards_data = [card.to_dict() for card in cards]
++
++        response = {
++            'cards': cards_data,
++            'total': len(cards_data),
++            'pages': 1,
++            'current_page': 1
+         }
+-        # Include image URIs
+-        if hasattr(card, 'image_uris') and card.image_uris:
+-            card_dict['image_uris'] = card.image_uris
+-
+-        # Include related URIs
+-        if card.related_uris:
+-            card_dict['related_uris'] = card.related_uris
+-
+-        # Include purchase URIs
+-        if card.purchase_uris:
+-            card_dict['purchase_uris'] = card.purchase_uris
+-
+-        cards_data.append(card_dict)
+-
+-    return jsonify({
+-        'cards': cards_data,
+-        'total': len(cards_data),
+-        'pages': 1,
+-        'current_page': 1
+-    }), 200
++
++        return jsonify(response), 200
++    except Exception as e:
++        logger.exception(f"Error in get_set_cards: {str(e)}")
++        return jsonify({"error": "An error occurred while fetching the set cards."}), 500
+diff --git a/backend_files.txt b/backend_files.txt
+index 1adcb3c..0a3be23 100644
+--- a/backend_files.txt
++++ b/backend_files.txt
+@@ -304,6 +304,7 @@ File: /home/gluth/mtg/backend/models/card.py
+ ================================================================================
+ from database import db
+ from sqlalchemy.dialects.postgresql import JSONB
++from datetime import datetime
+ 
+ class Card(db.Model):
+     __tablename__ = 'cards'
+@@ -316,7 +317,7 @@ class Card(db.Model):
+     tcgplayer_id = db.Column(db.BigInteger)
+     name = db.Column(db.Text, nullable=False, index=True)
+     lang = db.Column(db.Text)
+-    released_at = db.Column(db.Text)
++    released_at = db.Column(db.DateTime)
+     uri = db.Column(db.Text)
+     scryfall_uri = db.Column(db.Text)
+     layout = db.Column(db.Text)
+@@ -410,7 +411,10 @@ File: /home/gluth/mtg/backend/models/set.py
+ ================================================================================
+ from database import db
+ from models.card import Card
+-from sqlalchemy.sql import func  # Add this import at the top
++from models.set_collection_count import SetCollectionCount
++from sqlalchemy.sql import func
++from sqlalchemy.orm import joinedload
++from datetime import datetime
+ 
+ class Set(db.Model):
+     __tablename__ = 'sets'
+@@ -418,7 +422,7 @@ class Set(db.Model):
+     id = db.Column(db.Text, primary_key=True)
+     code = db.Column(db.Text, unique=True, nullable=False, index=True)
+     name = db.Column(db.Text, nullable=False)
+-    released_at = db.Column(db.Text)
++    released_at = db.Column(db.DateTime)
+     set_type = db.Column(db.Text)
+     card_count = db.Column(db.BigInteger)
+     digital = db.Column(db.Boolean)
+@@ -427,15 +431,20 @@ class Set(db.Model):
+ 
+     # Relationships
+     cards = db.relationship('Card', back_populates='set')
++    collection_count = db.relationship('SetCollectionCount', uselist=False, back_populates='set', lazy='joined')
+ 
+     def to_dict(self):
+-        collection_count = self.get_collection_count()
++        # Ensure collection_count is already loaded
++        if self.collection_count is None:
++            db.session.refresh(self)
++        
++        collection_count = self.collection_count.collection_count if self.collection_count else 0
+         collection_percentage = (collection_count / self.card_count) * 100 if self.card_count else 0
+         return {
+             'id': self.id,
+             'code': self.code,
+             'name': self.name,
+-            'released_at': self.released_at,
++            'released_at': self.released_at.isoformat() if self.released_at else None,
+             'set_type': self.set_type,
+             'card_count': self.card_count,
+             'digital': self.digital,
+@@ -445,12 +454,6 @@ class Set(db.Model):
+             'collection_percentage': collection_percentage
+         }
+ 
+-    def get_collection_count(self):
+-        # Count the number of unique cards in the collection for this set
+-        return db.session.query(func.count(Card.id)) \
+-            .filter(Card.set_code == self.code) \
+-            .filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)) \
+-            .scalar() or 0
+ ================================================================================
+ 
+ File: /home/gluth/mtg/backend/routes/__init__.py
+@@ -477,12 +480,36 @@ File: /home/gluth/mtg/backend/routes/card_routes.py
+ import pandas as pd
+ import logging
+ from flask import Blueprint, jsonify, request, current_app
+-from sqlalchemy.orm import joinedload, load_only
++import time
++
++def monitor_cache(func):
++    def wrapper(*args, **kwargs):
++        start_time = time.time()
++        result = func(*args, **kwargs)
++        end_time = time.time()
++        
++        # Increment total calls
++        current_app.redis_client.incr('cache_total_calls')
++        
++        # Increment hits or misses
++        if result is not None:
++            current_app.redis_client.incr('cache_hits')
++        else:
++            current_app.redis_client.incr('cache_misses')
++        
++        # Record response time
++        current_app.redis_client.lpush('cache_response_times', end_time - start_time)
++        current_app.redis_client.ltrim('cache_response_times', 0, 999)  # Keep last 1000 response times
++        
++        return result
++    return wrapper
++from sqlalchemy.orm import joinedload, load_only, subqueryload
+ from sqlalchemy.sql import func, asc, desc, text
+-from sqlalchemy import or_, distinct, Float
++from sqlalchemy import or_, distinct, Float, case
+ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+ from models.card import Card
+ from models.set import Set
++from models.set_collection_count import SetCollectionCount
+ from database import db
+ import orjson
+ from decimal import Decimal
+@@ -583,7 +610,12 @@ def get_collection():
+     set_code = request.args.get('set_code', '', type=str)
+ 
+     cache_key = f"collection:page:{page}:per_page:{per_page}:set_code:{set_code}"
+-    cached_data = current_app.redis_client.get(cache_key)
++
++    @monitor_cache
++    def get_cached_data(key):
++        return current_app.redis_client.get(key)
++
++    cached_data = get_cached_data(cache_key)
+ 
+     if cached_data:
+         return current_app.response_class(
+@@ -609,7 +641,10 @@ def get_collection():
+     }
+ 
+     serialized_data = orjson.dumps(result).decode()
+-    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
++    
++    # Dynamically set cache expiration based on data size
++    cache_expiration = min(300, max(60, len(serialized_data) // 1000))  # Between 1-5 minutes based on size
++    current_app.redis_client.setex(cache_key, cache_expiration, serialized_data)
+ 
+     return current_app.response_class(
+         response=serialized_data,
+@@ -620,6 +655,10 @@ def get_collection():
+ 
+ from collections import defaultdict
+ 
++from collections import defaultdict
++from sqlalchemy.orm import with_loader_criteria
++from sqlalchemy.sql import asc, desc
++
+ @card_routes.route('/collection/sets', methods=['GET'])
+ def get_collection_sets():
+     try:
+@@ -642,13 +681,26 @@ def get_collection_sets():
+ 
+         logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+ 
+-        # Subquery to calculate collection_count per set_code
+-        subquery = db.session.query(
+-            Card.set_code.label('set_code'),
+-            func.sum(Card.quantity_collection_regular + Card.quantity_collection_foil).label('collection_count')
+-        ).group_by(Card.set_code).subquery()
++        # Define valid sort fields and prevent SQL injection by limiting to allowed fields
++        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
++        if sort_by not in valid_sort_fields:
++            error_message = f"Invalid sort_by field: {sort_by}"
++            logger.error(error_message)
++            return jsonify({"error": error_message}), 400
++
++        # Determine sort column
++        if sort_by == 'collection_count':
++            sort_column = SetCollectionCount.collection_count
++        else:
++            sort_column = getattr(Set, sort_by)
++
++        # Apply sort order
++        if sort_order.lower() == 'asc':
++            order_func = asc
++        else:
++            order_func = desc
+ 
+-        # Main query to fetch sets with their collection counts
++        # Build the main query
+         query = db.session.query(
+             Set.id,
+             Set.code,
+@@ -659,40 +711,48 @@ def get_collection_sets():
+             Set.digital,
+             Set.foil_only,
+             Set.icon_svg_uri,
+-            func.coalesce(subquery.c.collection_count, 0).label('collection_count')
+-        ).outerjoin(subquery, Set.code == subquery.c.set_code)
++            func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count'),
++            func.coalesce(
++                db.session.query(
++                    func.sum(
++                        (func.cast(func.coalesce(Card.prices['usd'].astext, '0'), Float) * Card.quantity_collection_regular) +
++                        (func.cast(func.coalesce(Card.prices['usd_foil'].astext, '0'), Float) * Card.quantity_collection_foil)
++                    )
++                ).filter(Card.set_code == Set.code),
++                0.0
++            ).label('total_value')
++        ).outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
++         .outerjoin(Card, Set.code == Card.set_code)\
++         .group_by(Set.id, SetCollectionCount.collection_count)
+ 
++        # Apply filters
+         if name:
+             query = query.filter(Set.name.ilike(f'%{name}%'))
+             logger.info(f"Applied filter: Set.name ilike '%{name}%'")
+         if set_types:
+             query = query.filter(Set.set_type.in_(set_types))
+             logger.info(f"Applied filter: Set.set_type IN {set_types}")
+-
+-        valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
+-        if sort_by not in valid_sort_fields:
+-            error_message = f"Invalid sort_by field: {sort_by}"
+-            logger.error(error_message)
+-            return jsonify({"error": error_message}), 400
+-
+-        if sort_by == 'collection_count':
+-            sort_column = subquery.c.collection_count
+         else:
+-            sort_column = getattr(Set, sort_by)
++            # Use the partial index for relevant set types if no specific set_types are provided
++            default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
++            query = query.filter(Set.set_type.in_(default_set_types))
++            logger.info("Applied filter: Using partial index for relevant set types")
+ 
+-        if sort_order.lower() == 'asc':
+-            query = query.order_by(asc(sort_column))
+-            logger.info(f"Sorting by {sort_by} in ascending order")
+-        else:
+-            query = query.order_by(desc(sort_column))
+-            logger.info(f"Sorting by {sort_by} in descending order")
++        # Apply sorting
++        query = query.order_by(order_func(sort_column))
+ 
++        # Apply eager loading without filters
++        query = query.options(
++            subqueryload(Set.cards)
++        )
++
++        # Execute the query with pagination
+         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
+         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
+ 
+         sets_list = []
+         set_codes = [row.code for row in paginated_sets.items]
+-        
++
+         # Fetch all cards for the paginated sets
+         cards = Card.query.filter(Card.set_code.in_(set_codes)).all()
+ 
+@@ -718,39 +778,23 @@ def get_collection_sets():
+                 'id': row.id,
+                 'code': row.code,
+                 'name': row.name,
+-                'released_at': row.released_at,
++                'released_at': row.released_at.isoformat() if row.released_at else None,
+                 'set_type': row.set_type,
+                 'card_count': row.card_count,
+                 'digital': row.digital,
+                 'foil_only': row.foil_only,
+-                'icon_svg_uri': row.icon_svg_uri
+-            }
+-            collection_count = row.collection_count
+-            collection_percentage = (collection_count / row.card_count) * 100 if row.card_count else 0
+-
+-            # Calculate total_value for the set
+-            total_value_query = db.session.query(
+-                func.sum(
+-                    (func.cast((Card.prices['usd'].astext).cast(Float), Float) * Card.quantity_collection_regular) +
+-                    (func.cast((Card.prices['usd_foil'].astext).cast(Float), Float) * Card.quantity_collection_foil)
+-                )
+-            ).filter(Card.set_code == row.code)
+-
+-            total_value = total_value_query.scalar() or 0.0
+-
+-            set_item = {
+-                **set_data,
+-                'collection_count': collection_count,
+-                'collection_percentage': collection_percentage,
+-                'total_value': round(total_value, 2),
++                'icon_svg_uri': row.icon_svg_uri,
++                'collection_count': row.collection_count,
++                'collection_percentage': (row.collection_count / row.card_count) * 100 if row.card_count else 0,
++                'total_value': round(row.total_value or 0, 2),
+                 'variants': {}
+             }
+ 
+             # Add variant information
+             for category, variant_cards in set_to_variants[row.code].items():
+-                set_item['variants'][category] = [card.to_dict() for card in variant_cards]
++                set_data['variants'][category] = [card.to_dict() for card in variant_cards]
+ 
+-            sets_list.append(set_item)
++            sets_list.append(set_data)
+ 
+         # Convert Decimal objects to float
+         sets_list = convert_decimals(sets_list)
+@@ -791,14 +835,15 @@ def update_collection(card_id):
+     if not card:
+         return jsonify({"error": "Card not found."}), 404
+ 
++    old_set_code = card.set_code
+     card.quantity_collection_regular = quantity_regular
+     card.quantity_collection_foil = quantity_foil
+ 
+     db.session.commit()
+ 
+-    # Invalidate related caches
+-    current_app.redis_client.delete("collection:*")
+-    current_app.redis_client.delete("collection_sets:*")
++    # Invalidate specific caches
++    current_app.redis_client.delete(f"collection:*:set_code:{old_set_code}")
++    current_app.redis_client.delete(f"collection_sets:*:set_code:{old_set_code}")
+     current_app.redis_client.delete("collection_stats")
+ 
+     card_data = card.to_dict()
+@@ -893,6 +938,9 @@ def get_collection_set_cards(set_code):
+             colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
+             query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
+ 
++        # Use the composite index for efficient filtering and sorting
++        query = query.order_by(Card.set_code, Card.quantity_collection_regular.desc(), Card.quantity_collection_foil.desc())
++
+         # Execute the query
+         cards = query.all()
+ 
+@@ -947,21 +995,8 @@ def import_collection_csv():
+     df['Foil'] = df['Foil'].fillna(False).replace('', False)
+ 
+     try:
+-        with db.session.begin_nested():
+-            for index, row in df.iterrows():
+-                try:
+-                    process_collection_csv_row(row, index)
+-                except ValueError as e:
+-                    logger.error(f"Error processing row {index + 2}: {str(e)}")
+-                    continue
+-                except IntegrityError as e:
+-                    logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
+-                    db.session.rollback()
+-                    return jsonify({"error": f"Database integrity error at row {index + 2}: {str(e)}"}), 500
+-
+-                if index % 100 == 0:
+-                    db.session.flush()
+-
++        updates = process_collection_csv(df)
++        db.session.bulk_update_mappings(Card, updates)
+         db.session.commit()
+         logger.info("CSV imported successfully")
+ 
+@@ -972,38 +1007,37 @@ def import_collection_csv():
+ 
+         return jsonify({"message": "CSV imported successfully"}), 200
+ 
++    except ValueError as e:
++        logger.error(f"Error processing CSV: {str(e)}")
++        return jsonify({"error": str(e)}), 400
+     except SQLAlchemyError as e:
+         db.session.rollback()
+         logger.error(f"Database error during CSV import: {str(e)}")
+         return jsonify({"error": f"Database error: {str(e)}"}), 500
+ 
+-def process_collection_csv_row(row, index):
+-    scryfall_id = row['Scryfall ID']
+-    card_name = row['Name']
+-
+-    try:
+-        quantity = int(row['Quantity'])
+-        if quantity < 1:
++def process_collection_csv(df):
++    updates = []
++    for index, row in df.iterrows():
++        scryfall_id = row['Scryfall ID']
++        card_name = row['Name']
++        try:
++            quantity = int(row['Quantity'])
++            if quantity < 1:
++                raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
++        except ValueError:
+             raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
+-    except ValueError:
+-        raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
+ 
+-    foil = row['Foil']
+-    if isinstance(foil, bool):
+-        foil_status = foil
+-    else:
+-        raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
++        foil = row['Foil']
++        if not isinstance(foil, bool):
++            raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
+ 
+-    card = Card.query.filter_by(id=scryfall_id).first()
+-    if not card:
+-        raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
+-
+-    if foil_status:
+-        card.quantity_collection_foil += quantity
+-    else:
+-        card.quantity_collection_regular += quantity
++        updates.append({
++            'id': scryfall_id,
++            'quantity_collection_foil': db.func.coalesce(Card.quantity_collection_foil, 0) + (quantity if foil else 0),
++            'quantity_collection_regular': db.func.coalesce(Card.quantity_collection_regular, 0) + (quantity if not foil else 0)
++        })
+ 
+-    db.session.add(card)
++    return updates
+ 
+ # Kiosk Routes
+ 
+@@ -1064,10 +1098,16 @@ def get_kiosk_sets():
+             filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
+             distinct()
+ 
+-        if sort_order == 'desc':
+-            kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
++        if sort_by == 'released_at':
++            if sort_order == 'desc':
++                kiosk_sets = kiosk_sets.order_by(Set.released_at.desc())
++            else:
++                kiosk_sets = kiosk_sets.order_by(Set.released_at)
+         else:
+-            kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
++            if sort_order == 'desc':
++                kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
++            else:
++                kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
+ 
+         paginated_sets = kiosk_sets.paginate(page=page, per_page=per_page, error_out=False)
+ 
+@@ -1343,6 +1383,24 @@ def process_kiosk_csv_row(row, index):
+         card.quantity_kiosk_regular += quantity
+ 
+     db.session.add(card)
++@card_routes.route('/cache_stats', methods=['GET'])
++def get_cache_stats():
++    total_calls = int(current_app.redis_client.get('cache_total_calls') or 0)
++    hits = int(current_app.redis_client.get('cache_hits') or 0)
++    misses = int(current_app.redis_client.get('cache_misses') or 0)
++    
++    hit_rate = (hits / total_calls * 100) if total_calls > 0 else 0
++    
++    response_times = current_app.redis_client.lrange('cache_response_times', 0, -1)
++    avg_response_time = sum(float(t) for t in response_times) / len(response_times) if response_times else 0
++    
++    return jsonify({
++        'total_calls': total_calls,
++        'hits': hits,
++        'misses': misses,
++        'hit_rate': f"{hit_rate:.2f}%",
++        'avg_response_time': f"{avg_response_time:.4f} seconds"
++    })
+ 
+ ================================================================================
+ 
+@@ -1361,9 +1419,10 @@ File: /home/gluth/mtg/backend/routes/set_routes.py
+ from flask import Blueprint, jsonify, request
+ from models.set import Set
+ from models.card import Card
++from models.set_collection_count import SetCollectionCount
+ from database import db
+-from sqlalchemy import asc, desc
+-from sqlalchemy.orm import joinedload
++from sqlalchemy import asc, desc, func, Float
++from sqlalchemy.orm import joinedload, subqueryload
+ 
+ set_routes = Blueprint('set_routes', __name__)
+ 
+@@ -1378,7 +1437,9 @@ def get_all_sets():
+         page = request.args.get('page', type=int, default=1)
+         per_page = request.args.get('per_page', type=int, default=20)
+ 
+-        query = Set.query
++        query = db.session.query(Set)\
++            .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
++            .options(subqueryload(Set.cards))
+ 
+         # Apply filters
+         if name:
+@@ -1395,7 +1456,16 @@ def get_all_sets():
+         # Apply pagination
+         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
+ 
+-        sets = [set.to_dict() for set in paginated_sets.items]
++        sets = []
++        for set_instance in paginated_sets.items:
++            set_dict = set_instance.to_dict()
++            set_dict['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
++            set_dict['total_value'] = sum(
++                (float(card.prices.get('usd', 0)) * card.quantity_collection_regular) +
++                (float(card.prices.get('usd_foil', 0)) * card.quantity_collection_foil)
++                for card in set_instance.cards
++            )
++            sets.append(set_dict)
+ 
+         return jsonify({
+             'sets': sets,
