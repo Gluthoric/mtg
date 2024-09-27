@@ -43,7 +43,7 @@ class Card(db.Model):
     variation = db.Column(db.Boolean)
     set_code = db.Column(db.Text, db.ForeignKey('sets.code'), index=True)
     set_name = db.Column(db.Text)
-    collector_number = db.Column(db.Text, nullable=False, default='0')
+    collector_number = db.Column(db.Text, nullable=False)
     digital = db.Column(db.Boolean)
     rarity = db.Column(db.Text, index=True)
     card_back_id = db.Column(db.Text)
@@ -57,7 +57,8 @@ class Card(db.Model):
     related_uris = db.Column(JSONB)
     purchase_uris = db.Column(JSONB)
     promo_types = db.Column(JSONB)
-    frame_effects = db.Column(JSONB)
+    usd_price = db.Column(db.Numeric)
+    usd_foil_price = db.Column(db.Numeric)
 
     # New quantity fields
     quantity_collection_regular = db.Column(db.BigInteger, default=0)
@@ -74,7 +75,7 @@ class Card(db.Model):
             'name': self.name,
             'set_name': self.set_name,
             'set_code': self.set_code,
-            'collector_number': self.collector_number if self.collector_number else 'N/A',
+            'collector_number': self.collector_number,
             'type_line': self.type_line,
             'rarity': self.rarity,
             'mana_cost': self.mana_cost,

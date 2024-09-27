@@ -223,15 +223,15 @@ def get_collection_sets():
         # Group cards by set and variant category
         set_to_variants = defaultdict(lambda: defaultdict(list))
         for card in cards:
-            if 'showcase' in card.frame_effects:
+            if card.frame_effects and 'showcase' in card.frame_effects:
                 category = 'Showcases'
-            elif 'extendedart' in card.frame_effects:
+            elif card.frame_effects and 'extendedart' in card.frame_effects:
                 category = 'Extended Art'
-            elif 'fracturefoil' in card.promo_types:
+            elif card.promo_types and 'fracturefoil' in card.promo_types:
                 category = 'Fracture Foils'
-            elif 'borderless' in card.frame_effects:
+            elif card.frame_effects and 'borderless' in card.frame_effects:
                 category = 'Borderless Cards'
-            elif 'promo' in card.promo_types:
+            elif card.promo_types and 'promo' in card.promo_types:
                 category = 'Promos'
             else:
                 category = 'Art Variants'
