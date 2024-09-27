@@ -18,7 +18,7 @@ def get_all_sets():
         page = request.args.get('page', type=int, default=1)
         per_page = request.args.get('per_page', type=int, default=20)
 
-        query = Set.query
+        query = Set.query.options(joinedload(Set.collection_count))
 
         # Apply filters
         if name:

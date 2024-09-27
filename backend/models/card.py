@@ -1,5 +1,6 @@
 from database import db
 from sqlalchemy.dialects.postgresql import JSONB
+from datetime import datetime
 
 class Card(db.Model):
     __tablename__ = 'cards'
@@ -12,7 +13,7 @@ class Card(db.Model):
     tcgplayer_id = db.Column(db.BigInteger)
     name = db.Column(db.Text, nullable=False, index=True)
     lang = db.Column(db.Text)
-    released_at = db.Column(db.Text)
+    released_at = db.Column(db.DateTime)
     uri = db.Column(db.Text)
     scryfall_uri = db.Column(db.Text)
     layout = db.Column(db.Text)
@@ -68,6 +69,7 @@ class Card(db.Model):
 
     # Relationships
     set = db.relationship('Set', back_populates='cards')
+    collection_count = db.relationship('SetCollectionCount', back_populates='set', uselist=False)
 
     def to_dict(self):
         return {

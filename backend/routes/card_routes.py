@@ -1,9 +1,32 @@
 import pandas as pd
 import logging
 from flask import Blueprint, jsonify, request, current_app
-from sqlalchemy.orm import joinedload, load_only
+import time
+
+def monitor_cache(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        
+        # Increment total calls
+        current_app.redis_client.incr('cache_total_calls')
+        
+        # Increment hits or misses
+        if result is not None:
+            current_app.redis_client.incr('cache_hits')
+        else:
+            current_app.redis_client.incr('cache_misses')
+        
+        # Record response time
+        current_app.redis_client.lpush('cache_response_times', end_time - start_time)
+        current_app.redis_client.ltrim('cache_response_times', 0, 999)  # Keep last 1000 response times
+        
+        return result
+    return wrapper
+from sqlalchemy.orm import joinedload, load_only, subqueryload
 from sqlalchemy.sql import func, asc, desc, text
-from sqlalchemy import or_, distinct, Float
+from sqlalchemy import or_, distinct, Float, case
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.card import Card
 from models.set import Set
@@ -108,7 +131,12 @@ def get_collection():
     set_code = request.args.get('set_code', '', type=str)
 
     cache_key = f"collection:page:{page}:per_page:{per_page}:set_code:{set_code}"
-    cached_data = current_app.redis_client.get(cache_key)
+
+    @monitor_cache
+    def get_cached_data(key):
+        return current_app.redis_client.get(key)
+
+    cached_data = get_cached_data(cache_key)
 
     if cached_data:
         return current_app.response_class(
@@ -134,7 +162,10 @@ def get_collection():
     }
 
     serialized_data = orjson.dumps(result).decode()
-    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+    
+    # Dynamically set cache expiration based on data size
+    cache_expiration = min(300, max(60, len(serialized_data) // 1000))  # Between 1-5 minutes based on size
+    current_app.redis_client.setex(cache_key, cache_expiration, serialized_data)
 
     return current_app.response_class(
         response=serialized_data,
@@ -167,13 +198,7 @@ def get_collection_sets():
 
         logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
-        # Subquery to calculate collection_count per set_code
-        subquery = db.session.query(
-            Card.set_code.label('set_code'),
-            func.sum(Card.quantity_collection_regular + Card.quantity_collection_foil).label('collection_count')
-        ).group_by(Card.set_code).subquery()
-
-        # Main query to fetch sets with their collection counts
+        # Main query to fetch sets with their collection counts and total value
         query = db.session.query(
             Set.id,
             Set.code,
@@ -184,8 +209,14 @@ def get_collection_sets():
             Set.digital,
             Set.foil_only,
             Set.icon_svg_uri,
-            func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count')
-        ).outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)
+            func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count'),
+            func.sum(
+                (func.cast(func.coalesce(Card.prices['usd'].astext, '0'), Float) * Card.quantity_collection_regular) +
+                (func.cast(func.coalesce(Card.prices['usd_foil'].astext, '0'), Float) * Card.quantity_collection_foil)
+            ).label('total_value')
+        ).outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
+         .outerjoin(Card, Set.code == Card.set_code)\
+         .group_by(Set.id, SetCollectionCount.collection_count)
 
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
@@ -216,32 +247,23 @@ def get_collection_sets():
             query = query.order_by(desc(sort_column))
             logger.info(f"Sorting by {sort_by} in descending order")
 
+        # Eager load variant cards
+        query = query.options(
+            subqueryload(Set.cards).filter(
+                or_(
+                    Card.frame_effects.contains(['showcase']),
+                    Card.frame_effects.contains(['extendedart']),
+                    Card.promo_types.contains(['fracturefoil']),
+                    Card.frame_effects.contains(['borderless']),
+                    Card.promo_types.contains(['promo'])
+                )
+            )
+        )
+
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
         sets_list = []
-        set_codes = [row.code for row in paginated_sets.items]
-        
-        # Fetch all cards for the paginated sets
-        cards = Card.query.filter(Card.set_code.in_(set_codes)).all()
-
-        # Group cards by set and variant category
-        set_to_variants = defaultdict(lambda: defaultdict(list))
-        for card in cards:
-            if card.frame_effects and 'showcase' in card.frame_effects:
-                category = 'Showcases'
-            elif card.frame_effects and 'extendedart' in card.frame_effects:
-                category = 'Extended Art'
-            elif card.promo_types and 'fracturefoil' in card.promo_types:
-                category = 'Fracture Foils'
-            elif card.frame_effects and 'borderless' in card.frame_effects:
-                category = 'Borderless Cards'
-            elif card.promo_types and 'promo' in card.promo_types:
-                category = 'Promos'
-            else:
-                category = 'Art Variants'
-            set_to_variants[card.set_code][category].append(card)
-
         for row in paginated_sets.items:
             set_data = {
                 'id': row.id,
@@ -252,34 +274,29 @@ def get_collection_sets():
                 'card_count': row.card_count,
                 'digital': row.digital,
                 'foil_only': row.foil_only,
-                'icon_svg_uri': row.icon_svg_uri
-            }
-            collection_count = row.collection_count
-            collection_percentage = (collection_count / row.card_count) * 100 if row.card_count else 0
-
-            # Calculate total_value for the set
-            total_value_query = db.session.query(
-                func.sum(
-                    (func.cast((Card.prices['usd'].astext).cast(Float), Float) * Card.quantity_collection_regular) +
-                    (func.cast((Card.prices['usd_foil'].astext).cast(Float), Float) * Card.quantity_collection_foil)
-                )
-            ).filter(Card.set_code == row.code)
-
-            total_value = total_value_query.scalar() or 0.0
-
-            set_item = {
-                **set_data,
-                'collection_count': collection_count,
-                'collection_percentage': collection_percentage,
-                'total_value': round(total_value, 2),
-                'variants': {}
+                'icon_svg_uri': row.icon_svg_uri,
+                'collection_count': row.collection_count,
+                'collection_percentage': (row.collection_count / row.card_count) * 100 if row.card_count else 0,
+                'total_value': round(row.total_value or 0, 2),
+                'variants': defaultdict(list)
             }
 
-            # Add variant information
-            for category, variant_cards in set_to_variants[row.code].items():
-                set_item['variants'][category] = [card.to_dict() for card in variant_cards]
+            # Categorize variant cards
+            for card in row.cards:
+                if card.frame_effects and 'showcase' in card.frame_effects:
+                    set_data['variants']['Showcases'].append(card.to_dict())
+                elif card.frame_effects and 'extendedart' in card.frame_effects:
+                    set_data['variants']['Extended Art'].append(card.to_dict())
+                elif card.promo_types and 'fracturefoil' in card.promo_types:
+                    set_data['variants']['Fracture Foils'].append(card.to_dict())
+                elif card.frame_effects and 'borderless' in card.frame_effects:
+                    set_data['variants']['Borderless Cards'].append(card.to_dict())
+                elif card.promo_types and 'promo' in card.promo_types:
+                    set_data['variants']['Promos'].append(card.to_dict())
+                else:
+                    set_data['variants']['Art Variants'].append(card.to_dict())
 
-            sets_list.append(set_item)
+            sets_list.append(set_data)
 
         # Convert Decimal objects to float
         sets_list = convert_decimals(sets_list)
@@ -320,14 +337,15 @@ def update_collection(card_id):
     if not card:
         return jsonify({"error": "Card not found."}), 404
 
+    old_set_code = card.set_code
     card.quantity_collection_regular = quantity_regular
     card.quantity_collection_foil = quantity_foil
 
     db.session.commit()
 
-    # Invalidate related caches
-    current_app.redis_client.delete("collection:*")
-    current_app.redis_client.delete("collection_sets:*")
+    # Invalidate specific caches
+    current_app.redis_client.delete(f"collection:*:set_code:{old_set_code}")
+    current_app.redis_client.delete(f"collection_sets:*:set_code:{old_set_code}")
     current_app.redis_client.delete("collection_stats")
 
     card_data = card.to_dict()
@@ -479,21 +497,8 @@ def import_collection_csv():
     df['Foil'] = df['Foil'].fillna(False).replace('', False)
 
     try:
-        with db.session.begin_nested():
-            for index, row in df.iterrows():
-                try:
-                    process_collection_csv_row(row, index)
-                except ValueError as e:
-                    logger.error(f"Error processing row {index + 2}: {str(e)}")
-                    continue
-                except IntegrityError as e:
-                    logger.error(f"IntegrityError at row {index + 2}: {str(e)}")
-                    db.session.rollback()
-                    return jsonify({"error": f"Database integrity error at row {index + 2}: {str(e)}"}), 500
-
-                if index % 100 == 0:
-                    db.session.flush()
-
+        updates = process_collection_csv(df)
+        db.session.bulk_update_mappings(Card, updates)
         db.session.commit()
         logger.info("CSV imported successfully")
 
@@ -504,38 +509,37 @@ def import_collection_csv():
 
         return jsonify({"message": "CSV imported successfully"}), 200
 
+    except ValueError as e:
+        logger.error(f"Error processing CSV: {str(e)}")
+        return jsonify({"error": str(e)}), 400
     except SQLAlchemyError as e:
         db.session.rollback()
         logger.error(f"Database error during CSV import: {str(e)}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
 
-def process_collection_csv_row(row, index):
-    scryfall_id = row['Scryfall ID']
-    card_name = row['Name']
-
-    try:
-        quantity = int(row['Quantity'])
-        if quantity < 1:
+def process_collection_csv(df):
+    updates = []
+    for index, row in df.iterrows():
+        scryfall_id = row['Scryfall ID']
+        card_name = row['Name']
+        try:
+            quantity = int(row['Quantity'])
+            if quantity < 1:
+                raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
+        except ValueError:
             raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
-    except ValueError:
-        raise ValueError(f"Invalid quantity for card '{card_name}' at row {index + 2}.")
 
-    foil = row['Foil']
-    if isinstance(foil, bool):
-        foil_status = foil
-    else:
-        raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
+        foil = row['Foil']
+        if not isinstance(foil, bool):
+            raise ValueError(f"Foil value must be boolean for card '{card_name}' at row {index + 2}.")
 
-    card = Card.query.filter_by(id=scryfall_id).first()
-    if not card:
-        raise ValueError(f"Card with Scryfall ID '{scryfall_id}' not found in the database.")
+        updates.append({
+            'id': scryfall_id,
+            'quantity_collection_foil': db.func.coalesce(Card.quantity_collection_foil, 0) + (quantity if foil else 0),
+            'quantity_collection_regular': db.func.coalesce(Card.quantity_collection_regular, 0) + (quantity if not foil else 0)
+        })
 
-    if foil_status:
-        card.quantity_collection_foil += quantity
-    else:
-        card.quantity_collection_regular += quantity
-
-    db.session.add(card)
+    return updates
 
 # Kiosk Routes
 
@@ -596,10 +600,16 @@ def get_kiosk_sets():
             filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).\
             distinct()
 
-        if sort_order == 'desc':
-            kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
+        if sort_by == 'released_at':
+            if sort_order == 'desc':
+                kiosk_sets = kiosk_sets.order_by(Set.released_at.desc())
+            else:
+                kiosk_sets = kiosk_sets.order_by(Set.released_at)
         else:
-            kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
+            if sort_order == 'desc':
+                kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by).desc())
+            else:
+                kiosk_sets = kiosk_sets.order_by(getattr(Set, sort_by))
 
         paginated_sets = kiosk_sets.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -875,3 +885,21 @@ def process_kiosk_csv_row(row, index):
         card.quantity_kiosk_regular += quantity
 
     db.session.add(card)
+@card_routes.route('/cache_stats', methods=['GET'])
+def get_cache_stats():
+    total_calls = int(current_app.redis_client.get('cache_total_calls') or 0)
+    hits = int(current_app.redis_client.get('cache_hits') or 0)
+    misses = int(current_app.redis_client.get('cache_misses') or 0)
+    
+    hit_rate = (hits / total_calls * 100) if total_calls > 0 else 0
+    
+    response_times = current_app.redis_client.lrange('cache_response_times', 0, -1)
+    avg_response_time = sum(float(t) for t in response_times) / len(response_times) if response_times else 0
+    
+    return jsonify({
+        'total_calls': total_calls,
+        'hits': hits,
+        'misses': misses,
+        'hit_rate': f"{hit_rate:.2f}%",
+        'avg_response_time': f"{avg_response_time:.4f} seconds"
+    })

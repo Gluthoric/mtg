@@ -9,7 +9,7 @@ class Set(db.Model):
     id = db.Column(db.Text, primary_key=True)
     code = db.Column(db.Text, unique=True, nullable=False, index=True)
     name = db.Column(db.Text, nullable=False)
-    released_at = db.Column(db.Text)
+    released_at = db.Column(db.DateTime)
     set_type = db.Column(db.Text)
     card_count = db.Column(db.BigInteger)
     digital = db.Column(db.Boolean)
@@ -21,13 +21,17 @@ class Set(db.Model):
     collection_count = db.relationship('SetCollectionCount', uselist=False, backref='set', lazy='joined')
 
     def to_dict(self):
+        # Ensure collection_count is already loaded
+        if self.collection_count is None:
+            db.session.refresh(self)
+        
         collection_count = self.collection_count.collection_count if self.collection_count else 0
         collection_percentage = (collection_count / self.card_count) * 100 if self.card_count else 0
         return {
             'id': self.id,
             'code': self.code,
             'name': self.name,
-            'released_at': self.released_at,
+            'released_at': self.released_at.isoformat() if self.released_at else None,
             'set_type': self.set_type,
             'card_count': self.card_count,
             'digital': self.digital,
