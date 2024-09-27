@@ -74,8 +74,8 @@ export default {
     const totalPages = ref(1)
     const perPage = ref(20)
     const setTypes = ref([
-      'core', 'expansion', 'masters', 'draft_innovation', 'funny',
-      'starter', 'box', 'promo', 'token', 'memorabilia'
+      'core', 'expansion', 'masters', 'draft_innovation',
+      'commander', 'starter', 'box', 'promo', 'token', 'memorabilia'
     ])
 
     const fetchSets = async () => {

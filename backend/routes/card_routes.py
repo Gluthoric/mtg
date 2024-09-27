@@ -142,17 +142,19 @@ def get_collection():
     )
 
 
+from collections import defaultdict
+
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
         name = request.args.get('name', type=str)
-        set_type = request.args.get('set_type', type=str)
+        set_types = request.args.getlist('set_type[]')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         sort_by = request.args.get('sort_by', 'released_at', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
-        cache_key = f"collection_sets:name:{name}:set_type:{set_type}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
+        cache_key = f"collection_sets:name:{name}:set_type:{','.join(set_types)}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
         cached_data = current_app.redis_client.get(cache_key)
 
         if cached_data:
@@ -162,7 +164,7 @@ def get_collection_sets():
                 mimetype='application/json'
             )
 
-        logger.info(f"Received parameters: name={name}, set_type={set_type}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+        logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
         # Subquery to calculate collection_count per set_code
         subquery = db.session.query(
@@ -187,9 +189,9 @@ def get_collection_sets():
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
             logger.info(f"Applied filter: Set.name ilike '%{name}%'")
-        if set_type:
-            query = query.filter(Set.set_type == set_type)
-            logger.info(f"Applied filter: Set.set_type == '{set_type}'")
+        if set_types:
+            query = query.filter(Set.set_type.in_(set_types))
+            logger.info(f"Applied filter: Set.set_type IN {set_types}")
 
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
         if sort_by not in valid_sort_fields:
@@ -213,6 +215,28 @@ def get_collection_sets():
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
         sets_list = []
+        set_codes = [row.code for row in paginated_sets.items]
+        
+        # Fetch all cards for the paginated sets
+        cards = Card.query.filter(Card.set_code.in_(set_codes)).all()
+
+        # Group cards by set and variant category
+        set_to_variants = defaultdict(lambda: defaultdict(list))
+        for card in cards:
+            if 'showcase' in card.frame_effects:
+                category = 'Showcases'
+            elif 'extendedart' in card.frame_effects:
+                category = 'Extended Art'
+            elif 'fracturefoil' in card.promo_types:
+                category = 'Fracture Foils'
+            elif 'borderless' in card.frame_effects:
+                category = 'Borderless Cards'
+            elif 'promo' in card.promo_types:
+                category = 'Promos'
+            else:
+                category = 'Art Variants'
+            set_to_variants[card.set_code][category].append(card)
+
         for row in paginated_sets.items:
             set_data = {
                 'id': row.id,
@@ -238,12 +262,19 @@ def get_collection_sets():
 
             total_value = total_value_query.scalar() or 0.0
 
-            sets_list.append({
+            set_item = {
                 **set_data,
                 'collection_count': collection_count,
                 'collection_percentage': collection_percentage,
-                'total_value': round(total_value, 2)
-            })
+                'total_value': round(total_value, 2),
+                'variants': {}
+            }
+
+            # Add variant information
+            for category, variant_cards in set_to_variants[row.code].items():
+                set_item['variants'][category] = [card.to_dict() for card in variant_cards]
+
+            sets_list.append(set_item)
 
         # Convert Decimal objects to float
         sets_list = convert_decimals(sets_list)

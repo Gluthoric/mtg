@@ -76,13 +76,16 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const filters = ref({
-      set_type: ['core', 'expansion', 'masters', 'draft_innovation', 'funny']
+      set_type: ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
     })
     const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
     const currentPage = ref(1)
     const totalPages = ref(1)
     const perPage = ref(20)
-    const setTypes = ref(['core', 'expansion', 'masters', 'draft_innovation', 'funny'])
+    const setTypes = ref([
+      'core', 'expansion', 'masters', 'draft_innovation',
+      'commander', 'starter', 'box', 'promo', 'token', 'memorabilia'
+    ])
 
     const fetchSets = async () => {
       loading.value = true

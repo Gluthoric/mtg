@@ -52,9 +52,11 @@ class Card(db.Model):
     illustration_id = db.Column(db.Text)
     border_color = db.Column(db.Text)
     frame = db.Column(db.Text)
+    frame_effects = db.Column(JSONB)
     prices = db.Column(JSONB)
     related_uris = db.Column(JSONB)
     purchase_uris = db.Column(JSONB)
+    promo_types = db.Column(JSONB)
 
     # New quantity fields
     quantity_collection_regular = db.Column(db.BigInteger, default=0)
