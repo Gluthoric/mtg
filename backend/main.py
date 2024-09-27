@@ -96,6 +96,7 @@ def get_api_stats(app):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.config['SQLALCHEMY_ECHO'] = True
 
     # Initialize extensions
     db.init_app(app)

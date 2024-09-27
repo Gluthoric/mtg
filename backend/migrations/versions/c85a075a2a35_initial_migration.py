@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: 32c99e06368d
+Revision ID: c85a075a2a35
 Revises: 
-Create Date: 2024-09-26 21:28:02.916934
+Create Date: 2024-09-26 21:53:39.735867
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '32c99e06368d'
+revision = 'c85a075a2a35'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -25,7 +25,7 @@ def upgrade():
                existing_type=sa.TEXT(),
                type_=postgresql.JSONB(astext_type=sa.Text()),
                existing_nullable=True,
-               postgresql_using='multiverse_ids::jsonb')
+               postgresql_using="multiverse_ids::jsonb")
         batch_op.alter_column('name',
                existing_type=sa.TEXT(),
                nullable=False)
@@ -35,7 +35,8 @@ def upgrade():
         batch_op.alter_column('purchase_uris',
                existing_type=sa.TEXT(),
                type_=postgresql.JSONB(astext_type=sa.Text()),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="purchase_uris::jsonb")
         batch_op.drop_index('idx_cards_collector_number')
         batch_op.drop_index('idx_cards_colors_gin', postgresql_using='gin')
         batch_op.drop_index('idx_cards_name_trgm', postgresql_using='gin')
