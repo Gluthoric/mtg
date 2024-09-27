@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_migrate import Migrate
 from config import Config
 from database import db
 from routes import register_routes
@@ -99,6 +100,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     CORS(app)
+    migrate = Migrate(app, db)
 
     # Register routes
     register_routes(app)

@@ -57,6 +57,7 @@ class Card(db.Model):
     related_uris = db.Column(JSONB)
     purchase_uris = db.Column(JSONB)
     promo_types = db.Column(JSONB)
+    frame_effects = db.Column(JSONB)
 
     # New quantity fields
     quantity_collection_regular = db.Column(db.BigInteger, default=0)
