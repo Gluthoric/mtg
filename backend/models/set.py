@@ -1,6 +1,7 @@
 from database import db
 from models.card import Card
-from sqlalchemy.sql import func  # Add this import at the top
+from models.set_collection_count import SetCollectionCount
+from sqlalchemy.sql import func
 
 class Set(db.Model):
     __tablename__ = 'sets'
@@ -17,9 +18,10 @@ class Set(db.Model):
 
     # Relationships
     cards = db.relationship('Card', back_populates='set')
+    collection_count = db.relationship('SetCollectionCount', uselist=False, backref='set', lazy='joined')
 
     def to_dict(self):
-        collection_count = self.get_collection_count()
+        collection_count = self.collection_count.collection_count if self.collection_count else 0
         collection_percentage = (collection_count / self.card_count) * 100 if self.card_count else 0
         return {
             'id': self.id,
@@ -34,10 +36,3 @@ class Set(db.Model):
             'collection_count': collection_count,
             'collection_percentage': collection_percentage
         }
-
-    def get_collection_count(self):
-        # Count the number of unique cards in the collection for this set
-        return db.session.query(func.count(Card.id)) \
-            .filter(Card.set_code == self.code) \
-            .filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)) \
-            .scalar() or 0

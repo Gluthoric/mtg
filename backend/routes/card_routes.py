@@ -7,6 +7,7 @@ from sqlalchemy import or_, distinct, Float
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.card import Card
 from models.set import Set
+from models.set_collection_count import SetCollectionCount
 from database import db
 import orjson
 from decimal import Decimal
@@ -183,8 +184,8 @@ def get_collection_sets():
             Set.digital,
             Set.foil_only,
             Set.icon_svg_uri,
-            func.coalesce(subquery.c.collection_count, 0).label('collection_count')
-        ).outerjoin(subquery, Set.code == subquery.c.set_code)
+            func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count')
+        ).outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)
 
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
@@ -192,6 +193,10 @@ def get_collection_sets():
         if set_types:
             query = query.filter(Set.set_type.in_(set_types))
             logger.info(f"Applied filter: Set.set_type IN {set_types}")
+        else:
+            # Use the partial index for relevant set types if no specific set_types are provided
+            query = query.filter(Set.set_type.in_(['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']))
+            logger.info("Applied filter: Using partial index for relevant set types")
 
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
         if sort_by not in valid_sort_fields:
@@ -200,7 +205,7 @@ def get_collection_sets():
             return jsonify({"error": error_message}), 400
 
         if sort_by == 'collection_count':
-            sort_column = subquery.c.collection_count
+            sort_column = SetCollectionCount.collection_count
         else:
             sort_column = getattr(Set, sort_by)
 
@@ -416,6 +421,9 @@ def get_collection_set_cards(set_code):
             # Use JSONB array contains operator '?|'
             colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
             query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
+
+        # Use the composite index for efficient filtering and sorting
+        query = query.order_by(Card.set_code, Card.quantity_collection_regular.desc(), Card.quantity_collection_foil.desc())
 
         # Execute the query
         cards = query.all()
