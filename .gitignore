@@ -110,3 +110,4 @@ notes/scryfall_default_cards.json
 
 # Allow .aider.conf
 !.aider.conf
+.aider*
