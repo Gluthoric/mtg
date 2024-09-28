@@ -11,6 +11,15 @@
         @update-cards-per-row="updateCardsPerRow"
       />
 
+      <!-- Set Statistics -->
+      <div class="set-stats bg-dark-200 p-4 rounded-lg mb-4">
+        <h2 class="text-lg font-semibold mb-2">Set Statistics</h2>
+        <p>Total Cards in Set: {{ totalCardsInSet }}</p>
+        <p>Cards in Collection: {{ cardsInCollection }}</p>
+        <p>Completion: {{ completionPercentage }}%</p>
+        <p>Total Value: ${{ totalValue.toFixed(2) }}</p>
+      </div>
+
       <!-- Cards Grid -->
       <div class="card-grid grid gap-6" :style="gridStyle">
         <div
@@ -111,6 +120,13 @@
                 </div>
               </div>
             </div>
+            <!-- Card Details -->
+            <div class="card-details mt-2 text-xs text-gray-light">
+              <p><span class="font-semibold">Type:</span> {{ card.type_line || 'N/A' }}</p>
+              <p><span class="font-semibold">Mana Cost:</span> {{ card.mana_cost || 'N/A' }}</p>
+              <p><span class="font-semibold">Set:</span> {{ card.set_name }}</p>
+              <p><span class="font-semibold">Rarity:</span> {{ card.rarity }}</p>
+            </div>
           </div>
           <div v-if="isMissing(card)" class="missing-indicator absolute top-1 right-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow">
             Missing
@@ -119,7 +135,7 @@
       </div>
 
       <!-- Handle No Cards Matching Filters -->
-      <div v-if="filteredAndSortedCards.length === 0" class="text-center text-gray-light">
+      <div v-if="filteredAndSortedCards.length === 0" class="text-center text-gray-light mt-4">
         No cards match the selected filters.
       </div>
     </div>
@@ -152,6 +168,18 @@ export default {
       missing: false
     });
     const cardsPerRow = ref(6);
+
+    // New computed properties for set statistics
+    const totalCardsInSet = computed(() => cards.value.length);
+    const cardsInCollection = computed(() => cards.value.filter(card => card.quantity_regular > 0 || card.quantity_foil > 0).length);
+    const completionPercentage = computed(() => ((cardsInCollection.value / totalCardsInSet.value) * 100).toFixed(2));
+    const totalValue = computed(() => {
+      return cards.value.reduce((total, card) => {
+        const regularValue = (card.prices?.usd || 0) * card.quantity_regular;
+        const foilValue = (card.prices?.usd_foil || 0) * card.quantity_foil;
+        return total + regularValue + foilValue;
+      }, 0);
+    });
 
     const fetchCards = async () => {
       loading.value = true;
@@ -318,7 +346,11 @@ export default {
       onInput,
       cardsPerRow,
       updateCardsPerRow,
-      gridStyle
+      gridStyle,
+      totalCardsInSet,
+      cardsInCollection,
+      completionPercentage,
+      totalValue
     };
   },
 };
@@ -483,5 +515,22 @@ input[type="range"]::-moz-range-thumb {
 }
 .text-green-500 {
   color: #48bb78; /* Tailwind CSS green-500 */
+}
+
+/* New styles for set statistics */
+.set-stats {
+  background-color: var(--secondary-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.set-stats h2 {
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.set-stats p {
+  margin-bottom: 0.25rem;
 }
 </style>

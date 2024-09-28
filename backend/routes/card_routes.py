@@ -405,7 +405,10 @@ def get_collection_set_cards(set_code):
                 Card.rarity,
                 Card.set_name,
                 Card.quantity_collection_regular,
-                Card.quantity_collection_foil
+                Card.quantity_collection_foil,
+                Card.type_line,
+                Card.mana_cost,
+                Card.colors
             )
         ).filter(Card.set_code == set_code)
 
@@ -441,7 +444,10 @@ def get_collection_set_cards(set_code):
                 'rarity': card.rarity,
                 'set_name': card.set_name,
                 'quantity_regular': card.quantity_collection_regular,
-                'quantity_foil': card.quantity_collection_foil
+                'quantity_foil': card.quantity_collection_foil,
+                'type_line': card.type_line,
+                'mana_cost': card.mana_cost,
+                'colors': card.colors
             } for card in cards],
             'total': len(cards),
         }
