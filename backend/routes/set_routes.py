@@ -10,6 +10,7 @@ from collections import defaultdict
 from decimal import Decimal
 import orjson
 import logging
+from datetime import datetime
 
 set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
@@ -34,9 +35,13 @@ def get_all_sets():
         per_page = request.args.get('per_page', 20, type=int)
         sort_by = request.args.get('sort_by', 'released_at', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
+        digital = request.args.get('digital', type=str)
+        foil_only = request.args.get('foil_only', type=str)
+        released_from = request.args.get('released_from', type=str)
+        released_to = request.args.get('released_to', type=str)
 
         # Construct cache key
-        cache_key = f"collection_sets:name:{name}:set_type:{','.join(set_types)}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
+        cache_key = f"collection_sets:name:{name}:set_type:{','.join(set_types)}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}:digital:{digital}:foil_only:{foil_only}:released_from:{released_from}:released_to:{released_to}"
         cached_data = current_app.redis_client.get(cache_key)
 
         if cached_data:
@@ -46,7 +51,7 @@ def get_all_sets():
                 mimetype='application/json'
             )
 
-        logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+        logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}, digital={digital}, foil_only={foil_only}, released_from={released_from}, released_to={released_to}")
 
         # Define valid sort fields and prevent SQL injection
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
@@ -84,6 +89,28 @@ def get_all_sets():
             default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
             query = query.filter(Set.set_type.in_(default_set_types))
             logger.info("Applied filter: Using partial index for relevant set types")
+
+        # Apply digital filter
+        if digital in ['true', 'false']:
+            is_digital = digital.lower() == 'true'
+            query = query.filter(Set.digital == is_digital)
+            logger.info(f"Applied filter: Set.digital == {is_digital}")
+
+        # Apply foil_only filter
+        if foil_only in ['true', 'false']:
+            is_foil_only = foil_only.lower() == 'true'
+            query = query.filter(Set.foil_only == is_foil_only)
+            logger.info(f"Applied filter: Set.foil_only == {is_foil_only}")
+
+        # Apply released date range filter
+        if released_from:
+            released_from_date = datetime.strptime(released_from, '%Y-%m-%d')
+            query = query.filter(Set.released_at >= released_from_date)
+            logger.info(f"Applied filter: Set.released_at >= {released_from_date}")
+        if released_to:
+            released_to_date = datetime.strptime(released_to, '%Y-%m-%d')
+            query = query.filter(Set.released_at <= released_to_date)
+            logger.info(f"Applied filter: Set.released_at <= {released_to_date}")
 
         # Apply sorting
         query = query.order_by(order_func(sort_column))

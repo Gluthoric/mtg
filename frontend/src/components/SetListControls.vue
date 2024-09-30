@@ -17,6 +17,48 @@
           <option v-for="type in setTypes" :key="type" :value="type">{{ capitalize(type.replace('_', ' ')) }}</option>
         </select>
       </div>
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Digital</label>
+        <select 
+          v-model="localFilters.digital" 
+          @change="emitFilters"
+          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="">All</option>
+          <option value="true">Digital Only</option>
+          <option value="false">Physical Only</option>
+        </select>
+      </div>
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Foil Only</label>
+        <select 
+          v-model="localFilters.foil_only" 
+          @change="emitFilters"
+          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="">All</option>
+          <option value="true">Foil Only Sets</option>
+          <option value="false">Include Non-Foil Sets</option>
+        </select>
+      </div>
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Released From</label>
+        <input
+          type="date"
+          v-model="localFilters.released_from"
+          @change="emitFilters"
+          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+      </div>
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Released To</label>
+        <input
+          type="date"
+          v-model="localFilters.released_to"
+          @change="emitFilters"
+          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+      </div>
       <div class="sort-section">
         <label for="sortBy" class="block mb-1">Sort By:</label>
         <div class="flex space-x-2">
@@ -72,7 +114,11 @@ export default {
     return {
       localFilters: {
         name: '',
-        set_type: ''
+        set_type: '',
+        digital: '',
+        foil_only: '',
+        released_from: '',
+        released_to: ''
       },
       localSorting: {
         sortBy: 'released_at',

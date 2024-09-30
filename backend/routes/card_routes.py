@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 from flask import Blueprint, jsonify, request, current_app
 import time
+from sqlalchemy.dialects import postgresql
 
 def monitor_cache(func):
     def wrapper(*args, **kwargs):
@@ -410,8 +411,10 @@ def get_collection_stats():
 @card_routes.route('/collection/sets/<string:set_code>/cards', methods=['GET'])
 def get_collection_set_cards(set_code):
     name = request.args.get('name', '', type=str)
-    rarity = request.args.get('rarity', '', type=str)
+    rarities = request.args.getlist('rarities') + request.args.getlist('rarities[]')
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
+    types = request.args.getlist('types') + request.args.getlist('types[]')
+    keyword = request.args.get('keyword', '', type=str)
 
     try:
         # Build the query with only required columns using model attributes
@@ -427,25 +430,49 @@ def get_collection_set_cards(set_code):
                 Card.quantity_collection_regular,
                 Card.quantity_collection_foil,
                 Card.type_line,
-                Card.mana_cost,
-                Card.colors
+                Card.colors,
+                Card.keywords
             )
         ).filter(Card.set_code == set_code)
 
         # Apply filters
         if name:
             query = query.filter(Card.name.ilike(f'%{name}%'))
-        if rarity:
-            query = query.filter(Card.rarity == rarity)
+        if rarities:
+            query = query.filter(Card.rarity.in_(rarities))
         if colors:
-            VALID_COLORS = {'W', 'U', 'B', 'R', 'G'}
+            VALID_COLORS = {'W', 'U', 'B', 'R', 'G', 'C'}
             invalid_colors = set(colors) - VALID_COLORS
             if invalid_colors:
                 return jsonify({"error": f"Invalid colors: {', '.join(invalid_colors)}"}), 400
 
-            # Use JSONB array contains operator '?|'
-            colors_str = "{" + ",".join(f'"{c}"' for c in colors) + "}"
-            query = query.filter(text("cards.colors ?| :colors_str").bindparams(colors_str=colors_str))
+            # Handle "C" for colorless cards
+            if 'C' in colors:
+                colors.remove('C')
+                # Filter for colorless cards where the 'colors' array is empty
+                colorless_filter = func.jsonb_array_length(Card.colors) == 0
+            else:
+                colorless_filter = None
+
+            # Build the colors filter for colored cards
+            if colors:
+                colors_filter = Card.colors.overlap(colors)
+                if colorless_filter is not None:
+                    final_colors_filter = or_(colors_filter, colorless_filter)
+                else:
+                    final_colors_filter = colors_filter
+            else:
+                # Only colorless cards are selected
+                final_colors_filter = colorless_filter
+
+            # Apply the final colors filter
+            if final_colors_filter is not None:
+                query = query.filter(final_colors_filter)
+        if types:
+            type_filters = [Card.type_line.ilike(f'%{type_}%') for type_ in types]
+            query = query.filter(or_(*type_filters))
+        if keyword:
+            query = query.filter(Card.keywords.contains([keyword]))
 
         # Use the composite index for efficient filtering and sorting
         query = query.order_by(Card.set_code, Card.quantity_collection_regular.desc(), Card.quantity_collection_foil.desc())
@@ -466,8 +493,8 @@ def get_collection_set_cards(set_code):
                 'quantity_regular': card.quantity_collection_regular,
                 'quantity_foil': card.quantity_collection_foil,
                 'type_line': card.type_line,
-                'mana_cost': card.mana_cost,
-                'colors': card.colors
+                'colors': card.colors,
+                'keywords': card.keywords
             } for card in cards],
             'total': len(cards),
         }

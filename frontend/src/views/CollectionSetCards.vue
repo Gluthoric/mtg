@@ -163,9 +163,11 @@ export default {
     const error = ref(null);
     const filters = ref({
       name: '',
-      rarity: '',
+      rarities: [],
       colors: [],
-      missing: false
+      missing: false,
+      types: [],
+      keyword: ''
     });
     const cardsPerRow = ref(6);
 

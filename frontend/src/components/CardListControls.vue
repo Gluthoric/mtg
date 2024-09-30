@@ -13,17 +13,19 @@
 
       <!-- Rarity Filter -->
       <div class="filter-section">
-        <select 
-          v-model="localFilters.rarity" 
-          @change="emitFilters"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="">All Rarities</option>
-          <option value="common">Common</option>
-          <option value="uncommon">Uncommon</option>
-          <option value="rare">Rare</option>
-          <option value="mythic">Mythic</option>
-        </select>
+        <label class="block text-sm font-medium mb-2">Rarities</label>
+        <div class="flex flex-wrap gap-2">
+          <label v-for="rarity in availableRarities" :key="rarity" class="flex items-center">
+            <input
+              type="checkbox"
+              :value="rarity"
+              v-model="localFilters.rarities"
+              @change="emitFilters"
+              class="mr-1"
+            />
+            <span class="capitalize">{{ rarity }}</span>
+          </label>
+        </div>
       </div>
 
       <!-- Color Filter -->
@@ -38,9 +40,41 @@
               @change="emitFilters"
               class="mr-1"
             />
-            <span :class="colorClass(color)" class="capitalize">{{ color }}</span>
+            <span :class="colorClass(color)" class="capitalize">{{ getColorName(color) }}</span>
           </label>
         </div>
+      </div>
+
+      <!-- Type Line Filter -->
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Types</label>
+        <div class="flex flex-wrap gap-2">
+          <label v-for="type in availableTypes" :key="type" class="flex items-center">
+            <input
+              type="checkbox"
+              :value="type"
+              v-model="localFilters.types"
+              @change="emitFilters"
+              class="mr-1"
+            />
+            <span class="capitalize">{{ type }}</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Keywords Filter -->
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Keywords</label>
+        <select
+          v-model="localFilters.keyword"
+          @change="emitFilters"
+          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="">All Keywords</option>
+          <option v-for="keyword in availableKeywords" :key="keyword" :value="keyword">
+            {{ keyword }}
+          </option>
+        </select>
       </div>
 
       <!-- Missing Filter Button -->
@@ -83,9 +117,11 @@ export default {
       type: Object,
       default: () => ({
         name: '',
-        rarity: '',
+        rarities: [],
         colors: [],
-        missing: false
+        missing: false,
+        types: [],
+        keyword: ''
       })
     },
     cardsPerRow: {
@@ -97,7 +133,10 @@ export default {
     return {
       localFilters: { ...this.filters },
       localCardsPerRow: this.cardsPerRow,
-      availableColors: ['W', 'U', 'B', 'R', 'G']
+      availableColors: ['W', 'U', 'B', 'R', 'G', 'C'],
+      availableRarities: ['common', 'uncommon', 'rare', 'mythic'],
+      availableTypes: ['Creature', 'Artifact', 'Enchantment', 'Instant', 'Sorcery', 'Planeswalker', 'Land'],
+      availableKeywords: ['Flying', 'Haste', 'First strike', 'Trample', 'Vigilance']
     }
   },
   created() {
@@ -124,9 +163,21 @@ export default {
         B: 'text-black',
         R: 'text-red-500',
         G: 'text-green-500',
+        C: 'text-gray-500',
       }
       return colorMap[color] || 'text-gray-500'
-    }
+    },
+    getColorName(color) {
+      const colorNames = {
+        'W': 'White',
+        'U': 'Blue',
+        'B': 'Black',
+        'R': 'Red',
+        'G': 'Green',
+        'C': 'Colorless',
+      };
+      return colorNames[color] || color;
+    },
   },
   beforeUnmount() {
     // Cancel any pending debounced calls when the component is unmounted

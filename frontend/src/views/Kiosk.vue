@@ -11,12 +11,12 @@
     />
     <div v-if="loading" class="loading text-center mt-1">Loading...</div>
     <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
-    <div v-else-if="sets && sets.length > 0" class="set-grid grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+    <div v-else-if="sets && sets.length > 0" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       <div v-for="set in sets" :key="set.code" class="card bg-secondary p-4 rounded-lg shadow-md transition-transform hover:scale-105">
         <router-link :to="{ name: 'KioskSetCards', params: { setCode: set.code } }">
           <!-- Set icon displayed at the top -->
           <div class="set-icon">
-            <img :src="set.icon_svg_uri" :alt="set.name" />
+            <img :src="set.icon_svg_uri" :alt="set.name" loading="lazy" class="w-24 h-24 mx-auto mb-4" />
           </div>
 
           <!-- Set code and name in a compact format -->
