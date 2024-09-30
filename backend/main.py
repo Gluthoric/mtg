@@ -102,6 +102,11 @@ def create_app():
     db.init_app(app)
     CORS(app)
     migrate = Migrate(app, db)
+    migrate = Migrate(app, db)
+
+    with app.app_context():
+        # Initialize the database
+        db.create_all()
 
     # Register routes
     register_routes(app)
