@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        dark: {
+        'theme-dark': {
           100: '#2d2d2d',
           200: '#1f1f1f',
           300: '#121212',
@@ -22,8 +22,15 @@ module.exports = {
         primary: {
           DEFAULT: '#4299e1',
         },
+        secondary: {
+          DEFAULT: '#1f1f1f',
+        },
+        input: {
+          background: '#2d2d2d',
+        },
       },
     },
   },
   plugins: [],
+  darkMode: 'class',
 }

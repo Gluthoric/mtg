@@ -8,15 +8,27 @@
           placeholder="Search by name"
           class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <select 
-          v-model="localFilters.set_type" 
-          @change="emitFilters"
-          class="w-full mt-2 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="">All Types</option>
-          <option v-for="type in setTypes" :key="type" :value="type">{{ capitalize(type.replace('_', ' ')) }}</option>
-        </select>
       </div>
+
+      <!-- Set Types Filter -->
+      <div class="filter-section">
+        <label class="block text-sm font-medium mb-2">Set Types</label>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="type in setTypes"
+            :key="type"
+            @click="toggleSetType(type)"
+            :class="[
+              'px-3 py-1 rounded-full capitalize text-sm',
+              isSetTypeSelected(type) ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
+              'hover:bg-primary hover:text-white transition-colors duration-200'
+            ]"
+          >
+            {{ capitalize(type.replace('_', ' ')) }}
+          </button>
+        </div>
+      </div>
+
       <div class="filter-section">
         <label class="block text-sm font-medium mb-2">Digital</label>
         <select 
@@ -59,29 +71,21 @@
           class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
+
+      <!-- Sort Options -->
       <div class="sort-section">
-        <label for="sortBy" class="block mb-1">Sort By:</label>
-        <div class="flex space-x-2">
-          <select 
-            v-model="localSorting.sortBy" 
-            @change="emitSorting" 
-            id="sortBy"
-            class="w-1/2 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="released_at">Release Date</option>
-            <option value="name">Name</option>
-            <option value="collection_count">Collection Count</option>
-          </select>
-          <select 
-            v-model="localSorting.sortOrder" 
-            @change="emitSorting"
-            class="w-1/2 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-        </div>
+        <label class="block text-sm font-medium mb-2">Sort By</label>
+        <select
+          v-model="selectedSortOption"
+          @change="updateSorting"
+          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
       </div>
+
       <div class="pagination-section">
         <label for="perPage" class="block mb-1">Per Page:</label>
         <select 
@@ -114,16 +118,21 @@ export default {
     return {
       localFilters: {
         name: '',
-        set_type: '',
+        set_types: [],
         digital: '',
         foil_only: '',
         released_from: '',
         released_to: ''
       },
-      localSorting: {
-        sortBy: 'released_at',
-        sortOrder: 'desc'
-      },
+      selectedSortOption: 'released_at-desc',
+      sortOptions: [
+        { value: 'released_at-desc', label: 'Release Date (Newest)' },
+        { value: 'released_at-asc', label: 'Release Date (Oldest)' },
+        { value: 'name-asc', label: 'Name (A-Z)' },
+        { value: 'name-desc', label: 'Name (Z-A)' },
+        { value: 'collection_count-desc', label: 'Collection Count (High to Low)' },
+        { value: 'collection_count-asc', label: 'Collection Count (Low to High)' },
+      ],
       localPerPage: 20,
       perPageOptions: [10, 20, 50, 100]
     }
@@ -132,14 +141,27 @@ export default {
     emitFilters() {
       this.$emit('update-filters', { ...this.localFilters })
     },
-    emitSorting() {
-      this.$emit('update-sorting', { ...this.localSorting })
+    updateSorting() {
+      const [sortBy, sortOrder] = this.selectedSortOption.split('-')
+      this.$emit('update-sorting', { sortBy, sortOrder })
     },
     emitPerPage() {
       this.$emit('update-per-page', this.localPerPage)
     },
     capitalize(str) {
       return str.charAt(0).toUpperCase() + str.slice(1)
+    },
+    toggleSetType(type) {
+      const index = this.localFilters.set_types.indexOf(type)
+      if (index > -1) {
+        this.localFilters.set_types.splice(index, 1)
+      } else {
+        this.localFilters.set_types.push(type)
+      }
+      this.emitFilters()
+    },
+    isSetTypeSelected(type) {
+      return this.localFilters.set_types.includes(type)
     }
   }
 }

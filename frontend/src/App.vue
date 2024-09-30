@@ -1,24 +1,52 @@
 <template>
-  <div id="app" class="bg-dark-300 min-h-screen">
-    <nav class="bg-dark-200 p-4">
-      <div class="container mx-auto flex justify-center space-x-4">
-        <router-link to="/" class="text-white hover:text-primary">Home</router-link>
-        <router-link to="/collection" class="text-white hover:text-primary">Collection</router-link>
-        <router-link to="/kiosk" class="text-white hover:text-primary">Kiosk</router-link>
-        <router-link to="/sets" class="text-white hover:text-primary">Sets</router-link>
-        <router-link to="/import" class="text-white hover:text-primary">Import</router-link>
-      </div>
-    </nav>
-    <router-view class="container mx-auto p-4"/>
+  <div id="app" class="flex flex-col min-h-screen bg-white dark:bg-theme-dark-300 text-black dark:text-white">
+    <Header @toggle-dark-mode="toggleDarkMode" />
+    <main class="flex-1 overflow-x-hidden overflow-y-auto p-4">
+      <router-view></router-view>
+    </main>
   </div>
 </template>
 
 <script>
-export default {
-  name: 'App'
-}
+import { defineComponent, onMounted, ref } from 'vue'
+import Header from './components/Header.vue'
+
+export default defineComponent({
+  name: 'App',
+  components: {
+    Header
+  },
+  setup() {
+    const isDarkMode = ref(false)
+
+    const toggleDarkMode = () => {
+      isDarkMode.value = !isDarkMode.value
+      document.documentElement.classList.toggle('dark', isDarkMode.value)
+      localStorage.setItem('darkMode', isDarkMode.value)
+    }
+
+    onMounted(() => {
+      const savedDarkMode = localStorage.getItem('darkMode')
+      if (savedDarkMode !== null) {
+        isDarkMode.value = JSON.parse(savedDarkMode)
+        document.documentElement.classList.toggle('dark', isDarkMode.value)
+      }
+    })
+
+    return {
+      toggleDarkMode
+    }
+  }
+})
 </script>
 
 <style>
-/* Styles are now handled in main.css */
+#app {
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
 </style>
