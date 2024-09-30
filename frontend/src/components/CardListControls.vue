@@ -74,6 +74,8 @@
 </template>
 
 <script>
+import debounce from 'lodash.debounce'
+
 export default {
   name: 'CardListControls',
   props: {
@@ -98,9 +100,15 @@ export default {
       availableColors: ['W', 'U', 'B', 'R', 'G']
     }
   },
+  created() {
+    // Create a debounced version of emitFilters with a 300ms delay
+    this.debouncedEmitFilters = debounce(() => {
+      this.$emit('update-filters', { ...this.localFilters })
+    }, 300)
+  },
   methods: {
     emitFilters() {
-      this.$emit('update-filters', { ...this.localFilters })
+      this.debouncedEmitFilters()
     },
     emitCardsPerRow() {
       this.$emit('update-cards-per-row', this.localCardsPerRow)
@@ -119,6 +127,10 @@ export default {
       }
       return colorMap[color] || 'text-gray-500'
     }
+  },
+  beforeUnmount() {
+    // Cancel any pending debounced calls when the component is unmounted
+    this.debouncedEmitFilters.cancel()
   }
 }
 </script>
