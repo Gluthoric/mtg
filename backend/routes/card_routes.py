@@ -24,7 +24,8 @@ def monitor_cache(func):
         
         return result
     return wrapper
-from sqlalchemy.orm import joinedload, load_only, subqueryload
+from sqlalchemy.orm import joinedload, load_only, subqueryload, aliased
+from sqlalchemy import func, case
 from sqlalchemy.sql import func, asc, desc, text
 from sqlalchemy import or_, distinct, Float, case
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -254,30 +255,49 @@ def get_collection_sets():
             set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
             set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
 
-            # Compute total_value and variants
-            total_value = 0.0
+            # Compute total_value using SQL aggregation
+            total_value_query = db.session.query(
+                func.sum(
+                    (func.cast(Card.prices['usd'].astext, Float) * Card.quantity_collection_regular) +
+                    (func.cast(Card.prices['usd_foil'].astext, Float) * Card.quantity_collection_foil)
+                )
+            ).filter(Card.set_code == set_instance.code).scalar() or 0.0
+
+            # Compute variants using SQL CASE statements
+            variants_query = db.session.query(
+                case(
+                    (Card.frame_effects.contains(['showcase']), 'Showcases'),
+                    (Card.frame_effects.contains(['extendedart']), 'Extended Art'),
+                    (Card.promo_types.contains(['fracturefoil']), 'Fracture Foils'),
+                    (Card.frame_effects.contains(['borderless']), 'Borderless Cards'),
+                    (Card.promo_types.contains(['promo']), 'Promos'),
+                    else_='Art Variants'
+                ).label('category'),
+                Card.id,
+                Card.name,
+                Card.type_line,
+                Card.mana_cost,
+                Card.rarity,
+                Card.image_uris,
+                Card.collector_number,
+                Card.prices
+            ).filter(Card.set_code == set_instance.code).all()
+
             variants = defaultdict(list)
-            for card in set_instance.cards:
-                usd_price = float(card.prices.get('usd') or 0.0) if card.prices else 0.0
-                usd_foil_price = float(card.prices.get('usd_foil') or 0.0) if card.prices else 0.0
-                total_value += (usd_price * card.quantity_collection_regular) + (usd_foil_price * card.quantity_collection_foil)
+            for variant in variants_query:
+                category = variant.category
+                variants[category].append({
+                    'id': variant.id,
+                    'name': variant.name,
+                    'type_line': variant.type_line,
+                    'mana_cost': variant.mana_cost,
+                    'rarity': variant.rarity,
+                    'image_uris': variant.image_uris,
+                    'collector_number': variant.collector_number,
+                    'prices': variant.prices
+                })
 
-                # Categorize variant cards
-                if card.frame_effects and 'showcase' in card.frame_effects:
-                    category = 'Showcases'
-                elif card.frame_effects and 'extendedart' in card.frame_effects:
-                    category = 'Extended Art'
-                elif card.promo_types and 'fracturefoil' in card.promo_types:
-                    category = 'Fracture Foils'
-                elif card.frame_effects and 'borderless' in card.frame_effects:
-                    category = 'Borderless Cards'
-                elif card.promo_types and 'promo' in card.promo_types:
-                    category = 'Promos'
-                else:
-                    category = 'Art Variants'
-                variants[category].append(card.to_dict())
-
-            set_data['total_value'] = round(total_value, 2)
+            set_data['total_value'] = round(total_value_query, 2)
             set_data['variants'] = variants
 
             sets_list.append(set_data)

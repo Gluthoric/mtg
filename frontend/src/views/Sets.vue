@@ -9,7 +9,7 @@
       <div class="set-grid grid grid-cols-auto gap-4">
         <div v-for="set in sets" :key="set.code" class="card p-4">
           <router-link :to="{ name: 'SetDetails', params: { setCode: set.code } }" class="block">
-            <img :src="set.icon_svg_uri" :alt="set.name" class="w-12 h-12 mx-auto mb-2" />
+            <img v-lazy="set.icon_svg_uri" :alt="set.name" class="w-12 h-12 mx-auto mb-2" />
             <h2 class="text-lg font-semibold mb-2">{{ set.name }}</h2>
             <p class="mb-2">Released: {{ formatDate(set.released_at) }}</p>
             <div class="progress-container mb-2">

@@ -11,47 +11,55 @@
     />
     <div v-if="loading" class="loading text-center mt-1">Loading...</div>
     <div v-else-if="error" class="error text-center mt-1">{{ error }}</div>
-    <div v-else-if="sets && sets.length > 0" class="set-grid grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      <div v-for="set in sets" :key="set.code" class="card bg-secondary p-4 rounded-lg shadow-md transition-transform hover:scale-105">
-        <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
-          <!-- Set icon displayed at the top -->
-          <div class="set-icon">
-            <img :src="set.icon_svg_uri" :alt="set.name" />
-          </div>
+    <div v-else-if="sets && sets.length > 0" class="set-grid">
+      <RecycleScroller
+        class="scroller"
+        :items="sets"
+        :item-size="200"
+        key-field="code"
+        v-slot="{ item: set }"
+      >
+        <div class="card bg-secondary p-4 rounded-lg shadow-md transition-transform hover:scale-105">
+          <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }">
+            <!-- Set icon displayed at the top -->
+            <div class="set-icon">
+              <img :src="set.icon_svg_uri" :alt="set.name" />
+            </div>
 
-          <!-- Set code and name in a compact format -->
-          <h3 class="text-center">{{ set.code.toUpperCase() }} - {{ set.name }}</h3>
+            <!-- Set code and name in a compact format -->
+            <h3 class="text-center">{{ set.code.toUpperCase() }} - {{ set.name }}</h3>
 
-          <!-- Display the Collection card count -->
-          <p class="text-center">Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
+            <!-- Display the Collection card count -->
+            <p class="text-center">Collection: {{ set.collection_count }} / {{ set.card_count }}</p>
 
-          <!-- Display the completion percentage -->
-          <p class="text-center">Completion: {{ Math.round(set.collection_percentage) }}%</p>
+            <!-- Display the completion percentage -->
+            <p class="text-center">Completion: {{ Math.round(set.collection_percentage) }}%</p>
 
-          <!-- Add a progress bar for visual representation -->
-          <div class="progress-container">
-            <div
-              class="progress-bar"
-              :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
-            ></div>
-          </div>
-        </router-link>
-      </div>
+            <!-- Add a progress bar for visual representation -->
+            <div class="progress-container">
+              <div
+                class="progress-bar"
+                :style="{ width: `${set.collection_percentage}%`, backgroundColor: getProgressColor(set.collection_percentage) }"
+              ></div>
+            </div>
+          </router-link>
+        </div>
+      </RecycleScroller>
     </div>
     <div v-else-if="!loading && sets.length === 0" class="text-center mt-1">
       <p>No sets found in your collection.</p>
     </div>
     <div class="pagination flex justify-center items-center mt-4 space-x-4">
-      <button 
-        @click="changePage(-1)" 
+      <button
+        @click="changePage(-1)"
         :disabled="currentPage === 1"
         class="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Previous
       </button>
       <span class="text-lg font-semibold">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button 
-        @click="changePage(1)" 
+      <button
+        @click="changePage(1)"
         :disabled="currentPage === totalPages"
         class="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -63,13 +71,15 @@
 
 <script>
 import { ref, onMounted } from 'vue'
+import { RecycleScroller } from 'vue3-virtual-scroller'
 import axios from 'axios'
 import SetListControls from '../components/SetListControls.vue'
 
 export default {
   name: 'Collection',
   components: {
-    SetListControls
+    SetListControls,
+    RecycleScroller
   },
   setup() {
     const sets = ref([])
@@ -188,21 +198,12 @@ export default {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.grid {
-  display: grid;
-  gap: 1rem;
+.set-grid {
+  height: 600px; /* Adjust this value as needed */
 }
 
-@media (min-width: 768px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+.scroller {
+  height: 100%;
 }
 
 input, select {
@@ -223,6 +224,7 @@ input:focus, select:focus {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   transition: transform 0.3s ease;
+  height: 200px; /* Match this with the item-height in the VirtualScroller */
 }
 
 .card:hover {
