@@ -8,8 +8,8 @@ from datetime import datetime
 class Set(db.Model):
     __tablename__ = 'sets'
 
-    id = db.Column(db.Text, primary_key=True)
-    code = db.Column(db.Text, unique=True, nullable=False, index=True)
+    code = db.Column(db.Text, primary_key=True)
+    id = db.Column(db.Text, unique=True, nullable=False)
     name = db.Column(db.Text, nullable=False)
     released_at = db.Column(db.DateTime)
     set_type = db.Column(db.Text)

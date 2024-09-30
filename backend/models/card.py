@@ -60,6 +60,7 @@ class Card(db.Model):
     promo_types = db.Column(JSONB)
     usd_price = db.Column(db.Numeric)
     usd_foil_price = db.Column(db.Numeric)
+    import_record_id = db.Column(db.String, db.ForeignKey('import_records.id'))
 
     # New quantity fields
     quantity_collection_regular = db.Column(db.BigInteger, default=0)
@@ -69,6 +70,7 @@ class Card(db.Model):
 
     # Relationships
     set = db.relationship('Set', back_populates='cards')
+    import_record = db.relationship('ImportRecord', back_populates='cards')
 
     def to_dict(self):
         return {
