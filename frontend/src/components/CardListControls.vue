@@ -7,7 +7,7 @@
           v-model="localFilters.name"
           @input="emitFilters"
           placeholder="Search by name"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
@@ -21,8 +21,8 @@
             @click="toggleRarity(rarity)"
             :class="[
               'px-3 py-1 rounded-full capitalize text-sm',
-              isRaritySelected(rarity) ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
-              'hover:bg-primary hover:text-white transition-colors duration-200'
+              isRaritySelected(rarity) ? 'bg-primary text-white' : 'bg-gray-800 text-white hover:bg-gray-700',
+              'hover:text-white transition-colors duration-200'
             ]"
           >
             {{ rarity }}

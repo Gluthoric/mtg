@@ -7,11 +7,11 @@
       <form @submit.prevent="importSingleCard" class="grid grid-cols-1 gap-2">
         <div>
           <label for="scryfallId" class="block mb-1">Scryfall ID:</label>
-          <input v-model="singleCard.scryfallId" id="scryfallId" required class="w-full">
+          <input v-model="singleCard.scryfallId" id="scryfallId" required class="w-full bg-input-background text-white">
         </div>
         <div>
           <label for="quantity" class="block mb-1">Quantity:</label>
-          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required class="w-full">
+          <input v-model.number="singleCard.quantity" id="quantity" type="number" min="1" required class="w-full bg-input-background text-white">
         </div>
         <div class="flex items-center">
           <input v-model="singleCard.foil" id="foil" type="checkbox" class="mr-2">
@@ -19,7 +19,7 @@
         </div>
         <div>
           <label for="destination" class="block mb-1">Destination:</label>
-          <select v-model="singleCard.destination" id="destination" required class="w-full">
+          <select v-model="singleCard.destination" id="destination" required class="w-full bg-input-background text-white">
             <option value="collection">Collection</option>
             <option value="kiosk">Kiosk</option>
           </select>
@@ -43,11 +43,11 @@ Name,Edition,Edition code,Collector's number,Price,Foil,Currency,Scryfall ID,Qua
       <form @submit.prevent="importFromCSV" class="grid grid-cols-1 gap-2">
         <div>
           <label for="csvFile" class="block mb-1">CSV File:</label>
-          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required class="w-full">
+          <input type="file" id="csvFile" @change="handleFileUpload" accept=".csv" required class="w-full bg-input-background text-white">
         </div>
         <div>
           <label for="csvDestination" class="block mb-1">Destination:</label>
-          <select v-model="csvImport.destination" id="csvDestination" required class="w-full">
+          <select v-model="csvImport.destination" id="csvDestination" required class="w-full bg-input-background text-white">
             <option value="collection">Collection</option>
             <option value="kiosk">Kiosk</option>
           </select>

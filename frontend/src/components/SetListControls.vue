@@ -6,7 +6,7 @@
           v-model="localFilters.name"
           @input="emitFilters"
           placeholder="Search by name"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
@@ -92,7 +92,7 @@
           v-model="localPerPage" 
           @change="emitPerPage" 
           id="perPage"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option v-for="option in perPageOptions" :key="option" :value="option">{{ option }}</option>
         </select>

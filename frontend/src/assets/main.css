@@ -5,7 +5,7 @@
 /* Apply Global Styles */
 @layer base {
   body {
-    @apply bg-white text-black dark:bg-theme-dark-300 dark:text-white;
+    @apply bg-theme-dark-300 text-white;
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
@@ -17,7 +17,7 @@
   }
 
   a {
-    @apply text-primary hover:underline dark:text-primary;
+    @apply text-primary hover:underline;
   }
 }
 
@@ -28,11 +28,11 @@
   }
 
   .input {
-    @apply bg-white dark:bg-input-background text-black dark:text-white border border-gray-300 dark:border-gray-600 p-2 rounded transition-all duration-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50;
+    @apply bg-input-background text-white border border-gray-600 p-2 rounded transition-all duration-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50;
   }
 
   .card {
-    @apply bg-white dark:bg-theme-dark-200 border border-gray-300 dark:border-gray-600 rounded-lg p-4 text-black dark:text-white transition-transform duration-300 hover:scale-105 flex flex-col h-auto;
+    @apply bg-theme-dark-200 border border-gray-600 rounded-lg p-4 text-white transition-transform duration-300 hover:scale-105 flex flex-col h-auto;
   }
 }
 
@@ -49,7 +49,7 @@
 
 /* Progress Bars */
 .progress-container {
-  @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full my-2.5 overflow-hidden;
+  @apply w-full bg-gray-700 rounded-full my-2.5 overflow-hidden;
 }
 
 .progress-bar {

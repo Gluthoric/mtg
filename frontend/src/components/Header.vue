@@ -26,36 +26,35 @@
 </template>
 
 <script>
-import { Menu, Transition } from '@headlessui/vue'
+import { Menu } from '@headlessui/vue'
 import { useRoute } from 'vue-router'
 import {
   HomeIcon,
-  CollectionIcon,
-  DesktopComputerIcon,
+  Square3Stack3DIcon,
+  ComputerDesktopIcon,
   TableCellsIcon,
   ChevronDownIcon,
-  ViewGridIcon,
+  Squares2X2Icon,
   StarIcon,
-  UploadIcon,
-  MenuIcon,
+  ArrowUpTrayIcon,
+  Bars3Icon,
   SunIcon,
   MoonIcon
-} from '@heroicons/vue/outline'
+} from '@heroicons/vue/24/outline'
 
 export default {
   name: 'Header',
   components: {
     Menu,
-    Transition,
     HomeIcon,
-    CollectionIcon,
-    DesktopComputerIcon,
+    CollectionIcon: Square3Stack3DIcon,
+    DesktopComputerIcon: ComputerDesktopIcon,
     TableCellsIcon,
     ChevronDownIcon,
-    ViewGridIcon,
+    ViewGridIcon: Squares2X2Icon,
     StarIcon,
-    UploadIcon,
-    MenuIcon,
+    UploadIcon: ArrowUpTrayIcon,
+    MenuIcon: Bars3Icon,
     SunIcon,
     MoonIcon
   },

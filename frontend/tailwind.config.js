@@ -25,6 +25,7 @@ module.exports = {
         secondary: {
           DEFAULT: '#1f1f1f',
         },
+        'input-background': '#2d2d2d',
         input: {
           background: '#2d2d2d',
         },
