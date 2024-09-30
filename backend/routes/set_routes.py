@@ -33,8 +33,8 @@ def get_all_sets():
         set_types = request.args.getlist('set_type[]')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
-        sort_by = request.args.get('sort_by', 'released_at', type=str)
-        sort_order = request.args.get('sort_order', 'desc', type=str)
+        sort_by = request.args.get('sortBy', 'released_at', type=str)
+        sort_order = request.args.get('sortOrder', 'desc', type=str)
         digital = request.args.get('digital', type=str)
         foil_only = request.args.get('foil_only', type=str)
         released_from = request.args.get('released_from', type=str)
@@ -73,8 +73,11 @@ def get_all_sets():
         query = db.session.query(Set)\
             .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
             .options(
-                subqueryload(Set.cards),  # Eagerly load related cards
-                joinedload(Set.collection_count)  # Eagerly load collection_count
+                joinedload(Set.collection_count),
+                subqueryload(Set.cards).load_only(
+                    Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
+                    Card.quantity_collection_foil, Card.frame_effects, Card.promo_types
+                )
             )
 
         # Apply filters
@@ -146,7 +149,11 @@ def get_all_sets():
                     category = 'Promos'
                 else:
                     category = 'Art Variants'
-                variants[category].append(card.to_dict())
+                variants[category].append({
+                    'id': card.id,
+                    'name': card.name,
+                    'prices': card.prices
+                })
 
             set_data['total_value'] = round(total_value, 2)
             set_data['variants'] = variants
