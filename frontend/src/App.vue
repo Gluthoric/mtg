@@ -1,6 +1,6 @@
 <template>
   <div id="app" class="flex flex-col min-h-screen bg-white dark:bg-theme-dark-300 text-black dark:text-white">
-    <Header @toggle-dark-mode="toggleDarkMode" />
+    <Header :isDarkMode="isDarkMode" @toggle-dark-mode="toggleDarkMode" />
     <main class="flex-1 overflow-x-hidden overflow-y-auto p-4">
       <router-view></router-view>
     </main>

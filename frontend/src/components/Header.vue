@@ -28,14 +28,14 @@
 <script>
 import { Menu, Transition } from '@headlessui/vue'
 import { useRoute } from 'vue-router'
-import { 
-  HomeIcon, 
-  CollectionIcon, 
-  DesktopComputerIcon, 
-  TableCellsIcon, 
-  ChevronDownIcon, 
-  ViewGridIcon, 
-  StarIcon, 
+import {
+  HomeIcon,
+  CollectionIcon,
+  DesktopComputerIcon,
+  TableCellsIcon,
+  ChevronDownIcon,
+  ViewGridIcon,
+  StarIcon,
   UploadIcon,
   MenuIcon,
   SunIcon,
@@ -44,12 +44,12 @@ import {
 
 export default {
   name: 'Header',
-  components: { 
-    Menu, 
-    Transition, 
-    HomeIcon, 
-    CollectionIcon, 
-    DesktopComputerIcon, 
+  components: {
+    Menu,
+    Transition,
+    HomeIcon,
+    CollectionIcon,
+    DesktopComputerIcon,
     TableCellsIcon,
     ChevronDownIcon,
     ViewGridIcon,
