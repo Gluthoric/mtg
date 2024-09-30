@@ -93,7 +93,7 @@
                     v-model.number="card.quantity_foil"
                     type="number"
                     min="0"
-                    class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
+                    class="quantity-input text-center border-none outline-none bg-input-background text-white text-sm"
                     @input="updateQuantity(card, 'foil')"
                   />
                   <button
