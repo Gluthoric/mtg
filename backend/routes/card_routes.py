@@ -36,7 +36,7 @@ from models.set_collection_count import SetCollectionCount
 from database import db
 import orjson
 from decimal import Decimal
-from backend.utils.categorization import get_category_case
+from utils.categorization import get_category_case
 from backend.utils.categorization import get_category_case
 
 card_routes = Blueprint('card_routes', __name__)
