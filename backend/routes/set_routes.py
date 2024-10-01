@@ -3,8 +3,8 @@ from models.set import Set
 from models.card import Card
 from models.set_collection_count import SetCollectionCount
 from database import db
-from sqlalchemy import asc, desc
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy import asc, desc, func, Float, Integer, text
+from sqlalchemy.orm import joinedload, subqueryload, load_only
 from sqlalchemy.exc import SQLAlchemyError
 from collections import defaultdict
 from decimal import Decimal
@@ -12,7 +12,6 @@ import orjson
 import logging
 from datetime import datetime
 from utils.categorization import get_category_case
-from utils.categorization import categorize_card
 
 set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
@@ -214,6 +213,9 @@ def get_set_cards(set_code):
         logger.exception(f"Error in get_set_cards: {str(e)}")
         return jsonify({"error": "An error occurred while fetching the set cards."}), 500
 
+from sqlalchemy import func, text
+from sqlalchemy.dialects.postgresql import JSONB
+
 @set_routes.route('/collection/sets/<string:set_code>', methods=['GET'])
 def get_collection_set_details(set_code):
     try:
@@ -223,16 +225,20 @@ def get_collection_set_details(set_code):
             return jsonify({'error': 'Set not found'}), 404
 
         # Fetch cards in the set that are in the collection
-        cards = Card.query.filter(
+        cards = Card.query.options(load_only(
+            Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
+            Card.quantity_collection_foil, Card.frame_effects, Card.promo_types,
+            Card.type_line, Card.mana_cost, Card.rarity, Card.image_uris,
+            Card.collector_number
+        )).filter(
             Card.set_code == set_code,
             (Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)
         ).all()
 
-        # Categorize the cards
-        variants = defaultdict(list)
+        # Serialize card data
+        card_data = []
         for card in cards:
-            category = categorize_card(card)
-            variants[category].append({
+            card_info = {
                 'id': card.id,
                 'name': card.name,
                 'type_line': card.type_line,
@@ -243,12 +249,70 @@ def get_collection_set_details(set_code):
                 'prices': card.prices,
                 'quantity_collection_regular': card.quantity_collection_regular,
                 'quantity_collection_foil': card.quantity_collection_foil,
-            })
+                'frame_effects': card.frame_effects,
+                'promo_types': card.promo_types,
+                'oversized': getattr(card, 'oversized', False),
+                'promo': getattr(card, 'promo', False),
+                'reprint': getattr(card, 'reprint', False),
+                'variation': getattr(card, 'variation', False)
+            }
+            card_data.append(card_info)
+
+        # Frame Effects Counts
+        frame_effects_query = text("""
+            SELECT jsonb_array_elements_text(cards.frame_effects) AS frame_effect, COUNT(*) AS count 
+            FROM cards 
+            WHERE cards.set_code = :set_code 
+              AND (cards.quantity_collection_regular > 0 OR cards.quantity_collection_foil > 0) 
+              AND cards.frame_effects IS NOT NULL 
+            GROUP BY frame_effect
+        """)
+        frame_effects_result = db.session.execute(frame_effects_query, {'set_code': set_code}).fetchall()
+        frame_effects_dict = {row.frame_effect: row.count for row in frame_effects_result}
+
+        # Promo Types Counts
+        promo_types_query = text("""
+            SELECT jsonb_array_elements_text(cards.promo_types) AS promo_type, COUNT(*) AS count 
+            FROM cards 
+            WHERE cards.set_code = :set_code 
+              AND (cards.quantity_collection_regular > 0 OR cards.quantity_collection_foil > 0) 
+              AND cards.promo_types IS NOT NULL 
+            GROUP BY promo_type
+        """)
+        promo_types_result = db.session.execute(promo_types_query, {'set_code': set_code}).fetchall()
+        promo_types_dict = {row.promo_type: row.count for row in promo_types_result}
+
+        # Other Attributes Counts
+        other_attributes_query = text("""
+            SELECT 
+                SUM(CASE WHEN cards.oversized THEN 1 ELSE 0 END) AS oversized,
+                SUM(CASE WHEN cards.promo THEN 1 ELSE 0 END) AS promo,
+                SUM(CASE WHEN cards.reprint THEN 1 ELSE 0 END) AS reprint,
+                SUM(CASE WHEN cards.variation THEN 1 ELSE 0 END) AS variation
+            FROM cards
+            WHERE cards.set_code = :set_code 
+              AND (cards.quantity_collection_regular > 0 OR cards.quantity_collection_foil > 0)
+        """)
+        other_attributes_result = db.session.execute(other_attributes_query, {'set_code': set_code}).fetchone()
+        other_attributes_dict = {
+            'Oversized': other_attributes_result.oversized or 0,
+            'Promo': other_attributes_result.promo or 0,
+            'Reprint': other_attributes_result.reprint or 0,
+            'Variation': other_attributes_result.variation or 0
+        }
+
+        # Prepare the statistics
+        statistics = {
+            'frame_effects': frame_effects_dict,
+            'promo_types': promo_types_dict,
+            'other_attributes': other_attributes_dict
+        }
 
         # Prepare the response
         response = {
             'set': set_instance.to_dict(),
-            'variants': dict(variants)
+            'cards': card_data,
+            'statistics': statistics
         }
 
         return jsonify(response), 200

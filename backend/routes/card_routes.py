@@ -191,19 +191,7 @@ from sqlalchemy import func, cast, Float
 from sqlalchemy.orm import joinedload, subqueryload
 from sqlalchemy.sql import asc, desc
 
-def categorize_card(card):
-    if 'showcase' in (card.frame_effects or []):
-        return 'Showcases'
-    elif 'extendedart' in (card.frame_effects or []):
-        return 'Extended Art'
-    elif 'fracturefoil' in (card.promo_types or []):
-        return 'Fracture Foils'
-    elif 'borderless' in (card.frame_effects or []):
-        return 'Borderless Cards'
-    elif 'promo' in (card.promo_types or []):
-        return 'Promos'
-    else:
-        return 'Art Variants'
+# Remove the categorize_card function as it's no longer needed
 
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
@@ -282,16 +270,23 @@ def get_collection_sets():
         sets_list = []
         for set_instance in paginated_sets.items:
             set_data = set_instance.to_dict()
-            total_value = 0.0
-            variants = defaultdict(list)
-            for card in set_instance.cards:
-                usd_price = float(card.prices.get('usd', 0) or 0)
-                usd_foil_price = float(card.prices.get('usd_foil', 0) or 0)
-                total_value += (usd_price * card.quantity_collection_regular) + \
-                               (usd_foil_price * card.quantity_collection_foil)
+            set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
+            set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
 
-                category = categorize_card(card)
-                variants[category].append({
+            # Compute total_value
+            total_value = db.session.query(
+                func.sum(
+                    (func.cast((Card.prices['usd'].astext), Float) * Card.quantity_collection_regular) +
+                    (func.cast((Card.prices['usd_foil'].astext), Float) * Card.quantity_collection_foil)
+                )
+            ).filter(Card.set_code == set_instance.code).scalar() or 0.0
+            set_data['total_value'] = round(total_value, 2)
+
+            # Include card details directly
+            cards = set_instance.cards
+            card_data = []
+            for card in cards:
+                card_info = {
                     'id': card.id,
                     'name': card.name,
                     'type_line': card.type_line,
@@ -299,10 +294,15 @@ def get_collection_sets():
                     'rarity': card.rarity,
                     'image_uris': card.image_uris,
                     'collector_number': card.collector_number,
-                    'prices': card.prices
-                })
-            set_data['total_value'] = round(total_value, 2)
-            set_data['variants'] = dict(variants)
+                    'prices': card.prices,
+                    'quantity_collection_regular': card.quantity_collection_regular,
+                    'quantity_collection_foil': card.quantity_collection_foil,
+                    'frame_effects': card.frame_effects,
+                    'promo_types': card.promo_types
+                }
+                card_data.append(card_info)
+
+            set_data['cards'] = card_data  # Directly include card details
             sets_list.append(set_data)
 
         # Build response

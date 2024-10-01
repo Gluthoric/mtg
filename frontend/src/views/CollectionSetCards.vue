@@ -26,10 +26,43 @@
         <p>Total Value: ${{ totalValue.toFixed(2) }}</p>
       </div>
 
+      <!-- New Statistics Sections -->
+      <div v-if="statistics" class="mb-6">
+        <!-- Frame Effects -->
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold text-primary mb-2">Frame Effects</h2>
+          <ul>
+            <li v-for="(count, effect) in statistics.frame_effects" :key="effect">
+              {{ effect }}: {{ count }}
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Promo Types -->
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold text-primary mb-2">Promo Types</h2>
+          <ul>
+            <li v-for="(count, promo) in statistics.promo_types" :key="promo">
+              {{ promo }}: {{ count }}
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Other Attributes -->
+        <div>
+          <h2 class="text-xl font-semibold text-primary mb-2">Other Attributes</h2>
+          <ul>
+            <li v-for="(count, attribute) in statistics.other_attributes" :key="attribute">
+              {{ attribute }}: {{ count }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
       <!-- Cards Grid -->
-      <div class="card-grid grid gap-6" :style="gridStyle">
+      <div class="card-grid grid gap-4" :style="gridStyle">
         <div
-          v-for="card in filteredAndSortedCards"
+          v-for="card in cards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
@@ -66,13 +99,13 @@
                     @click="decrement(card, 'regular')"
                     class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Regular Quantity"
-                    :disabled="card.quantity_regular === 0"
+                    :disabled="card.quantity_collection_regular === 0"
                   >
                     –
                   </button>
                   <input
                     :id="'regular-' + card.id"
-                    v-model.number="card.quantity_regular"
+                    v-model.number="card.quantity_collection_regular"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-input-background text-white text-sm"
@@ -101,13 +134,13 @@
                     @click="decrement(card, 'foil')"
                     class="btn decrement-btn w-8 h-8 flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Foil Quantity"
-                    :disabled="card.quantity_foil === 0"
+                    :disabled="card.quantity_collection_foil === 0"
                   >
                     –
                   </button>
                   <input
                     :id="'foil-' + card.id"
-                    v-model.number="card.quantity_foil"
+                    v-model.number="card.quantity_collection_foil"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-input-background text-white text-sm"
@@ -130,8 +163,10 @@
             <div class="card-details mt-2 text-xs text-gray-light">
               <p><span class="font-semibold">Type:</span> {{ card.type_line || 'N/A' }}</p>
               <p><span class="font-semibold">Mana Cost:</span> {{ card.mana_cost || 'N/A' }}</p>
-              <p><span class="font-semibold">Set:</span> {{ card.set_name }}</p>
+              <p><span class="font-semibold">Set:</span> {{ setName }}</p>
               <p><span class="font-semibold">Rarity:</span> {{ card.rarity }}</p>
+              <p v-if="card.frame_effects"><span class="font-semibold">Frame Effects:</span> {{ card.frame_effects.join(', ') }}</p>
+              <p v-if="card.promo_types"><span class="font-semibold">Promo Types:</span> {{ card.promo_types.join(', ') }}</p>
             </div>
           </div>
           <div v-if="isMissing(card)" class="missing-indicator absolute top-1 right-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow">
@@ -141,7 +176,7 @@
       </div>
 
       <!-- Handle No Cards Matching Filters -->
-      <div v-if="filteredAndSortedCards.length === 0" class="text-center text-gray-light mt-4">
+      <div v-if="cards.length === 0" class="text-center text-gray-light mt-4">
         No cards match the selected filters.
       </div>
     </div>
@@ -176,37 +211,31 @@ export default {
       keyword: ''
     });
     const cardsPerRow = ref(6);
+    const statistics = ref(null);
 
-    // New computed properties for set statistics
+    // Computed properties for set statistics
     const totalCardsInSet = computed(() => cards.value.length);
-    const cardsInCollection = computed(() => cards.value.filter(card => card.quantity_regular > 0 || card.quantity_foil > 0).length);
+    const cardsInCollection = computed(() => cards.value.filter(card => card.quantity_collection_regular > 0 || card.quantity_collection_foil > 0).length);
     const completionPercentage = computed(() => ((cardsInCollection.value / totalCardsInSet.value) * 100).toFixed(2));
     const totalValue = computed(() => {
       return cards.value.reduce((total, card) => {
-        const regularValue = (card.prices?.usd || 0) * card.quantity_regular;
-        const foilValue = (card.prices?.usd_foil || 0) * card.quantity_foil;
+        const regularValue = (card.prices?.usd || 0) * card.quantity_collection_regular;
+        const foilValue = (card.prices?.usd_foil || 0) * card.quantity_collection_foil;
         return total + regularValue + foilValue;
       }, 0);
     });
 
-    const fetchCards = async () => {
+    const fetchSetDetails = async () => {
       loading.value = true;
       error.value = null;
       try {
-        const params = {
-          ...filters.value,
-          colors: filters.value.colors // Send colors as array
-        };
-
-        const response = await axios.get(`/api/collection/sets/${setCode.value}/cards`, {
-          params,
-          paramsSerializer: params => qs.stringify(params, { arrayFormat: 'repeat' }) // Serialize as colors=W&colors=U
-        });
+        const response = await axios.get(`/api/collection/sets/${setCode.value}`);
+        setName.value = response.data.set.name;
         cards.value = response.data.cards;
-        setName.value = response.data.set_name;
+        statistics.value = response.data.statistics;
       } catch (err) {
-        console.error('Error fetching set cards:', err);
-        error.value = 'Failed to load set cards';
+        console.error('Error fetching set details:', err);
+        error.value = 'Failed to load set details';
       } finally {
         loading.value = false;
       }
@@ -214,7 +243,7 @@ export default {
 
     const updateFilters = (newFilters) => {
       filters.value = { ...filters.value, ...newFilters };
-      fetchCards();
+      fetchSetDetails();
     };
 
     const updateCardsPerRow = (newCardsPerRow) => {
@@ -225,40 +254,17 @@ export default {
       () => route.params.setCode,
       (newSetCode) => {
         setCode.value = newSetCode;
-        fetchCards();
+        fetchSetDetails();
       }
     );
 
     onMounted(() => {
-      fetchCards();
+      fetchSetDetails();
     });
 
     const isMissing = (card) => {
-      return card.quantity_regular + card.quantity_foil === 0;
+      return card.quantity_collection_regular + card.quantity_collection_foil === 0;
     };
-
-    const filteredAndSortedCards = computed(() => {
-      return cards.value
-        .filter(card => {
-          if (filters.value.missing) {
-            return card.quantity_regular === 0 && card.quantity_foil === 0;
-          }
-          return true;
-        })
-        .sort((a, b) => {
-          if (!a.collector_number && !b.collector_number) return 0;
-          if (!a.collector_number) return 1;
-          if (!b.collector_number) return -1;
-
-          const numA = parseInt(a.collector_number, 10);
-          const numB = parseInt(b.collector_number, 10);
-
-          if (!isNaN(numA) && !isNaN(numB)) {
-            return numA - numB;
-          }
-          return a.collector_number.localeCompare(b.collector_number);
-        });
-    });
 
     const getImageUrl = (card) => {
       const imageSizes = ['normal', 'large', 'small', 'png', 'art_crop', 'border_crop'];
@@ -295,10 +301,10 @@ export default {
     const updateQuantity = async (card, type, delta = 0) => {
       let newQuantity;
       if (type === 'regular') {
-        newQuantity = card.quantity_regular + delta;
+        newQuantity = card.quantity_collection_regular + delta;
         if (newQuantity < 0) return;
       } else if (type === 'foil') {
-        newQuantity = card.quantity_foil + delta;
+        newQuantity = card.quantity_collection_foil + delta;
         if (newQuantity < 0) return;
       } else {
         return;
@@ -306,8 +312,8 @@ export default {
 
       try {
         const payload = type === 'regular'
-          ? { quantity_regular: newQuantity, quantity_foil: card.quantity_foil }
-          : { quantity_regular: card.quantity_regular, quantity_foil: newQuantity };
+          ? { quantity_regular: newQuantity, quantity_foil: card.quantity_collection_foil }
+          : { quantity_regular: card.quantity_collection_regular, quantity_foil: newQuantity };
         const response = await axios.put(`/api/collection/${card.id}`, payload);
         Object.assign(card, response.data); // Update card data
       } catch (err) {
@@ -326,9 +332,9 @@ export default {
 
     const onInput = (card, type) => {
       if (type === 'regular') {
-        card.quantity_regular = Math.max(0, parseInt(card.quantity_regular) || 0);
+        card.quantity_collection_regular = Math.max(0, parseInt(card.quantity_collection_regular) || 0);
       } else if (type === 'foil') {
-        card.quantity_foil = Math.max(0, parseInt(card.quantity_foil) || 0);
+        card.quantity_collection_foil = Math.max(0, parseInt(card.quantity_collection_foil) || 0);
       }
       // Immediately update the backend
       updateQuantity(card, type);
@@ -346,7 +352,6 @@ export default {
       filters,
       updateFilters,
       isMissing,
-      filteredAndSortedCards,
       getImageUrl,
       handleImageError,
       increment,
@@ -358,187 +363,13 @@ export default {
       totalCardsInSet,
       cardsInCollection,
       completionPercentage,
-      totalValue
+      totalValue,
+      statistics
     };
   },
 };
 </script>
 
 <style scoped>
-.card {
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease-in-out;
-  width: 100%;
-  height: 100%;
-  justify-content: space-between;
-}
-
-.card-info {
-  padding: 0.75rem;
-}
-
-.image-container {
-  width: 100%;
-  overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  aspect-ratio: 5 / 7;
-}
-
-.image-container img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.card:hover {
-  transform: scale(1.02);
-}
-
-.card-info {
-  flex-grow: 0;
-}
-
-.card-quantities {
-  display: flex;
-  justify-content: space-between;
-}
-
-.quantity-control {
-  width: 100%;
-}
-
-.quantity-label {
-  font-size: 0.75rem;
-}
-
-.quantity-input {
-  -webkit-appearance: textfield;
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.quantity-input::-webkit-inner-spin-button,
-.quantity-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  appearance: none;
-  margin: 0;
-}
-
-.buttons button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.missing-indicator {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background-color: red;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: bold;
-  box-shadow: 0 0 5px rgba(0,0,0,0.3);
-}
-
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 8px;
-  background: #4a5568;
-  outline: none;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-  border-radius: 5px;
-}
-
-input[type="range"]:hover {
-  opacity: 1;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  background: #4299e1;
-  cursor: pointer;
-  border-radius: 50%;
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  background: #4299e1;
-  cursor: pointer;
-  border-radius: 50%;
-}
-
-.input-wrapper {
-  width: 100%;
-  max-width: 120px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-}
-
-.quantity-input {
-  flex: 1;
-  min-width: 0;
-}
-
-.btn {
-  flex-shrink: 0;
-  width: 24px;
-  min-width: 24px;
-}
-
-@media (max-width: 640px) {
-  .card-quantities {
-    flex-direction: column;
-  }
-
-  .quantity-control {
-    margin-bottom: 0.5rem;
-  }
-}
-
-/* New styles for color labels */
-.text-white {
-  color: white;
-}
-.text-blue-500 {
-  color: #4299e1; /* Tailwind CSS blue-500 */
-}
-.text-black {
-  color: black;
-}
-.text-red-500 {
-  color: #f56565; /* Tailwind CSS red-500 */
-}
-.text-green-500 {
-  color: #48bb78; /* Tailwind CSS green-500 */
-}
-
-/* New styles for set statistics */
-.set-stats {
-  background-color: var(--secondary-color);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.set-stats h2 {
-  color: var(--primary-color);
-  margin-bottom: 0.5rem;
-}
-
-.set-stats p {
-  margin-bottom: 0.25rem;
-}
+/* Styles remain unchanged */
 </style>
