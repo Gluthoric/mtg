@@ -19,3 +19,14 @@ def get_category_case(Card):
     ).label('category')
 
     return category_case
+from sqlalchemy import case
+
+def get_category_case(Card):
+    return case(
+        (Card.frame_effects.contains(['showcase']), 'Showcases'),
+        (Card.frame_effects.contains(['extendedart']), 'Extended Art'),
+        (Card.promo_types.contains(['fracturefoil']), 'Fracture Foils'),
+        (Card.frame_effects.contains(['borderless']), 'Borderless Cards'),
+        (Card.promo_types.contains(['promo']), 'Promos'),
+        else_='Art Variants'
+    )

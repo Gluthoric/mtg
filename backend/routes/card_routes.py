@@ -263,7 +263,16 @@ def get_collection_sets():
 
         sets_list = []
         for set_instance in paginated_sets.items:
-            set_data = set_instance.to_dict()
+            set_data = {
+                'code': set_instance.code,
+                'name': set_instance.name,
+                'released_at': set_instance.released_at.isoformat() if set_instance.released_at else None,
+                'set_type': set_instance.set_type,
+                'card_count': set_instance.card_count,
+                'digital': set_instance.digital,
+                'foil_only': set_instance.foil_only,
+                'icon_svg_uri': set_instance.icon_svg_uri,
+            }
             set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
             set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
 

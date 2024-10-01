@@ -11,8 +11,7 @@ from decimal import Decimal
 import orjson
 import logging
 from datetime import datetime
-from backend.utils.categorization import get_category_case
-from backend.utils.categorization import get_category_case
+from utils.categorization import get_category_case
 
 set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
