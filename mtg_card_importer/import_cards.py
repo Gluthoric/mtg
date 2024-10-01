@@ -2,6 +2,7 @@ import os
 import json
 import psycopg2
 from psycopg2.extras import execute_values
+import requests
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -22,6 +23,8 @@ SET_CODE = os.getenv('SET_CODE', 'ALL')
 # Define the batch size for bulk inserts
 BATCH_SIZE = 1000
 
+EXCLUDED_SET_TYPES = ['promo', 'memorabilia', 'alchemy', 'arena_league', 'treasure_chest']
+
 def connect_db():
     """Establishes a connection to the PostgreSQL database."""
     try:
@@ -39,6 +42,19 @@ def connect_db():
         print(f"Error connecting to the database: {e}")
         exit(1)
 
+def fetch_excluded_sets():
+    """Fetches the list of excluded sets from Scryfall's API."""
+    print("Fetching sets from Scryfall...")
+    response = requests.get('https://api.scryfall.com/sets')
+    sets_data = response.json()
+
+    excluded_set_codes = [
+        set_obj['code'] for set_obj in sets_data['data']
+        if set_obj['set_type'] in EXCLUDED_SET_TYPES
+    ]
+
+    return excluded_set_codes
+
 def load_json(file_path):
     """Loads JSON data from the specified file path."""
     try:
@@ -50,9 +66,7 @@ def load_json(file_path):
         exit(1)
 
 def prepare_card_record(card):
-    """
-    Extracts and serializes necessary fields from the Scryfall card data.
-    """
+    """Extracts and serializes necessary fields from the Scryfall card data."""
     # Serialize JSONB fields
     multiverse_ids = json.dumps(card.get('multiverse_ids', []))
     image_uris = json.dumps(card.get('image_uris', {}))
@@ -128,9 +142,7 @@ def prepare_card_record(card):
     )
 
 def upsert_cards(conn, cards):
-    """
-    Performs an UPSERT (insert or update) operation on the `cards` table.
-    """
+    """Performs an UPSERT operation on the `cards` table."""
     with conn.cursor() as cur:
         sql = """
         INSERT INTO public.cards (
@@ -252,6 +264,7 @@ def upsert_cards(conn, cards):
                 page_size=BATCH_SIZE
             )
             conn.commit()
+            print(f"Upserted {len(cards)} cards successfully.")
         except Exception as e:
             conn.rollback()
             print(f"Error during upsert: {e}")
@@ -266,19 +279,24 @@ def main():
     data = load_json(SCRYFALL_BULK_JSON)
     print(f"Total cards in bulk data: {len(data)}")
 
-    # Filter cards if SET_CODE is specified
+    # Fetch excluded sets
+    excluded_sets = fetch_excluded_sets()
+    print(f"Fetched {len(excluded_sets)} excluded sets.")
+
+    # Filter cards if SET_CODE is specified and exclude specified set types
     if SET_CODE and SET_CODE.upper() not in ['ALL', 'NONE']:
-        cards_to_import = [card for card in data if card.get('set') == SET_CODE.lower()]
-        print(f"Total cards to import from set '{SET_CODE}': {len(cards_to_import)}")
+        cards_to_import = [card for card in data if card.get('set') == SET_CODE.lower() and card.get('set') not in excluded_sets]
+        print(f"Total cards to import from set '{SET_CODE}' (excluding specified set types): {len(cards_to_import)}")
     else:
-        cards_to_import = data
-        print(f"Total cards to import (all sets): {len(cards_to_import)}")
+        cards_to_import = [card for card in data if card.get('set') not in excluded_sets]
+        print(f"Total cards to import (all sets, excluding specified set types): {len(cards_to_import)}")
 
     # Prepare card records in batches
     batch = []
     for card in tqdm(cards_to_import, desc="Preparing cards for import"):
         record = prepare_card_record(card)
-        batch.append(record)
+        if record:
+            batch.append(record)
 
         # Insert in batches
         if len(batch) >= BATCH_SIZE:
