@@ -75,10 +75,6 @@ def get_all_sets():
             .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
             .options(
                 joinedload(Set.collection_count),
-                subqueryload(Set.cards).load_only(
-                    Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
-                    Card.quantity_collection_foil, Card.frame_effects, Card.promo_types
-                )
             )
 
         # Apply filters
@@ -124,37 +120,19 @@ def get_all_sets():
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
         sets_list = []
-        for set_instance in paginated_sets.items:
+        for set_instance, category in paginated_sets.items:
             set_data = set_instance.to_dict()
             set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
             set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
 
             # Compute total_value and variants
-            total_value = 0.0
-            variants = defaultdict(list)
-            for card in set_instance.cards:
-                usd_price = float(card.prices.get('usd', 0)) if card.prices and 'usd' in card.prices else 0.0
-                usd_foil_price = float(card.prices.get('usd_foil', 0)) if card.prices and 'usd_foil' in card.prices else 0.0
-                total_value += (usd_price * card.quantity_collection_regular) + (usd_foil_price * card.quantity_collection_foil)
-
-                # Use the get_category_case function
-                category_case = get_category_case(Card)
-                variants_query = db.session.query(
-                    category_case.label('category'),
-                    Card.id,
-                    Card.name,
-                    Card.prices
-                ).filter(Card.set_code == set_instance.code).all()
-
-                for variant in variants_query:
-                    variants[variant.category].append({
-                        'id': variant.id,
-                        'name': variant.name,
-                        'prices': variant.prices
-                    })
-
+            total_value = db.session.query(
+                func.sum(
+                    (func.cast((Card.prices['usd'].astext), Float) * Card.quantity_collection_regular) +
+                    (func.cast((Card.prices['usd_foil'].astext), Float) * Card.quantity_collection_foil)
+                )
+            ).filter(Card.set_code == set_instance.code).scalar() or 0.0
             set_data['total_value'] = round(total_value, 2)
-            set_data['variants'] = variants
 
             sets_list.append(set_data)
 

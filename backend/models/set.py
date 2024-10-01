@@ -20,15 +20,9 @@ class Set(db.Model):
 
     # Relationships
     cards = db.relationship('Card', back_populates='set')
-    collection_count = db.relationship('SetCollectionCount', uselist=False, back_populates='set', lazy='joined')
+    collection_count = db.relationship('SetCollectionCount', back_populates='set', uselist=False)
 
     def to_dict(self):
-        # Ensure collection_count is already loaded
-        if self.collection_count is None:
-            db.session.refresh(self)
-        
-        collection_count = self.collection_count.collection_count if self.collection_count else 0
-        collection_percentage = (collection_count / self.card_count) * 100 if self.card_count else 0
         return {
             'id': self.id,
             'code': self.code,
@@ -39,6 +33,6 @@ class Set(db.Model):
             'digital': self.digital,
             'foil_only': self.foil_only,
             'icon_svg_uri': self.icon_svg_uri,
-            'collection_count': collection_count,
-            'collection_percentage': collection_percentage
+            'collection_count': self.collection_count.collection_count if self.collection_count else 0,
+            'collection_percentage': (self.collection_count.collection_count / self.card_count) * 100 if self.card_count and self.collection_count else 0
         }
