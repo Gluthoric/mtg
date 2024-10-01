@@ -1,101 +1,62 @@
 <template>
   <div class="controls bg-secondary p-4 rounded-lg shadow-md">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div class="filter-section">
-        <input
-          v-model="localFilters.name"
-          @input="emitFilters"
-          placeholder="Search by name"
-          class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
-
-      <!-- Set Types Filter -->
-      <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Set Types</label>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="type in setTypes"
-            :key="type"
-            @click="toggleSetType(type)"
-            :class="[
-              'px-3 py-1 rounded-full capitalize text-sm',
-              isSetTypeSelected(type) ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
-              'hover:bg-primary hover:text-white transition-colors duration-200'
-            ]"
-          >
-            {{ capitalize(type.replace('_', ' ')) }}
-          </button>
+    <div class="max-w-3xl mx-auto">
+      <div class="space-y-6">
+        <div class="filter-section">
+          <input
+            v-model="localFilters.name"
+            @input="emitFilters"
+            placeholder="Search by name"
+            class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            aria-label="Search by name"
+          />
         </div>
-      </div>
 
-      <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Digital</label>
-        <select 
-          v-model="localFilters.digital" 
-          @change="emitFilters"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="">All</option>
-          <option value="true">Digital Only</option>
-          <option value="false">Physical Only</option>
-        </select>
-      </div>
-      <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Foil Only</label>
-        <select 
-          v-model="localFilters.foil_only" 
-          @change="emitFilters"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="">All</option>
-          <option value="true">Foil Only Sets</option>
-          <option value="false">Include Non-Foil Sets</option>
-        </select>
-      </div>
-      <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Released From</label>
-        <input
-          type="date"
-          v-model="localFilters.released_from"
-          @change="emitFilters"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
-      <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Released To</label>
-        <input
-          type="date"
-          v-model="localFilters.released_to"
-          @change="emitFilters"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
+        <div class="filter-section">
+          <label class="block text-sm font-medium mb-2 text-center">Set Types</label>
+          <div class="flex flex-wrap justify-center gap-2">
+            <button
+              v-for="type in setTypes"
+              :key="type"
+              @click="toggleSetType(type)"
+              :class="[
+                'px-3 py-1 rounded-full capitalize text-sm',
+                isSetTypeSelected(type) ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
+                'hover:bg-primary hover:text-white transition-colors duration-200'
+              ]"
+            >
+              {{ capitalize(type.replace('_', ' ')) }}
+            </button>
+          </div>
+        </div>
 
-      <!-- Sort Options -->
-      <div class="sort-section">
-        <label class="block text-sm font-medium mb-2">Sort By</label>
-        <select
-          v-model="selectedSortOption"
-          @change="updateSorting"
-          class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option v-for="option in sortOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-      </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="sort-section">
+            <label for="sortBy" class="block text-sm font-medium mb-2">Sort By</label>
+            <select
+              id="sortBy"
+              v-model="selectedSortOption"
+              @change="updateSorting"
+              class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
 
-      <div class="pagination-section">
-        <label for="perPage" class="block mb-1">Per Page:</label>
-        <select 
-          v-model="localPerPage" 
-          @change="emitPerPage" 
-          id="perPage"
-          class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option v-for="option in perPageOptions" :key="option" :value="option">{{ option }}</option>
-        </select>
+          <div class="pagination-section">
+            <label for="perPage" class="block text-sm font-medium mb-2">Per Page</label>
+            <select
+              id="perPage"
+              v-model="localPerPage"
+              @change="emitPerPage"
+              class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option v-for="option in perPageOptions" :key="option" :value="option">{{ option }}</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -119,10 +80,6 @@ export default {
       localFilters: {
         name: '',
         set_types: [],
-        digital: '',
-        foil_only: '',
-        released_from: '',
-        released_to: ''
       },
       selectedSortOption: 'released_at-desc',
       sortOptions: [
