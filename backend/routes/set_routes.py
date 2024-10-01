@@ -12,6 +12,7 @@ import orjson
 import logging
 from datetime import datetime
 from utils.categorization import get_category_case
+from utils.categorization import categorize_card
 
 set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
@@ -212,3 +213,46 @@ def get_set_cards(set_code):
     except Exception as e:
         logger.exception(f"Error in get_set_cards: {str(e)}")
         return jsonify({"error": "An error occurred while fetching the set cards."}), 500
+
+@set_routes.route('/collection/sets/<string:set_code>', methods=['GET'])
+def get_collection_set_details(set_code):
+    try:
+        # Fetch the set instance
+        set_instance = Set.query.filter_by(code=set_code).first()
+        if not set_instance:
+            return jsonify({'error': 'Set not found'}), 404
+
+        # Fetch cards in the set that are in the collection
+        cards = Card.query.filter(
+            Card.set_code == set_code,
+            (Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)
+        ).all()
+
+        # Categorize the cards
+        variants = defaultdict(list)
+        for card in cards:
+            category = categorize_card(card)
+            variants[category].append({
+                'id': card.id,
+                'name': card.name,
+                'type_line': card.type_line,
+                'mana_cost': card.mana_cost,
+                'rarity': card.rarity,
+                'image_uris': card.image_uris,
+                'collector_number': card.collector_number,
+                'prices': card.prices,
+                'quantity_collection_regular': card.quantity_collection_regular,
+                'quantity_collection_foil': card.quantity_collection_foil,
+            })
+
+        # Prepare the response
+        response = {
+            'set': set_instance.to_dict(),
+            'variants': dict(variants)
+        }
+
+        return jsonify(response), 200
+    except Exception as e:
+        # Handle exceptions appropriately
+        logger.exception(f"Error in get_collection_set_details: {str(e)}")
+        return jsonify({'error': 'An error occurred while fetching the set details.'}), 500
