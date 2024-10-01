@@ -1,5 +1,11 @@
 <template>
   <div class="container mx-auto px-4 bg-dark-300 text-white">
+    <nav class="mb-4 flex justify-center space-x-4">
+      <router-link to="/" class="text-primary hover:underline">Home</router-link>
+      <router-link to="/collection" class="text-primary hover:underline">Collection</router-link>
+      <router-link to="/kiosk" class="text-primary hover:underline">Kiosk</router-link>
+      <router-link to="/import" class="text-primary hover:underline">Import</router-link>
+    </nav>
     <h1 class="text-center mb-4 text-2xl font-bold text-primary">{{ setName }}</h1>
     <div v-if="loading" class="loading text-center mt-4">Loading...</div>
     <div v-else-if="error" class="error text-center mt-4 text-red-500">{{ error }}</div>

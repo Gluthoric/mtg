@@ -187,10 +187,23 @@ def get_collection():
 from collections import defaultdict
 
 from collections import defaultdict
-from sqlalchemy import case, func, cast, Float, and_, or_
-from sqlalchemy.orm import Session, with_loader_criteria
+from sqlalchemy import func, cast, Float
+from sqlalchemy.orm import joinedload, subqueryload
 from sqlalchemy.sql import asc, desc
-from utils.categorization import get_category_case
+
+def categorize_card(card):
+    if 'showcase' in (card.frame_effects or []):
+        return 'Showcases'
+    elif 'extendedart' in (card.frame_effects or []):
+        return 'Extended Art'
+    elif 'fracturefoil' in (card.promo_types or []):
+        return 'Fracture Foils'
+    elif 'borderless' in (card.frame_effects or []):
+        return 'Borderless Cards'
+    elif 'promo' in (card.promo_types or []):
+        return 'Promos'
+    else:
+        return 'Art Variants'
 
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
@@ -233,12 +246,17 @@ def get_collection_sets():
         order_func = desc if sort_order.lower() == 'desc' else asc
 
         # Build the main query to return Set instances
-        query = db.session.query(Set)\
-            .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
-            .options(
-                joinedload(Set.collection_count),
-                # Removed subqueryload of Set.cards to prevent loading all cards
+        query = db.session.query(Set).outerjoin(
+            SetCollectionCount, Set.code == SetCollectionCount.set_code
+        ).options(
+            joinedload(Set.collection_count),
+            subqueryload(Set.cards).load_only(
+                Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
+                Card.quantity_collection_foil, Card.frame_effects, Card.promo_types,
+                Card.type_line, Card.mana_cost, Card.rarity, Card.image_uris,
+                Card.collector_number
             )
+        )
 
         # Apply filters
         if name:
@@ -260,30 +278,19 @@ def get_collection_sets():
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
         logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
+        # Process results
         sets_list = []
         for set_instance in paginated_sets.items:
             set_data = set_instance.to_dict()
-            
-            # Compute total_value with handling for None values
-            total_value = sum(
-                (safe_float(card.prices.get('usd')) * card.quantity_collection_regular) +
-                (safe_float(card.prices.get('usd_foil')) * card.quantity_collection_foil)
-                for card in set_instance.cards
-            )
-            set_data['total_value'] = round(total_value, 2)
-
-            # Log warning for cards with missing prices
-            for card in set_instance.cards:
-                if card.prices.get('usd') is None:
-                    logger.warning(f"Card {card.id} in set {set_instance.code} has no 'usd' price.")
-                if card.prices.get('usd_foil') is None:
-                    logger.warning(f"Card {card.id} in set {set_instance.code} has no 'usd_foil' price.")
-
-            # Categorize cards
+            total_value = 0.0
             variants = defaultdict(list)
-            category_case = get_card_category_case(Card)
             for card in set_instance.cards:
-                category = db.session.query(category_case).filter(Card.id == card.id).scalar()
+                usd_price = float(card.prices.get('usd', 0) or 0)
+                usd_foil_price = float(card.prices.get('usd_foil', 0) or 0)
+                total_value += (usd_price * card.quantity_collection_regular) + \
+                               (usd_foil_price * card.quantity_collection_foil)
+
+                category = categorize_card(card)
                 variants[category].append({
                     'id': card.id,
                     'name': card.name,
@@ -294,16 +301,20 @@ def get_collection_sets():
                     'collector_number': card.collector_number,
                     'prices': card.prices
                 })
+            set_data['total_value'] = round(total_value, 2)
             set_data['variants'] = dict(variants)
-
             sets_list.append(set_data)
 
+        # Build response
         response = {
             'sets': sets_list,
             'total': paginated_sets.total,
             'pages': paginated_sets.pages,
             'current_page': paginated_sets.page
         }
+
+        # Convert any Decimal objects to float
+        response = convert_decimals(response)
 
         serialized_data = orjson.dumps(response).decode()
         current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes

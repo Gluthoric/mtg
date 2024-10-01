@@ -1,5 +1,11 @@
 <template>
   <div class="container">
+    <nav class="mb-4 flex justify-center space-x-4">
+      <router-link to="/" class="text-primary hover:underline">Home</router-link>
+      <router-link to="/collection" class="text-primary hover:underline">Collection</router-link>
+      <router-link to="/kiosk" class="text-primary hover:underline">Kiosk</router-link>
+      <router-link to="/import" class="text-primary hover:underline">Import</router-link>
+    </nav>
     <h1 class="text-center mb-4">Import Cards</h1>
 
     <div class="card mb-4">
