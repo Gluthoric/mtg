@@ -11,6 +11,8 @@ from decimal import Decimal
 import orjson
 import logging
 from datetime import datetime
+from backend.utils.categorization import get_category_case
+from backend.utils.categorization import get_category_case
 
 set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
@@ -136,24 +138,21 @@ def get_all_sets():
                 usd_foil_price = float(card.prices.get('usd_foil', 0)) if card.prices and 'usd_foil' in card.prices else 0.0
                 total_value += (usd_price * card.quantity_collection_regular) + (usd_foil_price * card.quantity_collection_foil)
 
-                # Categorize variant cards
-                if card.frame_effects and 'showcase' in card.frame_effects:
-                    category = 'Showcases'
-                elif card.frame_effects and 'extendedart' in card.frame_effects:
-                    category = 'Extended Art'
-                elif card.promo_types and 'fracturefoil' in card.promo_types:
-                    category = 'Fracture Foils'
-                elif card.frame_effects and 'borderless' in card.frame_effects:
-                    category = 'Borderless Cards'
-                elif card.promo_types and 'promo' in card.promo_types:
-                    category = 'Promos'
-                else:
-                    category = 'Art Variants'
-                variants[category].append({
-                    'id': card.id,
-                    'name': card.name,
-                    'prices': card.prices
-                })
+                # Use the get_category_case function
+                category_case = get_category_case(Card)
+                variants_query = db.session.query(
+                    category_case.label('category'),
+                    Card.id,
+                    Card.name,
+                    Card.prices
+                ).filter(Card.set_code == set_instance.code).all()
+
+                for variant in variants_query:
+                    variants[variant.category].append({
+                        'id': variant.id,
+                        'name': variant.name,
+                        'prices': variant.prices
+                    })
 
             set_data['total_value'] = round(total_value, 2)
             set_data['variants'] = variants

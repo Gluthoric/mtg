@@ -36,6 +36,8 @@ from models.set_collection_count import SetCollectionCount
 from database import db
 import orjson
 from decimal import Decimal
+from backend.utils.categorization import get_category_case
+from backend.utils.categorization import get_category_case
 
 card_routes = Blueprint('card_routes', __name__)
 
@@ -179,8 +181,10 @@ def get_collection():
 from collections import defaultdict
 
 from collections import defaultdict
-from sqlalchemy.orm import with_loader_criteria
+from sqlalchemy import case, func, cast, Float, and_, or_, else_
+from sqlalchemy.orm import Session, with_loader_criteria
 from sqlalchemy.sql import asc, desc
+from backend.utils.categorization import get_category_case
 
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
@@ -222,12 +226,19 @@ def get_collection_sets():
         # Apply sort order
         order_func = desc if sort_order.lower() == 'desc' else asc
 
+        # Get the category case
+        category_case = get_category_case(Card)
+
         # Build the main query to return Set instances
-        query = db.session.query(Set)\
+        query = db.session.query(Set, category_case)\
             .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)\
+            .outerjoin(Card, Set.code == Card.set_code)\
             .options(
-                subqueryload(Set.cards),  # Eagerly load related cards
-                joinedload(Set.collection_count)  # Eagerly load collection_count
+                subqueryload(Set.cards).load_only(
+                    Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
+                    Card.quantity_collection_foil, Card.frame_effects, Card.promo_types
+                ),
+                joinedload(Set.collection_count)
             )
 
         # Apply filters
