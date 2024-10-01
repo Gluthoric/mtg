@@ -267,7 +267,7 @@ def main():
     print(f"Total cards in bulk data: {len(data)}")
 
     # Filter cards if SET_CODE is specified
-    if SET_CODE and SET_CODE.upper() != 'ALL':
+    if SET_CODE and SET_CODE.upper() not in ['ALL', 'NONE']:
         cards_to_import = [card for card in data if card.get('set') == SET_CODE.lower()]
         print(f"Total cards to import from set '{SET_CODE}': {len(cards_to_import)}")
     else:

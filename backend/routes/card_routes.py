@@ -37,7 +37,7 @@ from database import db
 import orjson
 from decimal import Decimal
 from utils.categorization import get_category_case
-from backend.utils.categorization import get_category_case
+from utils.categorization import get_category_case
 
 card_routes = Blueprint('card_routes', __name__)
 
@@ -181,10 +181,10 @@ def get_collection():
 from collections import defaultdict
 
 from collections import defaultdict
-from sqlalchemy import case, func, cast, Float, and_, or_, else_
+from sqlalchemy import case, func, cast, Float, and_, or_
 from sqlalchemy.orm import Session, with_loader_criteria
 from sqlalchemy.sql import asc, desc
-from backend.utils.categorization import get_category_case
+from utils.categorization import get_category_case
 
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
