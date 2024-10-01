@@ -1,78 +1,80 @@
 <template>
-  <div class="container mx-auto px-4 bg-background text-foreground">
-    <nav class="mb-4 flex justify-center space-x-4">
+  <div class="bg-background text-foreground min-h-screen">
+    <nav class="mb-4 flex justify-center space-x-4 p-4">
       <router-link v-for="link in navLinks" :key="link.to" :to="link.to" class="text-primary hover:underline">
         {{ link.text }}
       </router-link>
     </nav>
-    <h1 class="text-center mb-4 text-2xl font-bold text-primary">My Collection</h1>
-    <SetListControls
-      :setTypes="setTypes"
-      :totalPages="totalPages"
-      @update-filters="updateFilters"
-      @update-sorting="updateSorting"
-      @update-per-page="updatePerPage"
-      class="controls bg-card p-4 rounded-lg shadow-md mb-4"
-    />
-    <div v-if="loading" class="loading text-center mt-4" role="status">
-      <span class="sr-only">Loading...</span>
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-    </div>
-    <div v-else-if="error" class="error text-center mt-4 text-destructive" role="alert">{{ error }}</div>
-    <div v-else-if="sets.length === 0" class="text-center mt-4">
-      <p>No sets found in your collection.</p>
-    </div>
-    <TransitionGroup
-      v-else
-      name="set-list"
-      tag="div"
-      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-    >
-      <div v-for="set in sets" :key="set.code"
-           class="card p-4 rounded-lg shadow-md transition-all duration-300 ease-in-out hover:scale-105"
-           :style="{ backgroundColor: set.background_color || '#333333', color: set.text_color || '#ffffff' }">
-        <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }" class="block">
-          <div class="flex items-center mb-2">
-            <img :src="set.icon_svg_uri" :alt="set.name" loading="lazy" class="w-8 h-8 mr-2" />
-            <h3 class="text-sm font-semibold truncate">{{ set.name }}</h3>
-          </div>
-          <div class="text-xs opacity-75 mb-1">{{ formatDate(set.released_at) }}</div>
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-xs">{{ set.collection_count }} / {{ set.card_count }}</span>
-            <span class="text-xs font-semibold">{{ Math.round(set.collection_percentage) }}%</span>
-          </div>
-          <div class="progress-container bg-opacity-30 bg-black rounded-full overflow-hidden">
-            <div
-              class="progress-bar h-1 transition-all duration-300 ease-in-out bg-white"
-              :style="{ width: `${set.collection_percentage}%` }"
-              role="progressbar"
-              :aria-valuenow="Math.round(set.collection_percentage)"
-              aria-valuemin="0"
-              aria-valuemax="100"
-            ></div>
-          </div>
-          <div class="text-xs mt-2">
-            <span class="font-semibold">Value:</span> {{ formatCurrency(set.total_value) }}
-          </div>
-        </router-link>
+    <div class="px-4 md:px-6 lg:px-8">
+      <h1 class="text-center mb-4 text-2xl font-bold text-primary">My Collection</h1>
+      <SetListControls
+        :setTypes="setTypes"
+        :totalPages="totalPages"
+        @update-filters="updateFilters"
+        @update-sorting="updateSorting"
+        @update-per-page="updatePerPage"
+        class="controls bg-card p-4 rounded-lg shadow-md mb-4"
+      />
+      <div v-if="loading" class="loading text-center mt-4" role="status">
+        <span class="sr-only">Loading...</span>
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
-    </TransitionGroup>
-    <div class="pagination flex justify-center items-center mt-4 space-x-4">
-      <button
-        @click="changePage(-1)"
-        :disabled="currentPage === 1"
-        class="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+      <div v-else-if="error" class="error text-center mt-4 text-destructive" role="alert">{{ error }}</div>
+      <div v-else-if="sets.length === 0" class="text-center mt-4">
+        <p>No sets found in your collection.</p>
+      </div>
+      <TransitionGroup
+        v-else
+        name="set-list"
+        tag="div"
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
       >
-        Previous
-      </button>
-      <span class="text-lg font-semibold">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button
-        @click="changePage(1)"
-        :disabled="currentPage === totalPages"
-        class="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Next
-      </button>
+        <div v-for="set in sets" :key="set.code"
+             class="card p-4 rounded-lg shadow-md transition-all duration-300 ease-in-out hover:scale-105"
+             :style="{ backgroundColor: set.background_color || '#333333', color: set.text_color || '#ffffff' }">
+          <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }" class="block">
+            <div class="flex items-center mb-2">
+              <img :src="set.icon_svg_uri" :alt="set.name" loading="lazy" class="w-8 h-8 mr-2" />
+              <h3 class="text-sm font-semibold truncate">{{ set.name }}</h3>
+            </div>
+            <div class="text-xs opacity-75 mb-1">{{ formatDate(set.released_at) }}</div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-xs">{{ set.collection_count }} / {{ set.card_count }}</span>
+              <span class="text-xs font-semibold">{{ Math.round(set.collection_percentage) }}%</span>
+            </div>
+            <div class="progress-container bg-opacity-30 bg-black rounded-full overflow-hidden">
+              <div
+                class="progress-bar h-1 transition-all duration-300 ease-in-out bg-white"
+                :style="{ width: `${set.collection_percentage}%` }"
+                role="progressbar"
+                :aria-valuenow="Math.round(set.collection_percentage)"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              ></div>
+            </div>
+            <div class="text-xs mt-2">
+              <span class="font-semibold">Value:</span> {{ formatCurrency(set.total_value) }}
+            </div>
+          </router-link>
+        </div>
+      </TransitionGroup>
+      <div class="pagination flex justify-center items-center mt-4 space-x-4">
+        <button
+          @click="changePage(-1)"
+          :disabled="currentPage === 1"
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Previous
+        </button>
+        <span class="text-lg font-semibold">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button
+          @click="changePage(1)"
+          :disabled="currentPage === totalPages"
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Next
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -175,13 +177,6 @@ onMounted(fetchSets)
 .set-list-leave-to {
   opacity: 0;
   transform: translateY(30px);
-}
-
-.controls {
-  background-color: var(--card);
-  padding: 1rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .card {
