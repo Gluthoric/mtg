@@ -62,7 +62,7 @@
       <!-- Cards Grid -->
       <div class="card-grid grid gap-4" :style="gridStyle">
         <div
-          v-for="card in cards"
+          v-for="card in sortedCards"
           :key="card.id"
           class="card bg-dark-200 shadow-md rounded-lg overflow-hidden relative flex flex-col"
           :class="{ 'border-2 border-red-500': isMissing(card) }"
@@ -232,7 +232,9 @@ export default {
         const response = await axios.get(`/api/collection/sets/${setCode.value}`);
         setName.value = response.data.set.name;
         cards.value = response.data.cards;
-        statistics.value = response.data.statistics;
+        // Update other relevant data from the response
+        // For example:
+        // statistics.value = response.data.set.statistics;
       } catch (err) {
         console.error('Error fetching set details:', err);
         error.value = 'Failed to load set details';
@@ -344,9 +346,18 @@ export default {
       gridTemplateColumns: `repeat(${cardsPerRow.value}, 1fr)`,
     }));
 
+    const sortedCards = computed(() => {
+      return [...cards.value].sort((a, b) => {
+        const aNum = parseInt(a.collector_number.replace(/\D/g, ''));
+        const bNum = parseInt(b.collector_number.replace(/\D/g, ''));
+        return aNum - bNum;
+      });
+    });
+
     return {
       setName,
       cards,
+      sortedCards,  // Add this line
       loading,
       error,
       filters,

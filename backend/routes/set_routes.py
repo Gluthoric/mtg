@@ -216,107 +216,68 @@ def get_set_cards(set_code):
 from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-@set_routes.route('/collection/sets/<string:set_code>', methods=['GET'])
+@set_routes.route('/sets/<string:set_code>/details', methods=['GET'])
 def get_collection_set_details(set_code):
     try:
-        # Fetch the set instance
-        set_instance = Set.query.filter_by(code=set_code).first()
-        if not set_instance:
-            return jsonify({'error': 'Set not found'}), 404
+        # Construct cache key
+        cache_key = f"set_details:{set_code}"
+        cached_data = current_app.redis_client.get(cache_key)
 
-        # Fetch cards in the set that are in the collection
-        cards = Card.query.options(load_only(
-            Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
-            Card.quantity_collection_foil, Card.frame_effects, Card.promo_types,
-            Card.type_line, Card.mana_cost, Card.rarity, Card.image_uris,
-            Card.collector_number
+        if cached_data:
+            return current_app.response_class(
+                response=cached_data.decode(),
+                status=200,
+                mimetype='application/json'
+            )
+
+        # Query cards with necessary attributes
+        query = Card.query.options(load_only(
+            Card.id,
+            Card.name,
+            Card.type_line,
+            Card.mana_cost,
+            Card.rarity,
+            Card.image_uris,
+            Card.collector_number,
+            Card.prices,
+            Card.quantity_collection_regular,
+            Card.quantity_collection_foil,
+            Card.frame_effects,
+            Card.promo_types,
+            # Add missing attributes to prevent N+1 problem
+            Card.promo,
+            Card.reprint,
+            Card.variation,
+            Card.oversized
         )).filter(
             Card.set_code == set_code,
             (Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)
-        ).all()
+        )
 
-        # Serialize card data
-        card_data = []
-        for card in cards:
-            card_info = {
-                'id': card.id,
-                'name': card.name,
-                'type_line': card.type_line,
-                'mana_cost': card.mana_cost,
-                'rarity': card.rarity,
-                'image_uris': card.image_uris,
-                'collector_number': card.collector_number,
-                'prices': card.prices,
-                'quantity_collection_regular': card.quantity_collection_regular,
-                'quantity_collection_foil': card.quantity_collection_foil,
-                'frame_effects': card.frame_effects,
-                'promo_types': card.promo_types,
-                'oversized': getattr(card, 'oversized', False),
-                'promo': getattr(card, 'promo', False),
-                'reprint': getattr(card, 'reprint', False),
-                'variation': getattr(card, 'variation', False)
-            }
-            card_data.append(card_info)
+        cards = query.all()
 
-        # Frame Effects Counts
-        frame_effects_query = text("""
-            SELECT jsonb_array_elements_text(cards.frame_effects) AS frame_effect, COUNT(*) AS count 
-            FROM cards 
-            WHERE cards.set_code = :set_code 
-              AND (cards.quantity_collection_regular > 0 OR cards.quantity_collection_foil > 0) 
-              AND cards.frame_effects IS NOT NULL 
-            GROUP BY frame_effect
-        """)
-        frame_effects_result = db.session.execute(frame_effects_query, {'set_code': set_code}).fetchall()
-        frame_effects_dict = {row.frame_effect: row.count for row in frame_effects_result}
+        # Serialize cards
+        cards_data = [card.to_dict() for card in cards]
 
-        # Promo Types Counts
-        promo_types_query = text("""
-            SELECT jsonb_array_elements_text(cards.promo_types) AS promo_type, COUNT(*) AS count 
-            FROM cards 
-            WHERE cards.set_code = :set_code 
-              AND (cards.quantity_collection_regular > 0 OR cards.quantity_collection_foil > 0) 
-              AND cards.promo_types IS NOT NULL 
-            GROUP BY promo_type
-        """)
-        promo_types_result = db.session.execute(promo_types_query, {'set_code': set_code}).fetchall()
-        promo_types_dict = {row.promo_type: row.count for row in promo_types_result}
-
-        # Other Attributes Counts
-        other_attributes_query = text("""
-            SELECT 
-                SUM(CASE WHEN cards.oversized THEN 1 ELSE 0 END) AS oversized,
-                SUM(CASE WHEN cards.promo THEN 1 ELSE 0 END) AS promo,
-                SUM(CASE WHEN cards.reprint THEN 1 ELSE 0 END) AS reprint,
-                SUM(CASE WHEN cards.variation THEN 1 ELSE 0 END) AS variation
-            FROM cards
-            WHERE cards.set_code = :set_code 
-              AND (cards.quantity_collection_regular > 0 OR cards.quantity_collection_foil > 0)
-        """)
-        other_attributes_result = db.session.execute(other_attributes_query, {'set_code': set_code}).fetchone()
-        other_attributes_dict = {
-            'Oversized': other_attributes_result.oversized or 0,
-            'Promo': other_attributes_result.promo or 0,
-            'Reprint': other_attributes_result.reprint or 0,
-            'Variation': other_attributes_result.variation or 0
-        }
-
-        # Prepare the statistics
-        statistics = {
-            'frame_effects': frame_effects_dict,
-            'promo_types': promo_types_dict,
-            'other_attributes': other_attributes_dict
-        }
-
-        # Prepare the response
+        # Build response
         response = {
-            'set': set_instance.to_dict(),
-            'cards': card_data,
-            'statistics': statistics
+            'set_code': set_code,
+            'cards': cards_data,
+            'total_cards': len(cards_data)
         }
 
-        return jsonify(response), 200
+        # Convert any Decimal objects to float
+        response = convert_decimals(response)
+
+        serialized_data = orjson.dumps(response).decode()
+        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
-        # Handle exceptions appropriately
-        logger.exception(f"Error in get_collection_set_details: {str(e)}")
-        return jsonify({'error': 'An error occurred while fetching the set details.'}), 500
+        error_message = f"An unexpected error occurred: {str(e)}"
+        logger.exception(error_message)
+        return jsonify({"error": error_message}), 500

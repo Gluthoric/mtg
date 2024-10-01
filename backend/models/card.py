@@ -67,7 +67,7 @@ class Card(db.Model):
     quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
 
     # Relationships
-    set = db.relationship('Set', back_populates='cards')
+    set = db.relationship('Set', back_populates='cards', lazy='joined')  # Eagerly load set using join
 
     def to_dict(self):
         return {
@@ -87,5 +87,12 @@ class Card(db.Model):
             'quantity_collection_regular': self.quantity_collection_regular,
             'quantity_collection_foil': self.quantity_collection_foil,
             'quantity_kiosk_regular': self.quantity_kiosk_regular,
-            'quantity_kiosk_foil': self.quantity_kiosk_foil
+            'quantity_kiosk_foil': self.quantity_kiosk_foil,
+            'frame_effects': self.frame_effects,
+            'promo_types': self.promo_types,
+            'promo': self.promo,
+            'reprint': self.reprint,
+            'variation': self.variation,
+            'oversized': self.oversized,
+            'keywords': self.keywords
         }

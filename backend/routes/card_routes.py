@@ -3,6 +3,23 @@ import logging
 from flask import Blueprint, jsonify, request, current_app
 import time
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import joinedload, load_only, subqueryload, aliased
+from sqlalchemy import func, case, or_, distinct, Float
+from sqlalchemy.sql import func, asc, desc, text
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from models.card import Card
+from models.set import Set
+from models.set_collection_count import SetCollectionCount
+from database import db
+import orjson
+from decimal import Decimal
+from utils.categorization import get_card_category_case, get_category_case
+
+card_routes = Blueprint('card_routes', __name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def safe_float(value):
     try:
@@ -31,25 +48,6 @@ def monitor_cache(func):
 
         return result
     return wrapper
-from sqlalchemy.orm import joinedload, load_only, subqueryload, aliased
-from sqlalchemy import func, case
-from sqlalchemy.sql import func, asc, desc, text
-from sqlalchemy import or_, distinct, Float, case
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from models.card import Card
-from models.set import Set
-from models.set_collection_count import SetCollectionCount
-from database import db
-import orjson
-from decimal import Decimal
-from utils.categorization import get_card_category_case
-from utils.categorization import get_category_case
-
-card_routes = Blueprint('card_routes', __name__)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def convert_decimals(obj):
     if isinstance(obj, list):
@@ -108,7 +106,14 @@ def get_cards():
 
 @card_routes.route('/cards/<string:card_id>', methods=['GET'])
 def get_card(card_id):
-    card = Card.query.get_or_404(card_id)
+    card = Card.query.options(load_only(
+        Card.id, Card.name, Card.set_name, Card.set_code, Card.collector_number,
+        Card.type_line, Card.rarity, Card.mana_cost, Card.cmc, Card.oracle_text,
+        Card.colors, Card.image_uris, Card.prices, Card.quantity_collection_regular,
+        Card.quantity_collection_foil, Card.quantity_kiosk_regular, Card.quantity_kiosk_foil,
+        Card.frame_effects, Card.promo_types, Card.promo, Card.reprint, Card.variation,
+        Card.oversized, Card.keywords
+    )).get_or_404(card_id)
     return jsonify(card.to_dict()), 200
 
 @card_routes.route('/cards/search', methods=['GET'])
@@ -117,13 +122,22 @@ def search_cards():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
 
-    cards = Card.query.filter(
+    query = Card.query.options(load_only(
+        Card.id, Card.name, Card.set_name, Card.set_code, Card.collector_number,
+        Card.type_line, Card.rarity, Card.mana_cost, Card.cmc, Card.oracle_text,
+        Card.colors, Card.image_uris, Card.prices, Card.quantity_collection_regular,
+        Card.quantity_collection_foil, Card.quantity_kiosk_regular, Card.quantity_kiosk_foil,
+        Card.frame_effects, Card.promo_types, Card.promo, Card.reprint, Card.variation,
+        Card.oversized, Card.keywords
+    )).filter(
         or_(
             Card.name.ilike(f'%{query_param}%'),
             Card.type_line.ilike(f'%{query_param}%'),
             Card.oracle_text.ilike(f'%{query_param}%')
         )
-    ).paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    cards = query.paginate(page=page, per_page=per_page, error_out=False)
 
     return jsonify({
         'cards': [card.to_dict() for card in cards.items],
@@ -215,13 +229,13 @@ def get_collection_sets():
                 mimetype='application/json'
             )
 
-        logger.info(f"Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+        logger.info(f"get_collection_sets: Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
         # Define valid sort fields and prevent SQL injection
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
         if sort_by not in valid_sort_fields:
             error_message = f"Invalid sort_by field: {sort_by}"
-            logger.error(error_message)
+            logger.error(f"get_collection_sets: {error_message}")
             return jsonify({"error": error_message}), 400
 
         # Determine sort column
@@ -238,33 +252,28 @@ def get_collection_sets():
             SetCollectionCount, Set.code == SetCollectionCount.set_code
         ).options(
             joinedload(Set.collection_count),
-            subqueryload(Set.cards).load_only(
-                Card.id, Card.name, Card.prices, Card.quantity_collection_regular,
-                Card.quantity_collection_foil, Card.frame_effects, Card.promo_types,
-                Card.type_line, Card.mana_cost, Card.rarity, Card.image_uris,
-                Card.collector_number
-            )
+            subqueryload(Set.cards)
         )
 
         # Apply filters
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
-            logger.info(f"Applied filter: Set.name ilike '%{name}%'")
+            logger.debug(f"get_collection_sets: Applied filter: Set.name ilike '%{name}%'")
         if set_types:
             query = query.filter(Set.set_type.in_(set_types))
-            logger.info(f"Applied filter: Set.set_type IN {set_types}")
+            logger.debug(f"get_collection_sets: Applied filter: Set.set_type IN {set_types}")
         else:
             # Use the partial index for relevant set types if no specific set_types are provided
             default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
             query = query.filter(Set.set_type.in_(default_set_types))
-            logger.info("Applied filter: Using partial index for relevant set types")
+            logger.debug("get_collection_sets: Applied filter: Using partial index for relevant set types")
 
         # Apply sorting
         query = query.order_by(order_func(sort_column))
 
         # Execute the query with pagination
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
-        logger.info(f"Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
+        logger.info(f"get_collection_sets: Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
         # Process results
         sets_list = []
@@ -286,20 +295,7 @@ def get_collection_sets():
             cards = set_instance.cards
             card_data = []
             for card in cards:
-                card_info = {
-                    'id': card.id,
-                    'name': card.name,
-                    'type_line': card.type_line,
-                    'mana_cost': card.mana_cost,
-                    'rarity': card.rarity,
-                    'image_uris': card.image_uris,
-                    'collector_number': card.collector_number,
-                    'prices': card.prices,
-                    'quantity_collection_regular': card.quantity_collection_regular,
-                    'quantity_collection_foil': card.quantity_collection_foil,
-                    'frame_effects': card.frame_effects,
-                    'promo_types': card.promo_types
-                }
+                card_info = card.to_dict()
                 card_data.append(card_info)
 
             set_data['cards'] = card_data  # Directly include card details
@@ -326,9 +322,9 @@ def get_collection_sets():
             mimetype='application/json'
         )
     except Exception as e:
-        error_message = f"An unexpected error occurred: {str(e)}"
+        error_message = f"An unexpected error occurred in get_collection_sets: {str(e)}"
         logger.exception(error_message)
-        return jsonify({"error": error_message}), 500
+        return jsonify({"error": "An internal server error occurred. Please try again later."}), 500
 
 # The rest of the code remains unchanged...
 
@@ -474,8 +470,8 @@ def get_collection_set_cards(set_code):
         if keyword:
             query = query.filter(Card.keywords.contains([keyword]))
 
-        # Use the composite index for efficient filtering and sorting
-        query = query.order_by(Card.set_code, Card.quantity_collection_regular.desc(), Card.quantity_collection_foil.desc())
+        # Sort by collector number as integer
+        query = query.order_by(func.cast(func.regexp_replace(Card.collector_number, '[^0-9]', '', 'g'), db.Integer))
 
         # Execute the query
         cards = query.all()
@@ -519,8 +515,9 @@ def import_collection_csv():
 
     try:
         df = pd.read_csv(file)
+        logger.info(f"import_collection_csv: Successfully parsed CSV file: {file.filename}")
     except Exception as e:
-        logger.error(f"Failed to parse CSV: {str(e)}")
+        logger.error(f"import_collection_csv: Failed to parse CSV: {str(e)}")
         return jsonify({"error": f"Failed to parse CSV: {str(e)}"}), 400
 
     required_columns = {
@@ -529,30 +526,33 @@ def import_collection_csv():
     }
     if not required_columns.issubset(set(df.columns)):
         missing = required_columns - set(df.columns)
+        logger.error(f"import_collection_csv: CSV is missing columns: {', '.join(missing)}")
         return jsonify({"error": f"CSV is missing columns: {', '.join(missing)}"}), 400
 
     df['Foil'] = df['Foil'].fillna(False).replace('', False)
+    logger.debug("import_collection_csv: Preprocessed 'Foil' column in CSV")
 
     try:
         updates = process_collection_csv(df)
         db.session.bulk_update_mappings(Card, updates)
         db.session.commit()
-        logger.info("CSV imported successfully")
+        logger.info(f"import_collection_csv: Successfully imported CSV with {len(updates)} updates")
 
         # Invalidate related caches
         current_app.redis_client.delete("collection:*")
         current_app.redis_client.delete("collection_sets:*")
         current_app.redis_client.delete("collection_stats")
+        logger.debug("import_collection_csv: Invalidated related caches")
 
-        return jsonify({"message": "CSV imported successfully"}), 200
+        return jsonify({"message": "CSV imported successfully", "updates": len(updates)}), 200
 
     except ValueError as e:
-        logger.error(f"Error processing CSV: {str(e)}")
+        logger.error(f"import_collection_csv: Error processing CSV: {str(e)}")
         return jsonify({"error": str(e)}), 400
     except SQLAlchemyError as e:
         db.session.rollback()
-        logger.error(f"Database error during CSV import: {str(e)}")
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        logger.error(f"import_collection_csv: Database error during CSV import: {str(e)}")
+        return jsonify({"error": "A database error occurred. Please try again later."}), 500
 
 def process_collection_csv(df):
     updates = []
@@ -940,3 +940,31 @@ def get_cache_stats():
         'hit_rate': f"{hit_rate:.2f}%",
         'avg_response_time': f"{avg_response_time:.4f} seconds"
     })
+
+@card_routes.route('/collection/sets/<string:set_code>', methods=['GET'])
+def get_collection_set(set_code):
+    try:
+        # Fetch the set instance
+        set_instance = Set.query.filter_by(code=set_code).first()
+        if not set_instance:
+            return jsonify({"error": "Set not found."}), 404
+
+        # Serialize set data
+        set_data = set_instance.to_dict()
+
+        # Include additional data such as collection counts
+        set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
+        set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
+
+        # Fetch cards for this set
+        cards = Card.query.filter_by(set_code=set_code).all()
+        set_data['cards'] = [card.to_dict() for card in cards]
+
+        return jsonify({
+            "set": set_data,
+            "cards": set_data['cards']
+        }), 200
+    except Exception as e:
+        error_message = f"An error occurred while fetching the set: {str(e)}"
+        logger.exception(error_message)
+        return jsonify({"error": error_message}), 500
