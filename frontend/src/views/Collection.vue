@@ -17,9 +17,9 @@
       <SetListControls
         :setTypes="setTypes"
         :totalPages="totalPages"
-        @update-filters="updateFilters"
-        @update-sorting="updateSorting"
-        @update-per-page="updatePerPage"
+        @update-filters="handleUpdateFilters"
+        @update-sorting="handleUpdateSorting"
+        @update-per-page="handleUpdatePerPage"
         class="controls bg-card p-4 rounded-lg shadow-md mb-4"
       />
       <div v-if="loading" class="loading text-center mt-4" role="status">
@@ -128,6 +128,7 @@ const sets = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const filters = ref({
+  name: "",
   set_type: [
     "core",
     "expansion",
@@ -168,7 +169,8 @@ const fetchSets = async () => {
     const response = await axios.get("/api/collection/sets", {
       params: {
         ...filters.value,
-        ...sorting.value,
+        sort_by: sorting.value.sortBy,
+        sort_order: sorting.value.sortOrder,
         page: currentPage.value,
         per_page: perPage.value,
       },
@@ -184,7 +186,7 @@ const fetchSets = async () => {
   }
 };
 
-const updateFilters = (newFilters) => {
+const handleUpdateFilters = (newFilters) => {
   filters.value = { ...filters.value, ...newFilters };
   if (newFilters.set_type) {
     filters.value.set_type =
@@ -194,12 +196,12 @@ const updateFilters = (newFilters) => {
   fetchSets();
 };
 
-const updateSorting = (newSorting) => {
+const handleUpdateSorting = (newSorting) => {
   sorting.value = { ...newSorting };
   fetchSets();
 };
 
-const updatePerPage = (newPerPage) => {
+const handleUpdatePerPage = (newPerPage) => {
   perPage.value = newPerPage;
   currentPage.value = 1;
   fetchSets();
