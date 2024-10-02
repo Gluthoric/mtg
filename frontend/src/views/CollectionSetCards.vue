@@ -285,6 +285,7 @@ const route = useRoute();
 const setCode = ref(route.params.setCode);
 const setName = ref("");
 const cards = ref([]);
+const originalCards = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const filters = ref({
@@ -334,8 +335,9 @@ const fetchSetDetails = async () => {
   try {
     const response = await axios.get(`/api/collection/sets/${setCode.value}`);
     setName.value = response.data.set.name;
-    cards.value = response.data.cards;
+    originalCards.value = response.data.cards;
     statistics.value = response.data.set.statistics;
+    applyFilters(); // Apply filters after fetching the data
   } catch (err) {
     console.error("Error fetching set details:", err);
     error.value = "Failed to load set details";
@@ -346,7 +348,45 @@ const fetchSetDetails = async () => {
 
 const updateFilters = (newFilters) => {
   filters.value = { ...filters.value, ...newFilters };
-  fetchSetDetails();
+  applyFilters();
+};
+
+const applyFilters = () => {
+  const filteredCards = originalCards.value.filter((card) => {
+    if (
+      filters.value.name &&
+      !card.name.toLowerCase().includes(filters.value.name.toLowerCase())
+    )
+      return false;
+    if (
+      filters.value.rarities.length &&
+      !filters.value.rarities.includes(card.rarity)
+    )
+      return false;
+    if (
+      filters.value.colors.length &&
+      !filters.value.colors.every((color) => card.colors.includes(color))
+    )
+      return false;
+    if (
+      filters.value.missing &&
+      (card.quantity_collection_regular > 0 ||
+        card.quantity_collection_foil > 0)
+    )
+      return false;
+    if (
+      filters.value.types.length &&
+      !filters.value.types.some((type) =>
+        card.type_line.toLowerCase().includes(type.toLowerCase()),
+      )
+    )
+      return false;
+    if (filters.value.keyword && !card.keywords.includes(filters.value.keyword))
+      return false;
+    return true;
+  });
+
+  cards.value = filteredCards;
 };
 
 const updateCardsPerRow = (newCardsPerRow) => {
@@ -359,6 +399,14 @@ watch(
     setCode.value = newSetCode;
     fetchSetDetails();
   },
+);
+
+watch(
+  () => filters.value,
+  () => {
+    applyFilters();
+  },
+  { deep: true },
 );
 
 onMounted(() => {
@@ -437,7 +485,13 @@ const updateQuantity = async (card, type, delta = 0) => {
             quantity_foil: newQuantity,
           };
     const response = await axios.put(`/api/collection/${card.id}`, payload);
-    Object.assign(card, response.data); // Update card data
+    const updatedCard = response.data;
+    // Update card data in originalCards
+    const index = originalCards.value.findIndex((c) => c.id === card.id);
+    if (index !== -1) {
+      originalCards.value[index] = updatedCard;
+    }
+    applyFilters(); // Re-apply filters to update the displayed cards
   } catch (err) {
     console.error("Error updating quantity:", err);
     alert("Failed to update quantity. Please try again.");

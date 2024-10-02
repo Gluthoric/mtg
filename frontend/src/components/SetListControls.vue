@@ -14,7 +14,9 @@
         </div>
 
         <div class="filter-section">
-          <label class="block text-sm font-medium mb-2 text-center">Set Types</label>
+          <label class="block text-sm font-medium mb-2 text-center"
+            >Set Types</label
+          >
           <div class="flex flex-wrap justify-center gap-2">
             <button
               v-for="type in setTypes"
@@ -28,14 +30,16 @@
                 'hover:bg-primary hover:text-white transition-colors duration-200',
               ]"
             >
-              {{ capitalize(type.replace('_', ' ')) }}
+              {{ capitalize(type.replace("_", " ")) }}
             </button>
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="sort-section">
-            <label for="sort-select" class="block text-sm font-medium mb-2">Sort By</label>
+            <label for="sort-select" class="block text-sm font-medium mb-2"
+              >Sort By</label
+            >
             <select
               id="sort-select"
               v-model="selectedSortOption"
@@ -53,7 +57,9 @@
           </div>
 
           <div class="pagination-section">
-            <label for="per-page-select" class="block text-sm font-medium mb-2">Per Page</label>
+            <label for="per-page-select" class="block text-sm font-medium mb-2"
+              >Per Page</label
+            >
             <select
               id="per-page-select"
               v-model="localPerPage"
@@ -105,8 +111,14 @@ export default {
         { value: "released_at-asc", label: "Release Date (Oldest)" },
         { value: "name-asc", label: "Name (A-Z)" },
         { value: "name-desc", label: "Name (Z-A)" },
-        { value: "collection_count-desc", label: "Collection Count (High to Low)" },
-        { value: "collection_count-asc", label: "Collection Count (Low to High)" },
+        {
+          value: "collection_count-desc",
+          label: "Collection Count (High to Low)",
+        },
+        {
+          value: "collection_count-asc",
+          label: "Collection Count (Low to High)",
+        },
       ],
       localPerPage: 50,
       perPageOptions: [20, 50, 100, 200],
@@ -152,7 +164,7 @@ export default {
     },
   },
   watch: {
-    'localFilters.name': {
+    "localFilters.name": {
       handler() {
         this.debouncedEmitChanges();
       },

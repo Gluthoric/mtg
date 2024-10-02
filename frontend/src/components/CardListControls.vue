@@ -4,10 +4,9 @@
       <!-- Name Filter -->
       <div class="filter-section">
         <input
-          v-model="localFilters.name"
-          @input="emitFilters"
+          v-model="filters.name"
           placeholder="Search by name"
-          class="w-full p-2 border rounded-md bg-input-background text-white focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full p-2 border rounded-md bg-input-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
@@ -22,9 +21,9 @@
             :class="[
               'px-3 py-1 rounded-full capitalize text-sm',
               isRaritySelected(rarity)
-                ? 'bg-primary text-white'
-                : 'bg-gray-800 text-white hover:bg-gray-700',
-              'hover:text-white transition-colors duration-200',
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary-foreground text-secondary hover:bg-secondary-hover',
+              'hover:text-secondary-foreground transition-colors duration-200',
             ]"
           >
             {{ rarity }}
@@ -65,9 +64,9 @@
             :class="[
               'px-3 py-1 rounded-full capitalize text-sm',
               isTypeSelected(type)
-                ? 'bg-primary text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
-              'hover:bg-primary hover:text-white transition-colors duration-200',
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary-foreground text-secondary hover:bg-secondary-hover',
+              'hover:bg-primary hover:text-primary-foreground transition-colors duration-200',
             ]"
           >
             {{ type }}
@@ -88,17 +87,17 @@
             @focus="showKeywordDropdown = true"
             @input="filterKeywords"
             placeholder="Select keyword"
-            class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            class="w-full p-2 border rounded-md bg-input-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <ul
             v-if="showKeywordDropdown"
-            class="absolute z-10 bg-white text-black w-full mt-1 max-h-40 overflow-auto border rounded-md"
+            class="absolute z-10 bg-background text-foreground w-full mt-1 max-h-40 overflow-auto border rounded-md"
           >
             <li
               v-for="keyword in filteredKeywords"
               :key="keyword"
               @click="selectKeyword(keyword)"
-              class="px-4 py-2 hover:bg-gray-200 cursor-pointer"
+              class="px-4 py-2 hover:bg-secondary cursor-pointer"
             >
               {{ keyword }}
             </li>
@@ -114,14 +113,13 @@
         <input
           id="cards-per-row-slider"
           type="range"
-          v-model="localCardsPerRow"
+          v-model="cardsPerRow"
           min="5"
           max="12"
           step="1"
           class="w-full"
-          @input="emitCardsPerRow"
         />
-        <div class="text-sm mt-1">{{ localCardsPerRow }} cards per row</div>
+        <div class="text-sm mt-1">{{ cardsPerRow }} cards per row</div>
       </div>
 
       <!-- Missing Filter Toggle -->
@@ -132,8 +130,7 @@
             <div class="toggle-button"></div>
             <input
               type="checkbox"
-              v-model="localFilters.missing"
-              @change="emitFilters"
+              v-model="filters.missing"
               class="toggle-checkbox"
             />
           </div>
@@ -143,95 +140,76 @@
   </div>
 </template>
 
-<script>
-import debounce from "lodash.debounce";
+<script lang="ts">
+import { defineComponent, ref, computed, watch } from "vue";
+import { vClickOutside } from "@vueuse/core";
 
-export default {
+interface Filters {
+  name: string;
+  rarities: string[];
+  colors: string[];
+  missing: boolean;
+  types: string[];
+  keyword: string;
+}
+
+export default defineComponent({
   name: "CardListControls",
+  directives: {
+    clickOutside: vClickOutside,
+  },
   props: {
-    filters: {
-      type: Object,
-      default: () => ({
-        name: "",
-        rarities: [],
-        colors: [],
-        missing: false,
-        types: [],
-        keyword: "",
-      }),
+    modelValue: {
+      type: Object as () => Filters,
+      required: true,
     },
-    cardsPerRow: {
+    modelCardsPerRow: {
       type: Number,
       default: 6,
     },
   },
-  data() {
-    return {
-      localFilters: { ...this.filters },
-      localCardsPerRow: this.cardsPerRow,
-      availableColors: ["W", "U", "B", "R", "G", "C"],
-      availableRarities: ["common", "uncommon", "rare", "mythic"],
-      availableTypes: [
-        "Creature",
-        "Artifact",
-        "Enchantment",
-        "Instant",
-        "Sorcery",
-        "Planeswalker",
-        "Land",
-      ],
-      availableKeywords: [
-        "Flying",
-        "Haste",
-        "First strike",
-        "Trample",
-        "Vigilance",
-      ],
-      keywordSearch: "",
-      showKeywordDropdown: false,
-      filteredKeywords: [],
-    };
-  },
-  created() {
-    this.debouncedEmitFilters = debounce(() => {
-      this.$emit("update-filters", { ...this.localFilters });
-    }, 300);
-    this.filteredKeywords = this.availableKeywords;
-  },
-  methods: {
-    emitFilters() {
-      console.log('Filters:', this.localFilters);
-      this.debouncedEmitFilters();
-    },
-    emitCardsPerRow() {
-      this.$emit("update-cards-per-row", this.localCardsPerRow);
-    },
-    toggleRarity(rarity) {
-      const index = this.localFilters.rarities.indexOf(rarity);
-      if (index > -1) {
-        this.localFilters.rarities.splice(index, 1);
-      } else {
-        this.localFilters.rarities.push(rarity);
-      }
-      this.emitFilters();
-    },
-    isRaritySelected(rarity) {
-      return this.localFilters.rarities.includes(rarity);
-    },
-    toggleColor(color) {
-      const index = this.localFilters.colors.indexOf(color);
-      if (index > -1) {
-        this.localFilters.colors.splice(index, 1);
-      } else {
-        this.localFilters.colors.push(color);
-      }
-      this.emitFilters();
-    },
-    isColorSelected(color) {
-      return this.localFilters.colors.includes(color);
-    },
-    colorClass(color) {
-      const colorMap = {
+  emits: ["update:modelValue", "update:modelCardsPerRow"],
+  setup(props, { emit }) {
+    const filters = ref<Filters>({ ...props.modelValue });
+    const cardsPerRow = ref(props.modelCardsPerRow);
+
+    const availableColors = ["W", "U", "B", "R", "G", "C"];
+    const availableRarities = ["common", "uncommon", "rare", "mythic"];
+    const availableTypes = [
+      "Creature",
+      "Artifact",
+      "Enchantment",
+      "Instant",
+      "Sorcery",
+      "Planeswalker",
+      "Land",
+    ];
+    const availableKeywords = [
+      "Flying",
+      "Haste",
+      "First strike",
+      "Trample",
+      "Vigilance",
+    ];
+
+    const keywordSearch = ref("");
+    const showKeywordDropdown = ref(false);
+    const filteredKeywords = ref(availableKeywords);
+
+    const isRaritySelected = computed(
+      () => (rarity: string) => filters.value.rarities.includes(rarity),
+    );
+
+    const isColorSelected = computed(
+      () => (color: string) => filters.value.colors.includes(color),
+    );
+
+    const isTypeSelected = computed(
+      () => (type: string) => filters.value.types.includes(type),
+    );
+
+    const colorClass = (color: string) => {
+      const colorMap: Record<string, string> = {
         W: "bg-white text-black",
         U: "bg-blue-500 text-white",
         B: "bg-black text-white",
@@ -240,9 +218,10 @@ export default {
         C: "bg-gray-500 text-white",
       };
       return colorMap[color] || "bg-gray-500 text-white";
-    },
-    getColorName(color) {
-      const colorNames = {
+    };
+
+    const getColorName = (color: string) => {
+      const colorNames: Record<string, string> = {
         W: "White",
         U: "Blue",
         B: "Black",
@@ -251,51 +230,82 @@ export default {
         C: "Colorless",
       };
       return colorNames[color] || color;
-    },
-    toggleType(type) {
-      const index = this.localFilters.types.indexOf(type);
+    };
+
+    const toggleRarity = (rarity: string) => {
+      const index = filters.value.rarities.indexOf(rarity);
       if (index > -1) {
-        this.localFilters.types.splice(index, 1);
+        filters.value.rarities.splice(index, 1);
       } else {
-        this.localFilters.types.push(type);
+        filters.value.rarities.push(rarity);
       }
-      this.emitFilters();
-    },
-    isTypeSelected(type) {
-      return this.localFilters.types.includes(type);
-    },
-    filterKeywords() {
-      const search = this.keywordSearch.toLowerCase();
-      this.filteredKeywords = this.availableKeywords.filter((kw) =>
+    };
+
+    const toggleColor = (color: string) => {
+      const index = filters.value.colors.indexOf(color);
+      if (index > -1) {
+        filters.value.colors.splice(index, 1);
+      } else {
+        filters.value.colors.push(color);
+      }
+    };
+
+    const toggleType = (type: string) => {
+      const index = filters.value.types.indexOf(type);
+      if (index > -1) {
+        filters.value.types.splice(index, 1);
+      } else {
+        filters.value.types.push(type);
+      }
+    };
+
+    const filterKeywords = () => {
+      const search = keywordSearch.value.toLowerCase();
+      filteredKeywords.value = availableKeywords.filter((kw) =>
         kw.toLowerCase().includes(search),
       );
-    },
-    selectKeyword(keyword) {
-      this.localFilters.keyword = keyword;
-      this.keywordSearch = keyword;
-      this.showKeywordDropdown = false;
-      this.emitFilters();
-    },
-  },
-  beforeUnmount() {
-    this.debouncedEmitFilters.cancel();
-  },
-  directives: {
-    clickOutside: {
-      beforeMount(el, binding) {
-        el.clickOutsideEvent = function (event) {
-          if (!(el == event.target || el.contains(event.target))) {
-            binding.value(event);
-          }
-        };
-        document.body.addEventListener("click", el.clickOutsideEvent);
+    };
+
+    const selectKeyword = (keyword: string) => {
+      filters.value.keyword = keyword;
+      keywordSearch.value = keyword;
+      showKeywordDropdown.value = false;
+    };
+
+    watch(
+      filters,
+      (newFilters) => {
+        emit("update:modelValue", newFilters);
       },
-      unmounted(el) {
-        document.body.removeEventListener("click", el.clickOutsideEvent);
-      },
-    },
+      { deep: true },
+    );
+
+    watch(cardsPerRow, (newCardsPerRow) => {
+      emit("update:modelCardsPerRow", newCardsPerRow);
+    });
+
+    return {
+      filters,
+      cardsPerRow,
+      availableColors,
+      availableRarities,
+      availableTypes,
+      keywordSearch,
+      showKeywordDropdown,
+      filteredKeywords,
+      isRaritySelected,
+      isColorSelected,
+      isTypeSelected,
+      colorClass,
+      getColorName,
+      toggleRarity,
+      toggleColor,
+      toggleType,
+      filterKeywords,
+      selectKeyword,
+    };
   },
-};
+});
 </script>
 
 <style scoped>
