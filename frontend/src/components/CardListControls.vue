@@ -21,8 +21,10 @@
             @click="toggleRarity(rarity)"
             :class="[
               'px-3 py-1 rounded-full capitalize text-sm',
-              isRaritySelected(rarity) ? 'bg-primary text-white' : 'bg-gray-800 text-white hover:bg-gray-700',
-              'hover:text-white transition-colors duration-200'
+              isRaritySelected(rarity)
+                ? 'bg-primary text-white'
+                : 'bg-gray-800 text-white hover:bg-gray-700',
+              'hover:text-white transition-colors duration-200',
             ]"
           >
             {{ rarity }}
@@ -41,8 +43,10 @@
             :class="[
               'w-8 h-8 rounded-full flex items-center justify-center',
               colorClass(color),
-              isColorSelected(color) ? 'ring-2 ring-offset-2 ring-primary' : 'opacity-50 hover:opacity-75',
-              'hover:opacity-100 transition-opacity duration-200'
+              isColorSelected(color)
+                ? 'ring-2 ring-offset-2 ring-primary'
+                : 'opacity-50 hover:opacity-75',
+              'hover:opacity-100 transition-opacity duration-200',
             ]"
           >
             <span class="sr-only">{{ getColorName(color) }}</span>
@@ -60,8 +64,10 @@
             @click="toggleType(type)"
             :class="[
               'px-3 py-1 rounded-full capitalize text-sm',
-              isTypeSelected(type) ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
-              'hover:bg-primary hover:text-white transition-colors duration-200'
+              isTypeSelected(type)
+                ? 'bg-primary text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
+              'hover:bg-primary hover:text-white transition-colors duration-200',
             ]"
           >
             {{ type }}
@@ -70,7 +76,10 @@
       </div>
 
       <!-- Keywords Filter -->
-      <div class="filter-section relative" v-click-outside="() => showKeywordDropdown = false">
+      <div
+        class="filter-section relative"
+        v-click-outside="() => (showKeywordDropdown = false)"
+      >
         <label class="block text-sm font-medium mb-2">Keywords</label>
         <div class="relative">
           <input
@@ -81,7 +90,10 @@
             placeholder="Select keyword"
             class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
           />
-          <ul v-if="showKeywordDropdown" class="absolute z-10 bg-white text-black w-full mt-1 max-h-40 overflow-auto border rounded-md">
+          <ul
+            v-if="showKeywordDropdown"
+            class="absolute z-10 bg-white text-black w-full mt-1 max-h-40 overflow-auto border rounded-md"
+          >
             <li
               v-for="keyword in filteredKeywords"
               :key="keyword"
@@ -112,7 +124,9 @@
 
       <!-- Cards Per Row Slider -->
       <div class="filter-section">
-        <label for="cards-per-row-slider" class="block text-sm font-medium mb-2">Cards per row</label>
+        <label for="cards-per-row-slider" class="block text-sm font-medium mb-2"
+          >Cards per row</label
+        >
         <input
           id="cards-per-row-slider"
           type="range"
@@ -130,141 +144,157 @@
 </template>
 
 <script>
-import debounce from 'lodash.debounce'
+import debounce from "lodash.debounce";
 
 export default {
-  name: 'CardListControls',
+  name: "CardListControls",
   props: {
     filters: {
       type: Object,
       default: () => ({
-        name: '',
+        name: "",
         rarities: [],
         colors: [],
         missing: false,
         types: [],
-        keyword: ''
-      })
+        keyword: "",
+      }),
     },
     cardsPerRow: {
       type: Number,
-      default: 6
-    }
+      default: 6,
+    },
   },
   data() {
     return {
       localFilters: { ...this.filters },
       localCardsPerRow: this.cardsPerRow,
-      availableColors: ['W', 'U', 'B', 'R', 'G', 'C'],
-      availableRarities: ['common', 'uncommon', 'rare', 'mythic'],
-      availableTypes: ['Creature', 'Artifact', 'Enchantment', 'Instant', 'Sorcery', 'Planeswalker', 'Land'],
-      availableKeywords: ['Flying', 'Haste', 'First strike', 'Trample', 'Vigilance'],
-      keywordSearch: '',
+      availableColors: ["W", "U", "B", "R", "G", "C"],
+      availableRarities: ["common", "uncommon", "rare", "mythic"],
+      availableTypes: [
+        "Creature",
+        "Artifact",
+        "Enchantment",
+        "Instant",
+        "Sorcery",
+        "Planeswalker",
+        "Land",
+      ],
+      availableKeywords: [
+        "Flying",
+        "Haste",
+        "First strike",
+        "Trample",
+        "Vigilance",
+      ],
+      keywordSearch: "",
       showKeywordDropdown: false,
       filteredKeywords: [],
-    }
+    };
   },
   created() {
     this.debouncedEmitFilters = debounce(() => {
-      this.$emit('update-filters', { ...this.localFilters })
-    }, 300)
-    this.filteredKeywords = this.availableKeywords
+      this.$emit("update-filters", { ...this.localFilters });
+    }, 300);
+    this.filteredKeywords = this.availableKeywords;
   },
   methods: {
     emitFilters() {
-      this.debouncedEmitFilters()
+      this.debouncedEmitFilters();
     },
     emitCardsPerRow() {
-      this.$emit('update-cards-per-row', this.localCardsPerRow)
+      this.$emit("update-cards-per-row", this.localCardsPerRow);
     },
     toggleRarity(rarity) {
-      const index = this.localFilters.rarities.indexOf(rarity)
+      const index = this.localFilters.rarities.indexOf(rarity);
       if (index > -1) {
-        this.localFilters.rarities.splice(index, 1)
+        this.localFilters.rarities.splice(index, 1);
       } else {
-        this.localFilters.rarities.push(rarity)
+        this.localFilters.rarities.push(rarity);
       }
-      this.emitFilters()
+      this.emitFilters();
     },
     isRaritySelected(rarity) {
-      return this.localFilters.rarities.includes(rarity)
+      return this.localFilters.rarities.includes(rarity);
     },
     toggleColor(color) {
-      const index = this.localFilters.colors.indexOf(color)
+      const index = this.localFilters.colors.indexOf(color);
       if (index > -1) {
-        this.localFilters.colors.splice(index, 1)
+        this.localFilters.colors.splice(index, 1);
       } else {
-        this.localFilters.colors.push(color)
+        this.localFilters.colors.push(color);
       }
-      this.emitFilters()
+      this.emitFilters();
     },
     isColorSelected(color) {
-      return this.localFilters.colors.includes(color)
+      return this.localFilters.colors.includes(color);
     },
     colorClass(color) {
       const colorMap = {
-        W: 'bg-white text-black',
-        U: 'bg-blue-500 text-white',
-        B: 'bg-black text-white',
-        R: 'bg-red-500 text-white',
-        G: 'bg-green-500 text-white',
-        C: 'bg-gray-500 text-white',
-      }
-      return colorMap[color] || 'bg-gray-500 text-white'
+        W: "bg-white text-black",
+        U: "bg-blue-500 text-white",
+        B: "bg-black text-white",
+        R: "bg-red-500 text-white",
+        G: "bg-green-500 text-white",
+        C: "bg-gray-500 text-white",
+      };
+      return colorMap[color] || "bg-gray-500 text-white";
     },
     getColorName(color) {
       const colorNames = {
-        'W': 'White',
-        'U': 'Blue',
-        'B': 'Black',
-        'R': 'Red',
-        'G': 'Green',
-        'C': 'Colorless',
+        W: "White",
+        U: "Blue",
+        B: "Black",
+        R: "Red",
+        G: "Green",
+        C: "Colorless",
       };
       return colorNames[color] || color;
     },
     toggleType(type) {
-      const index = this.localFilters.types.indexOf(type)
+      const index = this.localFilters.types.indexOf(type);
       if (index > -1) {
-        this.localFilters.types.splice(index, 1)
+        this.localFilters.types.splice(index, 1);
       } else {
-        this.localFilters.types.push(type)
+        this.localFilters.types.push(type);
       }
-      this.emitFilters()
+      this.emitFilters();
     },
     isTypeSelected(type) {
-      return this.localFilters.types.includes(type)
+      return this.localFilters.types.includes(type);
     },
     filterKeywords() {
-      const search = this.keywordSearch.toLowerCase()
-      this.filteredKeywords = this.availableKeywords.filter(kw => kw.toLowerCase().includes(search))
+      const search = this.keywordSearch.toLowerCase();
+      this.filteredKeywords = this.availableKeywords.filter((kw) =>
+        kw.toLowerCase().includes(search),
+      );
     },
     selectKeyword(keyword) {
-      this.localFilters.keyword = keyword
-      this.keywordSearch = keyword
-      this.showKeywordDropdown = false
-      this.emitFilters()
+      this.localFilters.keyword = keyword;
+      this.keywordSearch = keyword;
+      this.showKeywordDropdown = false;
+      this.emitFilters();
     },
   },
   beforeUnmount() {
-    this.debouncedEmitFilters.cancel()
+    this.debouncedEmitFilters.cancel();
   },
   directives: {
     clickOutside: {
       beforeMount(el, binding) {
-        el.clickOutsideEvent = function(event) {
+        el.clickOutsideEvent = function (event) {
           if (!(el == event.target || el.contains(event.target))) {
-            binding.value(event)
+            binding.value(event);
           }
-        }
-        document.body.addEventListener('click', el.clickOutsideEvent)
+        };
+        document.body.addEventListener("click", el.clickOutsideEvent);
       },
       unmounted(el) {
-        document.body.removeEventListener('click', el.clickOutsideEvent)
+        document.body.removeEventListener("click", el.clickOutsideEvent);
       },
     },
   },
-}
+};
 </script>
 
 <style scoped>

@@ -12,19 +12,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 
 const props = defineProps({
   to: { type: [String, Object], required: true },
-  icon: { type: String, required: true }
-})
+  icon: { type: String, required: true },
+});
 
-const route = useRoute()
+const route = useRoute();
 const isActive = computed(() => {
-  if (typeof props.to === 'string') {
-    return route.path === props.to
+  if (typeof props.to === "string") {
+    return route.path === props.to;
   }
-  return route.path === props.to.path
-})
+  return route.path === props.to.path;
+});
 </script>

@@ -1,12 +1,19 @@
 <template>
   <div class="bg-background text-foreground min-h-screen">
     <nav class="mb-4 flex justify-center space-x-4 p-4">
-      <router-link v-for="link in navLinks" :key="link.to" :to="link.to" class="text-primary hover:underline">
+      <router-link
+        v-for="link in navLinks"
+        :key="link.to"
+        :to="link.to"
+        class="text-primary hover:underline"
+      >
         {{ link.text }}
       </router-link>
     </nav>
     <div class="px-4 md:px-6 lg:px-8">
-      <h1 class="text-center mb-4 text-2xl font-bold text-primary">My Collection</h1>
+      <h1 class="text-center mb-4 text-2xl font-bold text-primary">
+        My Collection
+      </h1>
       <SetListControls
         :setTypes="setTypes"
         :totalPages="totalPages"
@@ -17,9 +24,17 @@
       />
       <div v-if="loading" class="loading text-center mt-4" role="status">
         <span class="sr-only">Loading...</span>
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div
+          class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+        ></div>
       </div>
-      <div v-else-if="error" class="error text-center mt-4 text-destructive" role="alert">{{ error }}</div>
+      <div
+        v-else-if="error"
+        class="error text-center mt-4 text-destructive"
+        role="alert"
+      >
+        {{ error }}
+      </div>
       <div v-else-if="sets.length === 0" class="text-center mt-4">
         <p>No sets found in your collection.</p>
       </div>
@@ -29,20 +44,42 @@
         tag="div"
         class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
       >
-        <div v-for="set in sets" :key="set.code"
-             class="card p-4 rounded-lg shadow-md transition-all duration-300 ease-in-out hover:scale-105"
-             :style="{ backgroundColor: set.background_color || '#333333', color: set.text_color || '#ffffff' }">
-          <router-link :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }" class="block">
+        <div
+          v-for="set in sets"
+          :key="set.code"
+          class="card p-4 rounded-lg shadow-md transition-all duration-300 ease-in-out hover:scale-105"
+          :style="{
+            backgroundColor: set.background_color || '#333333',
+            color: set.text_color || '#ffffff',
+          }"
+        >
+          <router-link
+            :to="{ name: 'CollectionSetCards', params: { setCode: set.code } }"
+            class="block"
+          >
             <div class="flex items-center mb-2">
-              <img :src="set.icon_svg_uri" :alt="set.name" loading="lazy" class="w-8 h-8 mr-2" />
+              <img
+                :src="set.icon_svg_uri"
+                :alt="set.name"
+                loading="lazy"
+                class="w-8 h-8 mr-2"
+              />
               <h3 class="text-sm font-semibold truncate">{{ set.name }}</h3>
             </div>
-            <div class="text-xs opacity-75 mb-1">{{ formatDate(set.released_at) }}</div>
-            <div class="flex justify-between items-center mb-1">
-              <span class="text-xs">{{ set.collection_count }} / {{ set.card_count }}</span>
-              <span class="text-xs font-semibold">{{ Math.round(set.collection_percentage) }}%</span>
+            <div class="text-xs opacity-75 mb-1">
+              {{ formatDate(set.released_at) }}
             </div>
-            <div class="progress-container bg-opacity-30 bg-black rounded-full overflow-hidden">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-xs"
+                >{{ set.collection_count }} / {{ set.card_count }}</span
+              >
+              <span class="text-xs font-semibold"
+                >{{ Math.round(set.collection_percentage) }}%</span
+              >
+            </div>
+            <div
+              class="progress-container bg-opacity-30 bg-black rounded-full overflow-hidden"
+            >
               <div
                 class="progress-bar h-1 transition-all duration-300 ease-in-out bg-white"
                 :style="{ width: `${set.collection_percentage}%` }"
@@ -53,7 +90,8 @@
               ></div>
             </div>
             <div class="text-xs mt-2">
-              <span class="font-semibold">Value:</span> {{ formatCurrency(set.total_value) }}
+              <span class="font-semibold">Value:</span>
+              {{ formatCurrency(set.total_value) }}
             </div>
           </router-link>
         </div>
@@ -66,7 +104,9 @@
         >
           Previous
         </button>
-        <span class="text-lg font-semibold">Page {{ currentPage }} of {{ totalPages }}</span>
+        <span class="text-lg font-semibold"
+          >Page {{ currentPage }} of {{ totalPages }}</span
+        >
         <button
           @click="changePage(1)"
           :disabled="currentPage === totalPages"
@@ -80,92 +120,111 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
-import SetListControls from '../components/SetListControls.vue'
+import { ref, onMounted } from "vue";
+import axios from "axios";
+import SetListControls from "../components/SetListControls.vue";
 
-const sets = ref([])
-const loading = ref(true)
-const error = ref(null)
+const sets = ref([]);
+const loading = ref(true);
+const error = ref(null);
 const filters = ref({
-  set_type: ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander'],
-})
-const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
-const currentPage = ref(1)
-const totalPages = ref(1)
-const perPage = ref(50)
+  set_type: [
+    "core",
+    "expansion",
+    "masters",
+    "draft_innovation",
+    "funny",
+    "commander",
+  ],
+});
+const sorting = ref({ sortBy: "released_at", sortOrder: "desc" });
+const currentPage = ref(1);
+const totalPages = ref(1);
+const perPage = ref(50);
 const setTypes = ref([
-  'core', 'expansion', 'masters', 'draft_innovation',
-  'commander', 'starter', 'box', 'promo', 'token', 'memorabilia'
-])
+  "core",
+  "expansion",
+  "masters",
+  "draft_innovation",
+  "commander",
+  "starter",
+  "box",
+  "promo",
+  "token",
+  "memorabilia",
+]);
 
 const navLinks = [
-  { to: '/', text: 'Home' },
-  { to: '/collection', text: 'Collection' },
-  { to: '/kiosk', text: 'Kiosk' },
-  { to: '/import', text: 'Import' }
-]
+  { to: "/", text: "Home" },
+  { to: "/collection", text: "Collection" },
+  { to: "/kiosk", text: "Kiosk" },
+  { to: "/import", text: "Import" },
+];
 
 const fetchSets = async () => {
-  loading.value = true
-  error.value = null
+  loading.value = true;
+  error.value = null;
   try {
-    const response = await axios.get('/api/collection/sets', {
+    const response = await axios.get("/api/collection/sets", {
       params: {
         ...filters.value,
         ...sorting.value,
         page: currentPage.value,
-        per_page: perPage.value
-      }
-    })
-    sets.value = response.data.sets
-    totalPages.value = response.data.pages
-    currentPage.value = response.data.current_page
+        per_page: perPage.value,
+      },
+    });
+    sets.value = response.data.sets;
+    totalPages.value = response.data.pages;
+    currentPage.value = response.data.current_page;
   } catch (err) {
-    console.error('Error fetching collection sets:', err)
-    error.value = 'Failed to load collection sets'
+    console.error("Error fetching collection sets:", err);
+    error.value = "Failed to load collection sets";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const updateFilters = (newFilters) => {
-  filters.value = { ...filters.value, ...newFilters }
+  filters.value = { ...filters.value, ...newFilters };
   if (newFilters.set_type) {
-    filters.value.set_type = newFilters.set_type.length > 0 ? newFilters.set_type : undefined
+    filters.value.set_type =
+      newFilters.set_type.length > 0 ? newFilters.set_type : undefined;
   }
-  currentPage.value = 1
-  fetchSets()
-}
+  currentPage.value = 1;
+  fetchSets();
+};
 
 const updateSorting = (newSorting) => {
-  sorting.value = { ...newSorting }
-  fetchSets()
-}
+  sorting.value = { ...newSorting };
+  fetchSets();
+};
 
 const updatePerPage = (newPerPage) => {
-  perPage.value = newPerPage
-  currentPage.value = 1
-  fetchSets()
-}
+  perPage.value = newPerPage;
+  currentPage.value = 1;
+  fetchSets();
+};
 
 const changePage = (delta) => {
-  const newPage = currentPage.value + delta
+  const newPage = currentPage.value + delta;
   if (newPage >= 1 && newPage <= totalPages.value) {
-    currentPage.value = newPage
-    fetchSets()
+    currentPage.value = newPage;
+    fetchSets();
   }
-}
+};
 
 const formatDate = (dateString) => {
-  return dateString ? new Date(dateString).getFullYear() : 'N/A'
-}
+  return dateString ? new Date(dateString).getFullYear() : "N/A";
+};
 
 const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
-}
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value || 0);
+};
 
-onMounted(fetchSets)
+onMounted(fetchSets);
 </script>
 
 <style scoped>
@@ -185,7 +244,9 @@ onMounted(fetchSets)
 
 .card:hover {
   transform: scale(1.05);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .progress-container {
