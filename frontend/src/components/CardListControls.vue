@@ -106,22 +106,6 @@
         </div>
       </div>
 
-      <!-- Missing Filter Toggle -->
-      <div class="filter-section flex items-center">
-        <label class="flex items-center">
-          <span class="mr-2 text-sm font-medium">Show Missing Cards</span>
-          <input
-            type="checkbox"
-            v-model="localFilters.missing"
-            @change="emitFilters"
-            class="toggle-checkbox"
-          />
-          <div class="toggle-slot">
-            <div class="toggle-button"></div>
-          </div>
-        </label>
-      </div>
-
       <!-- Cards Per Row Slider -->
       <div class="filter-section">
         <label for="cards-per-row-slider" class="block text-sm font-medium mb-2"
@@ -138,6 +122,22 @@
           @input="emitCardsPerRow"
         />
         <div class="text-sm mt-1">{{ localCardsPerRow }} cards per row</div>
+      </div>
+
+      <!-- Missing Filter Toggle -->
+      <div class="filter-section flex items-center">
+        <label class="flex items-center relative">
+          <span class="mr-2 text-sm font-medium">Show Missing Cards</span>
+          <div class="toggle-slot">
+            <div class="toggle-button"></div>
+            <input
+              type="checkbox"
+              v-model="localFilters.missing"
+              @change="emitFilters"
+              class="toggle-checkbox"
+            />
+          </div>
+        </label>
       </div>
     </div>
   </div>
@@ -167,7 +167,10 @@ export default {
   },
   data() {
     return {
-      localFilters: { ...this.filters },
+      localFilters: { 
+        ...this.filters,
+        missing: false 
+      },
       localCardsPerRow: this.cardsPerRow,
       availableColors: ["W", "U", "B", "R", "G", "C"],
       availableRarities: ["common", "uncommon", "rare", "mythic"],
@@ -200,6 +203,7 @@ export default {
   },
   methods: {
     emitFilters() {
+      console.log('Filters:', this.localFilters);
       this.debouncedEmitFilters();
     },
     emitCardsPerRow() {
@@ -299,8 +303,15 @@ export default {
 
 <style scoped>
 .toggle-checkbox {
-  opacity: 0;
   position: absolute;
+  top: 0;
+  left: 0;
+  width: 40px;
+  height: 20px;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
 }
 .toggle-slot {
   position: relative;
@@ -320,11 +331,11 @@ export default {
   background-color: white;
   transition: transform 0.3s ease;
 }
-.toggle-checkbox:checked + .toggle-slot {
-  background-color: #4299e1;
-}
-.toggle-checkbox:checked + .toggle-slot .toggle-button {
+.toggle-checkbox:checked + .toggle-button {
   transform: translateX(20px);
+}
+.toggle-checkbox:checked ~ .toggle-slot {
+  background-color: #4299e1;
 }
 
 input[type="range"]::-webkit-slider-thumb {

@@ -6,7 +6,7 @@ load_dotenv()
 
 class Config:
     # The base configuration class that other environments will inherit from
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI')
+    SQLALCHEMY_DATABASE_URI = 'postgresql://gluth:Caprisun1!@192.168.1.126:5432/mtg_collection_kiosk'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv('SECRET_KEY')
 

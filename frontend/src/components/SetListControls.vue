@@ -76,6 +76,8 @@
 </template>
 
 <script>
+import debounce from "lodash.debounce";
+
 export default {
   name: "SetListControls",
   props: {
@@ -122,6 +124,9 @@ export default {
       },
     },
   },
+  created() {
+    this.debouncedEmitChanges = debounce(this.emitChanges, 300);
+  },
   methods: {
     emitChanges() {
       this.$emit("update-filters", { ...this.localFilters });
@@ -149,9 +154,8 @@ export default {
   watch: {
     'localFilters.name': {
       handler() {
-        this.emitFilters();
+        this.debouncedEmitChanges();
       },
-      debounce: 300,
     },
   },
 };
