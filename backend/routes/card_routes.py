@@ -205,8 +205,6 @@ from sqlalchemy import func, cast, Float
 from sqlalchemy.orm import joinedload, subqueryload
 from sqlalchemy.sql import asc, desc
 
-# Remove the categorize_card function as it's no longer needed
-
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
     try:
@@ -218,18 +216,22 @@ def get_collection_sets():
         sort_by = request.args.get('sort_by', 'released_at', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
+        # Log received parameters
+        logger.info(f"get_collection_sets: Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+
         # Construct cache key
         cache_key = f"collection_sets:name:{name}:set_type:{','.join(set_types)}:page:{page}:per_page:{per_page}:sort_by:{sort_by}:sort_order:{sort_order}"
         cached_data = current_app.redis_client.get(cache_key)
 
         if cached_data:
+            logger.info("get_collection_sets: Returning cached data")
             return current_app.response_class(
                 response=cached_data.decode(),
                 status=200,
                 mimetype='application/json'
             )
 
-        logger.info(f"get_collection_sets: Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
+        logger.info("get_collection_sets: Cache miss, fetching data from database")
 
         # Define valid sort fields and prevent SQL injection
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
@@ -247,12 +249,27 @@ def get_collection_sets():
         # Apply sort order
         order_func = desc if sort_order.lower() == 'desc' else asc
 
-        # Build the main query to return Set instances
-        query = db.session.query(Set).outerjoin(
+        # Build a query that fetches the sets and aggregates the total card values and collection counts
+        subquery = (
+            db.session.query(
+                Card.set_code,
+                func.sum(
+                    (func.cast((Card.prices['usd'].astext), Float) * Card.quantity_collection_regular) +
+                    (func.cast((Card.prices['usd_foil'].astext), Float) * Card.quantity_collection_foil)
+                ).label('total_value')
+            )
+            .group_by(Card.set_code)
+            .subquery()
+        )
+
+        query = db.session.query(
+            Set,
+            SetCollectionCount.collection_count,
+            subquery.c.total_value
+        ).outerjoin(
             SetCollectionCount, Set.code == SetCollectionCount.set_code
-        ).options(
-            joinedload(Set.collection_count),
-            subqueryload(Set.cards)
+        ).outerjoin(
+            subquery, Set.code == subquery.c.set_code
         )
 
         # Apply filters
@@ -277,28 +294,11 @@ def get_collection_sets():
 
         # Process results
         sets_list = []
-        for set_instance in paginated_sets.items:
+        for set_instance, collection_count, total_value in paginated_sets.items:
             set_data = set_instance.to_dict()
-            set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
+            set_data['collection_count'] = collection_count if collection_count else 0
             set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
-
-            # Compute total_value
-            total_value = db.session.query(
-                func.sum(
-                    (func.cast((Card.prices['usd'].astext), Float) * Card.quantity_collection_regular) +
-                    (func.cast((Card.prices['usd_foil'].astext), Float) * Card.quantity_collection_foil)
-                )
-            ).filter(Card.set_code == set_instance.code).scalar() or 0.0
-            set_data['total_value'] = round(total_value, 2)
-
-            # Include card details directly
-            cards = set_instance.cards
-            card_data = []
-            for card in cards:
-                card_info = card.to_dict()
-                card_data.append(card_info)
-
-            set_data['cards'] = card_data  # Directly include card details
+            set_data['total_value'] = round(total_value, 2) if total_value else 0.0
             sets_list.append(set_data)
 
         # Build response
@@ -325,8 +325,6 @@ def get_collection_sets():
         error_message = f"An unexpected error occurred in get_collection_sets: {str(e)}"
         logger.exception(error_message)
         return jsonify({"error": "An internal server error occurred. Please try again later."}), 500
-
-# The rest of the code remains unchanged...
 
 @card_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
