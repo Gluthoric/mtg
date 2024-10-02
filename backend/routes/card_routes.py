@@ -5,7 +5,7 @@ import time
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, load_only, subqueryload, aliased
 from sqlalchemy import func, case, or_, distinct, Float
-from sqlalchemy.sql import func, asc, desc, text
+from sqlalchemy.sql import asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.card import Card
 from models.set import Set
@@ -13,9 +13,17 @@ from models.set_collection_count import SetCollectionCount
 from database import db
 import orjson
 from decimal import Decimal
-from utils.categorization import get_card_category_case, get_category_case
 
 card_routes = Blueprint('card_routes', __name__)
+
+def get_category_case():
+    return case(
+        (Set.set_type.in_(['core', 'expansion']), 'Standard Sets'),
+        (Set.set_type.in_(['draft_innovation', 'masters']), 'Special Sets'),
+        (Set.set_type == 'funny', 'Un-Sets'),
+        (Set.set_type == 'commander', 'Commander Sets'),
+        else_='Other'
+    )
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

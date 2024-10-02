@@ -1,326 +1,413 @@
+SELECT
+  table_name
+FROM
+  information_schema.tables
+WHERE
+  table_schema = 'public'
+  AND table_type = 'BASE TABLE';
+
 [
   {
-    "info_type": "Columns",
-    "info": "alembic_version - version_num (character varying)"
+    "table_name": "alembic_version"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - arena_id (bigint)"
+    "table_name": "sets"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - artist (text)"
-  },
-  {
-    "info_type": "Columns",
-    "info": "cards - artist_ids (jsonb)"
-  },
-  {
-    "info_type": "Columns",
-    "info": "cards - booster (boolean)"
-  },
+    "table_name": "cards"
+  }
+]
+
+SELECT
+  kcu.table_name,
+  kcu.column_name
+FROM
+  information_schema.table_constraints AS tc
+  JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
+WHERE
+  tc.constraint_type = 'PRIMARY KEY'
+  AND tc.table_schema = 'public';
+
+[
   {
-    "info_type": "Columns",
-    "info": "cards - border_color (text)"
+    "table_name": "cards",
+    "column_name": "id"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - card_back_id (text)"
+    "table_name": "alembic_version",
+    "column_name": "version_num"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - cmc (double precision)"
-  },
-  {
-    "info_type": "Columns",
-    "info": "cards - collector_number (text)"
-  },
-  {
-    "info_type": "Columns",
-    "info": "cards - color_identity (jsonb)"
-  },
+    "table_name": "sets",
+    "column_name": "code"
+  }
+]
+
+
+SELECT
+  table_name,
+  column_name,
+  data_type
+FROM
+  information_schema.columns
+WHERE
+  table_schema = 'public';
+
+
+[
   {
-    "info_type": "Columns",
-    "info": "cards - colors (jsonb)"
+    "table_name": "sets",
+    "column_name": "card_count",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - digital (boolean)"
+    "table_name": "cards",
+    "column_name": "digital",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - finishes (jsonb)"
+    "table_name": "sets",
+    "column_name": "digital",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - foil (boolean)"
+    "table_name": "cards",
+    "column_name": "multiverse_ids",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - frame (text)"
+    "table_name": "cards",
+    "column_name": "highres_image",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - frame_effects (jsonb)"
+    "table_name": "cards",
+    "column_name": "artist_ids",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - full_art (boolean)"
+    "table_name": "cards",
+    "column_name": "mtgo_id",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - games (jsonb)"
+    "table_name": "cards",
+    "column_name": "image_uris",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - highres_image (boolean)"
+    "table_name": "cards",
+    "column_name": "arena_id",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - id (text)"
+    "table_name": "cards",
+    "column_name": "full_art",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - illustration_id (text)"
+    "table_name": "cards",
+    "column_name": "textless",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - image_status (text)"
+    "table_name": "cards",
+    "column_name": "booster",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - image_uris (jsonb)"
+    "table_name": "cards",
+    "column_name": "story_spotlight",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - import_record_id (character varying)"
+    "table_name": "cards",
+    "column_name": "prices",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - keywords (jsonb)"
+    "table_name": "cards",
+    "column_name": "related_uris",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - lang (text)"
+    "table_name": "cards",
+    "column_name": "purchase_uris",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - layout (text)"
+    "table_name": "cards",
+    "column_name": "usd_price",
+    "data_type": "numeric"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - legalities (jsonb)"
+    "table_name": "cards",
+    "column_name": "usd_foil_price",
+    "data_type": "numeric"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - mana_cost (text)"
+    "table_name": "cards",
+    "column_name": "quantity_collection_regular",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - mtgo_id (bigint)"
+    "table_name": "cards",
+    "column_name": "quantity_collection_foil",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - multiverse_ids (jsonb)"
+    "table_name": "cards",
+    "column_name": "quantity_kiosk_regular",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - name (text)"
+    "table_name": "cards",
+    "column_name": "quantity_kiosk_foil",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - nonfoil (boolean)"
+    "table_name": "cards",
+    "column_name": "frame_effects",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - oracle_id (text)"
+    "table_name": "cards",
+    "column_name": "promo_types",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - oracle_text (text)"
+    "table_name": "cards",
+    "column_name": "set_id",
+    "data_type": "uuid"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - oversized (boolean)"
+    "table_name": "cards",
+    "column_name": "search_vector",
+    "data_type": "tsvector"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - prices (jsonb)"
+    "table_name": "cards",
+    "column_name": "cmc",
+    "data_type": "double precision"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - produced_mana (jsonb)"
+    "table_name": "cards",
+    "column_name": "tcgplayer_id",
+    "data_type": "bigint"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - promo (boolean)"
+    "table_name": "sets",
+    "column_name": "foil_only",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - promo_types (jsonb)"
+    "table_name": "cards",
+    "column_name": "colors",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - purchase_uris (jsonb)"
+    "table_name": "cards",
+    "column_name": "color_identity",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - quantity_collection_foil (bigint)"
+    "table_name": "cards",
+    "column_name": "keywords",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - quantity_collection_regular (bigint)"
+    "table_name": "cards",
+    "column_name": "produced_mana",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - quantity_kiosk_foil (bigint)"
+    "table_name": "cards",
+    "column_name": "legalities",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - quantity_kiosk_regular (bigint)"
+    "table_name": "cards",
+    "column_name": "games",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - rarity (text)"
+    "table_name": "cards",
+    "column_name": "reserved",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - related_uris (jsonb)"
+    "table_name": "cards",
+    "column_name": "foil",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - released_at (timestamp without time zone)"
+    "table_name": "cards",
+    "column_name": "nonfoil",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - reprint (boolean)"
+    "table_name": "cards",
+    "column_name": "finishes",
+    "data_type": "jsonb"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - reserved (boolean)"
+    "table_name": "cards",
+    "column_name": "oversized",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - scryfall_uri (text)"
+    "table_name": "cards",
+    "column_name": "promo",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - set_code (text)"
+    "table_name": "cards",
+    "column_name": "reprint",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - set_name (text)"
+    "table_name": "cards",
+    "column_name": "variation",
+    "data_type": "boolean"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - story_spotlight (boolean)"
+    "table_name": "sets",
+    "column_name": "released_at",
+    "data_type": "timestamp without time zone"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - tcgplayer_id (bigint)"
+    "table_name": "cards",
+    "column_name": "released_at",
+    "data_type": "timestamp without time zone"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - textless (boolean)"
+    "table_name": "cards",
+    "column_name": "set_code",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - type_line (text)"
+    "table_name": "sets",
+    "column_name": "id",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - uri (text)"
+    "table_name": "sets",
+    "column_name": "code",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - usd_foil_price (numeric)"
+    "table_name": "sets",
+    "column_name": "name",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - usd_price (numeric)"
+    "table_name": "sets",
+    "column_name": "set_type",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "cards - variation (boolean)"
+    "table_name": "sets",
+    "column_name": "icon_svg_uri",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "import_records - id (character varying)"
+    "table_name": "cards",
+    "column_name": "id",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "import_records - summary (jsonb)"
+    "table_name": "cards",
+    "column_name": "oracle_id",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "import_records - timestamp (timestamp without time zone)"
+    "table_name": "cards",
+    "column_name": "name",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - card_count (bigint)"
+    "table_name": "cards",
+    "column_name": "lang",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - code (text)"
+    "table_name": "cards",
+    "column_name": "uri",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - digital (boolean)"
+    "table_name": "cards",
+    "column_name": "scryfall_uri",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - foil_only (boolean)"
+    "table_name": "cards",
+    "column_name": "layout",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - icon_svg_uri (text)"
+    "table_name": "cards",
+    "column_name": "image_status",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - id (text)"
+    "table_name": "cards",
+    "column_name": "mana_cost",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - name (text)"
+    "table_name": "cards",
+    "column_name": "type_line",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - released_at (timestamp without time zone)"
+    "table_name": "cards",
+    "column_name": "oracle_text",
+    "data_type": "text"
   },
   {
-    "info_type": "Columns",
-    "info": "sets - set_type (text)"
+    "table_name": "alembic_version",
+    "column_name": "version_num",
+    "data_type": "character varying"
   },
   {
-    "info_type": "Primary Keys",
-    "info": "alembic_version - version_num"
+    "table_name": "cards",
+    "column_name": "set_name",
+    "data_type": "text"
   },
   {
-    "info_type": "Primary Keys",
-    "info": "cards - id"
+    "table_name": "cards",
+    "column_name": "collector_number",
+    "data_type": "text"
   },
   {
-    "info_type": "Primary Keys",
-    "info": "import_records - id"
+    "table_name": "cards",
+    "column_name": "rarity",
+    "data_type": "text"
   },
   {
-    "info_type": "Primary Keys",
-    "info": "sets - code"
+    "table_name": "cards",
+    "column_name": "card_back_id",
+    "data_type": "text"
   },
   {
-    "info_type": "Tables",
-    "info": "alembic_version"
+    "table_name": "cards",
+    "column_name": "artist",
+    "data_type": "text"
   },
   {
-    "info_type": "Tables",
-    "info": "cards"
+    "table_name": "cards",
+    "column_name": "illustration_id",
+    "data_type": "text"
   },
   {
-    "info_type": "Tables",
-    "info": "import_records"
+    "table_name": "cards",
+    "column_name": "border_color",
+    "data_type": "text"
   },
   {
-    "info_type": "Tables",
-    "info": "sets"
+    "table_name": "cards",
+    "column_name": "frame",
+    "data_type": "text"
   }
 ]
