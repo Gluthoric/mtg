@@ -93,7 +93,7 @@ const filters = ref({
 const sorting = ref({ sortBy: 'released_at', sortOrder: 'desc' })
 const currentPage = ref(1)
 const totalPages = ref(1)
-const perPage = ref(20)
+const perPage = ref(50)
 const setTypes = ref([
   'core', 'expansion', 'masters', 'draft_innovation',
   'commander', 'starter', 'box', 'promo', 'token', 'memorabilia'

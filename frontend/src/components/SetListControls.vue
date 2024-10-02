@@ -90,8 +90,8 @@ export default {
         { value: 'collection_count-desc', label: 'Collection Count (High to Low)' },
         { value: 'collection_count-asc', label: 'Collection Count (Low to High)' },
       ],
-      localPerPage: 20,
-      perPageOptions: [10, 20, 50, 100]
+      localPerPage: 50,
+      perPageOptions: [20, 50, 100, 200]
     }
   },
   methods: {

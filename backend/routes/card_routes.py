@@ -78,7 +78,7 @@ def serialize_cards(cards, quantity_type='collection'):
 @card_routes.route('/cards', methods=['GET'])
 def get_cards():
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
     name = request.args.get('name', '')
     set_code = request.args.get('set_code', '')
     rarity = request.args.get('rarity', '')
@@ -120,7 +120,7 @@ def get_card(card_id):
 def search_cards():
     query_param = request.args.get('q', '')
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
 
     query = Card.query.options(load_only(
         Card.id, Card.name, Card.set_name, Card.set_code, Card.collector_number,
@@ -151,7 +151,7 @@ def search_cards():
 @card_routes.route('/collection', methods=['GET'])
 def get_collection():
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
     set_code = request.args.get('set_code', '', type=str)
 
     cache_key = f"collection:page:{page}:per_page:{per_page}:set_code:{set_code}"

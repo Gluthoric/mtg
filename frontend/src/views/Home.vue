@@ -1,110 +1,35 @@
 <template>
-  <div class="container">
-    <nav class="mb-4 flex justify-center space-x-4">
-      <router-link to="/" class="text-primary hover:underline">Home</router-link>
-      <router-link to="/collection" class="text-primary hover:underline">Collection</router-link>
-      <router-link to="/kiosk" class="text-primary hover:underline">Kiosk</router-link>
-      <router-link to="/import" class="text-primary hover:underline">Import</router-link>
+  <div class="bg-background text-foreground min-h-screen">
+    <nav class="mb-4 flex justify-center space-x-4 p-4">
+      <router-link v-for="link in navLinks" :key="link.to" :to="link.to" class="text-primary hover:underline">
+        {{ link.text }}
+      </router-link>
     </nav>
-    <h1 class="text-center mb-4">MTG Collection Manager</h1>
-
-    <!-- Collection Stats -->
-    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div class="card text-center">
-        <h2 class="mb-2">Collection Total Cards</h2>
-        <p class="text-2xl font-bold">{{ stats.collection.total_cards }}</p>
+    <div class="px-4 md:px-6 lg:px-8">
+      <h1 class="text-center mb-6 text-3xl font-bold text-primary">MTG Collection Kiosk</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <router-link v-for="link in mainLinks" :key="link.to" :to="link.to" class="block">
+          <div class="bg-card hover:bg-card-hover text-card-foreground rounded-lg shadow-md p-6 transition-all duration-300 ease-in-out transform hover:scale-105">
+            <h2 class="text-xl font-semibold mb-2">{{ link.text }}</h2>
+            <p class="text-muted-foreground">{{ link.description }}</p>
+          </div>
+        </router-link>
       </div>
-      <div class="card text-center">
-        <h2 class="mb-2">Collection Unique Cards</h2>
-        <p class="text-2xl font-bold">{{ stats.collection.unique_cards }}</p>
-      </div>
-      <div class="card text-center">
-        <h2 class="mb-2">Collection Total Value</h2>
-        <p class="text-2xl font-bold">${{ stats.collection.total_value.toFixed(2) }}</p>
-      </div>
-    </div>
-
-    <!-- Kiosk Stats -->
-    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div class="card text-center">
-        <h2 class="mb-2">Kiosk Total Cards</h2>
-        <p class="text-2xl font-bold">{{ stats.kiosk.total_cards }}</p>
-      </div>
-      <div class="card text-center">
-        <h2 class="mb-2">Kiosk Unique Cards</h2>
-        <p class="text-2xl font-bold">{{ stats.kiosk.unique_cards }}</p>
-      </div>
-      <div class="card text-center">
-        <h2 class="mb-2">Kiosk Total Value</h2>
-        <p class="text-2xl font-bold">${{ stats.kiosk.total_value.toFixed(2) }}</p>
-      </div>
-    </div>
-
-    <!-- Total Stats -->
-    <div class="dashboard grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div class="card text-center">
-        <h2 class="mb-2">Total Cards</h2>
-        <p class="text-2xl font-bold">{{ stats.total.total_cards }}</p>
-      </div>
-      <div class="card text-center">
-        <h2 class="mb-2">Total Unique Cards</h2>
-        <p class="text-2xl font-bold">{{ stats.total.unique_cards }}</p>
-      </div>
-      <div class="card text-center">
-        <h2 class="mb-2">Total Value</h2>
-        <p class="text-2xl font-bold">${{ stats.total.total_value.toFixed(2) }}</p>
-      </div>
-    </div>
-
-    <!-- Refresh Button -->
-    <div class="text-center">
-      <button @click="refreshStats" class="px-4 py-2">Refresh Stats</button>
     </div>
   </div>
 </template>
 
-<script>
-import { ref, onMounted, onUnmounted } from 'vue'
-import axios from 'axios'
+<script setup>
+const navLinks = [
+  { to: '/', text: 'Home' },
+  { to: '/collection', text: 'Collection' },
+  { to: '/kiosk', text: 'Kiosk' },
+  { to: '/import', text: 'Import' }
+];
 
-export default {
-  name: 'Home',
-  setup() {
-    const stats = ref({
-      collection: { total_cards: 0, unique_cards: 0, total_value: 0 },
-      kiosk: { total_cards: 0, unique_cards: 0, total_value: 0 },
-      total: { total_cards: 0, unique_cards: 0, total_value: 0 }
-    })
-    let refreshInterval
-
-    const fetchStats = async (forceRefresh = false) => {
-      try {
-        const response = await axios.get('/api/stats', {
-          params: { refresh: forceRefresh }
-        })
-        stats.value = response.data
-      } catch (error) {
-        console.error('Failed to fetch stats:', error)
-      }
-    }
-
-    const refreshStats = () => {
-      fetchStats(true)
-    }
-
-    onMounted(() => {
-      fetchStats()
-      refreshInterval = setInterval(() => fetchStats(), 300000) // Refresh every 5 minutes
-    })
-
-    onUnmounted(() => {
-      clearInterval(refreshInterval)
-    })
-
-    return {
-      stats,
-      refreshStats
-    }
-  }
-}
+const mainLinks = [
+  { to: '/collection', text: 'My Collection', description: 'View and manage your MTG card collection' },
+  { to: '/kiosk', text: 'Kiosk Mode', description: 'Quick card entry for new acquisitions' },
+  { to: '/import', text: 'Import Cards', description: 'Import cards from various sources' }
+];
 </script>
