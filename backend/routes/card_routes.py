@@ -249,27 +249,28 @@ def get_collection_sets():
         # Apply sort order
         order_func = desc if sort_order.lower() == 'desc' else asc
 
-        # Build a query that fetches the sets and aggregates the total card values and collection counts
-        subquery = (
+        # Subquery for total value
+        value_subquery = (
             db.session.query(
                 Card.set_code,
                 func.sum(
-                    (func.cast((Card.prices['usd'].astext), Float) * Card.quantity_collection_regular) +
-                    (func.cast((Card.prices['usd_foil'].astext), Float) * Card.quantity_collection_foil)
+                    (func.cast(Card.prices['usd'].astext, Float) * Card.quantity_collection_regular) +
+                    (func.cast(Card.prices['usd_foil'].astext, Float) * Card.quantity_collection_foil)
                 ).label('total_value')
             )
             .group_by(Card.set_code)
             .subquery()
         )
 
-        query = db.session.query(
-            Set,
-            SetCollectionCount.collection_count,
-            subquery.c.total_value
-        ).outerjoin(
-            SetCollectionCount, Set.code == SetCollectionCount.set_code
-        ).outerjoin(
-            subquery, Set.code == subquery.c.set_code
+        # Main query
+        query = (
+            db.session.query(
+                Set,
+                func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count'),
+                func.coalesce(value_subquery.c.total_value, 0).label('total_value')
+            )
+            .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)
+            .outerjoin(value_subquery, Set.code == value_subquery.c.set_code)
         )
 
         # Apply filters
@@ -280,7 +281,6 @@ def get_collection_sets():
             query = query.filter(Set.set_type.in_(set_types))
             logger.debug(f"get_collection_sets: Applied filter: Set.set_type IN {set_types}")
         else:
-            # Use the partial index for relevant set types if no specific set_types are provided
             default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
             query = query.filter(Set.set_type.in_(default_set_types))
             logger.debug("get_collection_sets: Applied filter: Using partial index for relevant set types")
@@ -296,9 +296,9 @@ def get_collection_sets():
         sets_list = []
         for set_instance, collection_count, total_value in paginated_sets.items:
             set_data = set_instance.to_dict()
-            set_data['collection_count'] = collection_count if collection_count else 0
-            set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
-            set_data['total_value'] = round(total_value, 2) if total_value else 0.0
+            set_data['collection_count'] = collection_count
+            set_data['collection_percentage'] = (collection_count / set_instance.card_count) * 100 if set_instance.card_count else 0
+            set_data['total_value'] = round(total_value, 2)
             sets_list.append(set_data)
 
         # Build response
