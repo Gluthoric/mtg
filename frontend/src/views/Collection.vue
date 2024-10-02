@@ -188,9 +188,9 @@ const fetchSets = async () => {
 
 const handleUpdateFilters = (newFilters) => {
   filters.value = { ...filters.value, ...newFilters };
-  if (newFilters.set_type) {
+  if (newFilters.set_types) {
     filters.value.set_type =
-      newFilters.set_type.length > 0 ? newFilters.set_type : undefined;
+      newFilters.set_types.length > 0 ? newFilters.set_types : undefined;
   }
   currentPage.value = 1;
   fetchSets();

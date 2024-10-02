@@ -94,7 +94,10 @@ export default {
         name: "",
         set_types: [],
       },
-      selectedSortOption: "released_at-desc",
+      localSorting: {
+        sortBy: "released_at",
+        sortOrder: "desc",
+      },
       sortOptions: [
         { value: "released_at-desc", label: "Release Date (Newest)" },
         { value: "released_at-asc", label: "Release Date (Oldest)" },
@@ -107,13 +110,22 @@ export default {
       perPageOptions: [20, 50, 100, 200],
     };
   },
-  methods: {
-    emitFilters() {
-      this.$emit("update-filters", { ...this.localFilters });
+  computed: {
+    selectedSortOption: {
+      get() {
+        return `${this.localSorting.sortBy}-${this.localSorting.sortOrder}`;
+      },
+      set(value) {
+        const [sortBy, sortOrder] = value.split("-");
+        this.localSorting = { sortBy, sortOrder };
+        this.emitChanges();
+      },
     },
-    updateSorting() {
-      const [sortBy, sortOrder] = this.selectedSortOption.split("-");
-      this.$emit("update-sorting", { sortBy, sortOrder });
+  },
+  methods: {
+    emitChanges() {
+      this.$emit("update-filters", { ...this.localFilters });
+      this.$emit("update-sorting", { ...this.localSorting });
     },
     emitPerPage() {
       this.$emit("update-per-page", this.localPerPage);
@@ -128,7 +140,7 @@ export default {
       } else {
         this.localFilters.set_types.splice(index, 1);
       }
-      this.emitFilters();
+      this.emitChanges();
     },
     isSetTypeSelected(type) {
       return this.localFilters.set_types.includes(type);

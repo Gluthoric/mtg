@@ -1,3 +1,4 @@
+import logging
 from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -8,9 +9,13 @@ import redis
 import orjson
 import os
 
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
 def create_app(config_name='default'):
+    app = Flask(__name__)
+    app.logger.setLevel(logging.WARNING)
     # Check if we are in development or production mode
     is_production = config_name == 'production'
 
