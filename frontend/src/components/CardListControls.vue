@@ -77,7 +77,7 @@
       <!-- Keywords Filter -->
       <div
         class="filter-section relative"
-        v-click-outside="() => (showKeywordDropdown = false)"
+        ref="keywordDropdownRef"
       >
         <label class="block text-sm font-medium mb-2">Keywords</label>
         <div class="relative">
@@ -142,7 +142,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { vClickOutside } from "@vueuse/core";
+import { onClickOutside } from "@vueuse/core";
 
 interface Filters {
   name: string;
@@ -155,9 +155,6 @@ interface Filters {
 
 export default defineComponent({
   name: "CardListControls",
-  directives: {
-    clickOutside: vClickOutside,
-  },
   props: {
     modelValue: {
       type: Object as () => Filters,
@@ -170,7 +167,14 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "update:modelCardsPerRow"],
   setup(props, { emit }) {
-    const filters = ref<Filters>({ ...props.modelValue });
+    const filters = ref<Filters>({
+      name: props.modelValue.name || "",
+      rarities: props.modelValue.rarities || [],
+      colors: props.modelValue.colors || [],
+      missing: props.modelValue.missing || false,
+      types: props.modelValue.types || [],
+      keyword: props.modelValue.keyword || "",
+    });
     const cardsPerRow = ref(props.modelCardsPerRow);
 
     const availableColors = ["W", "U", "B", "R", "G", "C"];
@@ -197,15 +201,15 @@ export default defineComponent({
     const filteredKeywords = ref(availableKeywords);
 
     const isRaritySelected = computed(
-      () => (rarity: string) => filters.value.rarities.includes(rarity),
+      () => (rarity: string) => filters.value.rarities.includes(rarity)
     );
 
     const isColorSelected = computed(
-      () => (color: string) => filters.value.colors.includes(color),
+      () => (color: string) => filters.value.colors.includes(color)
     );
 
     const isTypeSelected = computed(
-      () => (type: string) => filters.value.types.includes(type),
+      () => (type: string) => filters.value.types.includes(type)
     );
 
     const colorClass = (color: string) => {
@@ -262,7 +266,7 @@ export default defineComponent({
     const filterKeywords = () => {
       const search = keywordSearch.value.toLowerCase();
       filteredKeywords.value = availableKeywords.filter((kw) =>
-        kw.toLowerCase().includes(search),
+        kw.toLowerCase().includes(search)
       );
     };
 
@@ -277,11 +281,16 @@ export default defineComponent({
       (newFilters) => {
         emit("update:modelValue", newFilters);
       },
-      { deep: true },
+      { deep: true }
     );
 
     watch(cardsPerRow, (newCardsPerRow) => {
       emit("update:modelCardsPerRow", newCardsPerRow);
+    });
+
+    const keywordDropdownRef = ref(null);
+    onClickOutside(keywordDropdownRef, () => {
+      showKeywordDropdown.value = false;
     });
 
     return {
@@ -303,6 +312,7 @@ export default defineComponent({
       toggleType,
       filterKeywords,
       selectKeyword,
+      keywordDropdownRef,
     };
   },
 });

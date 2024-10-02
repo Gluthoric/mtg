@@ -29,10 +29,8 @@
       </div>
       <div v-else>
         <CardListControls
-          :filters="filters"
-          :cardsPerRow="cardsPerRow"
-          @update-filters="updateFilters"
-          @update-cards-per-row="updateCardsPerRow"
+          v-model="filters"
+          v-model:modelCardsPerRow="cardsPerRow"
           class="controls bg-card p-4 rounded-lg shadow-md mb-4"
         />
 
@@ -122,7 +120,7 @@
             class="card bg-card shadow-md rounded-lg overflow-hidden relative flex flex-col"
             :class="{ 'border-2 border-destructive': isMissing(card) }"
           >
-            <div class="card-info p-2 z-10 bg-card bg-opacity-80">
+          <div class="card-info p-2 z-10 bg-card bg-opacity-80">
               <h3 class="text-base font-semibold truncate text-primary">
                 {{ card.name }}
               </h3>
@@ -346,11 +344,6 @@ const fetchSetDetails = async () => {
   }
 };
 
-const updateFilters = (newFilters) => {
-  filters.value = { ...filters.value, ...newFilters };
-  applyFilters();
-};
-
 const applyFilters = () => {
   const filteredCards = originalCards.value.filter((card) => {
     if (
@@ -389,10 +382,6 @@ const applyFilters = () => {
   cards.value = filteredCards;
 };
 
-const updateCardsPerRow = (newCardsPerRow) => {
-  cardsPerRow.value = newCardsPerRow;
-};
-
 watch(
   () => route.params.setCode,
   (newSetCode) => {
@@ -402,7 +391,7 @@ watch(
 );
 
 watch(
-  () => filters.value,
+  filters,
   () => {
     applyFilters();
   },
