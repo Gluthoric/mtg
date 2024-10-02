@@ -167,10 +167,7 @@ export default {
   },
   data() {
     return {
-      localFilters: { 
-        ...this.filters,
-        missing: false 
-      },
+      localFilters: { ...this.filters },
       localCardsPerRow: this.cardsPerRow,
       availableColors: ["W", "U", "B", "R", "G", "C"],
       availableRarities: ["common", "uncommon", "rare", "mythic"],

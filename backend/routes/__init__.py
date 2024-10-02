@@ -3,7 +3,10 @@ from .card_routes import card_routes
 from .set_routes import set_routes
 import os
 
+from .import_routes import import_routes
+
 def register_routes(app):
+    app.register_blueprint(import_routes)
     api = Blueprint('api', __name__, url_prefix='/api')
 
     api.register_blueprint(card_routes)
