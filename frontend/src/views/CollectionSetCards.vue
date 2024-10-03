@@ -332,7 +332,7 @@ const fetchSetDetails = async () => {
   error.value = null;
   try {
     const response = await axios.get(
-      `/api/collection/sets/${setCode.value}/details`,
+      `/api/collection/sets/${setCode.value}`,
     );
     set.value = response.data.set;
     setName.value = response.data.set.name;

@@ -5,6 +5,7 @@ from flask_migrate import Migrate
 from config import config
 from database import db
 from routes import register_routes
+from routes.set_routes import set_routes
 import redis
 import orjson
 import os
@@ -46,6 +47,9 @@ def create_app(config_name='default'):
 
     # Register routes
     register_routes(app)
+    
+    # Register set_routes blueprint with the correct URL prefix
+    app.register_blueprint(set_routes, url_prefix='/api/collection')
 
     # Add Redis client to app context
     app.redis_client = redis_client

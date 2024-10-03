@@ -207,7 +207,7 @@ def get_set_cards(set_code):
 from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-@set_routes.route('/sets/<string:set_code>/details', methods=['GET'])
+@set_routes.route('/sets/<string:set_code>', methods=['GET'])
 def get_collection_set_details(set_code):
     try:
         # Construct cache key
