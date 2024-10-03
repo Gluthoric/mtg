@@ -1,6 +1,10 @@
 from database import db
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from models.set_collection_count import SetCollectionCount
 
 class Card(db.Model):
     __tablename__ = 'cards'
@@ -42,11 +46,11 @@ class Card(db.Model):
     story_spotlight = db.Column(db.Boolean)
     reprint = db.Column(db.Boolean)
     variation = db.Column(db.Boolean)
-    set_code = db.Column(db.Text, db.ForeignKey('sets.code'), index=True)
+    set_code = db.Column(db.Text, db.ForeignKey('sets.code'))
     set_name = db.Column(db.Text)
     collector_number = db.Column(db.Text, nullable=False)
     digital = db.Column(db.Boolean)
-    rarity = db.Column(db.Text, index=True)
+    rarity = db.Column(db.Text)
     card_back_id = db.Column(db.Text)
     artist = db.Column(db.Text)
     artist_ids = db.Column(JSONB)
@@ -60,14 +64,13 @@ class Card(db.Model):
     promo_types = db.Column(JSONB)
     usd_price = db.Column(db.Numeric)
     usd_foil_price = db.Column(db.Numeric)
-    # New quantity fields
     quantity_regular = db.Column(db.BigInteger, default=0)
     quantity_foil = db.Column(db.BigInteger, default=0)
     quantity_kiosk_regular = db.Column(db.BigInteger, default=0)
     quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
 
     # Relationships
-    set = db.relationship('Set', back_populates='cards', lazy='joined')  # Eagerly load set using join
+    set = db.relationship('Set', back_populates='cards')
 
     def to_dict(self):
         return {
@@ -96,3 +99,13 @@ class Card(db.Model):
             'oversized': self.oversized,
             'keywords': self.keywords
         }
+
+@event.listens_for(Session, 'after_flush')
+def after_flush(session, flush_context):
+    updated_set_codes = set()
+    for instance in session.new.union(session.dirty).union(session.deleted):
+        if isinstance(instance, Card):
+            updated_set_codes.add(instance.set_code)
+
+    if updated_set_codes:
+        SetCollectionCount.refresh()

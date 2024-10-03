@@ -21,13 +21,9 @@ class Set(db.Model):
 
     # Relationships
     cards = relationship('Card', back_populates='set')
-    
-    # Updated relationship with explicit foreign key handling
-    set_collection_count = relationship('SetCollectionCount', back_populates='set', uselist=False, 
-                                        primaryjoin="Set.code == foreign(SetCollectionCount.set_code)")
+    set_collection_count = relationship('SetCollectionCount', back_populates='set', uselist=False)
 
     def to_dict(self):
-        # Use set_collection_count here to avoid confusion with 'collection_count'
         collection_count = self.get_collection_count()
         return {
             'id': self.id,
@@ -44,25 +40,11 @@ class Set(db.Model):
         }
 
     def get_collection_count(self):
-        # Use set_collection_count instead of collection_count
-        if self.set_collection_count:
-            return self.set_collection_count.collection_count
-        return 0
+        return self.set_collection_count.collection_count if self.set_collection_count else 0
 
     @classmethod
     def get_sets_with_collection_counts(cls):
-        # Renaming for clarity and ensuring correct join usage
         return db.session.query(cls, SetCollectionCount.collection_count) \
-            .outerjoin(SetCollectionCount, cls.code == SetCollectionCount.set_code) \
+            .outerjoin(SetCollectionCount) \
             .order_by(cls.released_at.desc()) \
             .all()
-
-    @classmethod
-    def update_collection_counts(cls):
-        try:
-            SetCollectionCount.refresh()
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            print(f"Error refreshing materialized view: {e}")
-            raise e  # or handle accordingly

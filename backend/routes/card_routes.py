@@ -779,10 +779,6 @@ def get_collection_set(set_code):
         # Serialize set data
         set_data = set_instance.to_dict()
 
-        # Include additional data such as collection counts
-        set_data['collection_count'] = set_instance.collection_count.collection_count if set_instance.collection_count else 0
-        set_data['collection_percentage'] = (set_data['collection_count'] / set_instance.card_count) * 100 if set_instance.card_count else 0
-
         # Fetch cards for this set
         cards = Card.query.filter_by(set_code=set_code).all()
         set_data['cards'] = [card.to_dict() for card in cards]
@@ -799,7 +795,17 @@ def get_collection_set(set_code):
             }
         }
 
+        collection_count = 0
+        total_value = 0.0
+
         for card in cards:
+            collection_count += card.quantity_regular + card.quantity_foil
+            
+            # Calculate card value
+            regular_value = float(card.prices.get('usd', 0) or 0) * card.quantity_regular
+            foil_value = float(card.prices.get('usd_foil', 0) or 0) * card.quantity_foil
+            total_value += regular_value + foil_value
+
             if card.frame_effects:
                 for effect in card.frame_effects:
                     statistics['frame_effects'][effect] = statistics['frame_effects'].get(effect, 0) + 1
@@ -815,6 +821,9 @@ def get_collection_set(set_code):
             if card.oversized:
                 statistics['other_attributes']['oversized'] += 1
 
+        set_data['collection_count'] = collection_count
+        set_data['collection_percentage'] = (collection_count / set_instance.card_count) * 100 if set_instance.card_count else 0
+        set_data['total_value'] = round(total_value, 2)
         set_data['statistics'] = statistics
 
         return jsonify({

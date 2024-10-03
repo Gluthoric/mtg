@@ -9,8 +9,6 @@ import redis
 import orjson
 import os
 from decimal import Decimal
-# from commands import update_collection_counts_command
-
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
@@ -58,7 +56,6 @@ def create_app(config_name='default'):
 from flask.cli import FlaskGroup
 
 cli = FlaskGroup(create_app=create_app)
-#cli.add_command(update_collection_counts_command)
 
 if __name__ == '__main__':
     cli()
