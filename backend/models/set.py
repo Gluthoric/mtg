@@ -2,7 +2,6 @@ from database import db
 from models.card import Card
 from models.set_collection_count import SetCollectionCount
 from sqlalchemy.sql import func
-from sqlalchemy.orm import joinedload
 from datetime import datetime
 
 class Set(db.Model):
@@ -23,6 +22,7 @@ class Set(db.Model):
     collection_count = db.relationship('SetCollectionCount', back_populates='set', uselist=False)
 
     def to_dict(self):
+        collection_count = self.get_collection_count()
         return {
             'id': self.id,
             'code': self.code,
@@ -33,6 +33,40 @@ class Set(db.Model):
             'digital': self.digital,
             'foil_only': self.foil_only,
             'icon_svg_uri': self.icon_svg_uri,
-            'collection_count': self.collection_count.collection_count if self.collection_count else 0,
-            'collection_percentage': (self.collection_count.collection_count / self.card_count) * 100 if self.card_count and self.collection_count else 0
+            'collection_count': collection_count,
+            'collection_percentage': (collection_count / self.card_count) * 100 if self.card_count and collection_count > 0 else 0
         }
+
+    def get_collection_count(self):
+        if self.collection_count:
+            return self.collection_count.collection_count
+        return 0
+
+    @classmethod
+    def get_sets_with_collection_counts(cls):
+        return db.session.query(cls, SetCollectionCount.collection_count) \
+            .outerjoin(SetCollectionCount, cls.code == SetCollectionCount.set_code) \
+            .order_by(cls.released_at.desc()) \
+            .all()
+
+    @classmethod
+    def update_collection_counts(cls):
+        subquery = db.session.query(
+            Card.set_code,
+            func.sum(Card.quantity_regular + Card.quantity_foil).label('count')
+        ).group_by(Card.set_code).subquery()
+
+        sets_to_update = db.session.query(cls, subquery.c.count) \
+            .outerjoin(subquery, cls.code == subquery.c.set_code) \
+            .all()
+
+        for set, count in sets_to_update:
+            if count is None:
+                count = 0
+            if set.collection_count:
+                set.collection_count.collection_count = count
+            else:
+                new_count = SetCollectionCount(set_code=set.code, collection_count=count)
+                db.session.add(new_count)
+
+        db.session.commit()

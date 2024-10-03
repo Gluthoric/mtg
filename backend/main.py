@@ -8,6 +8,7 @@ from routes import register_routes
 import redis
 import orjson
 import os
+from models.set import Set
 
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
@@ -36,6 +37,17 @@ def create_app(config_name='default'):
     with app.app_context():
         # Initialize the database
         db.create_all()
+
+        # Update collection counts
+        Set.update_collection_counts()
+
+        # Precalculate and cache set data
+        sets_with_counts = Set.get_sets_with_collection_counts()
+        sets_data = [
+            set.to_dict()
+            for set, _ in sets_with_counts
+        ]
+        redis_client.set('sets_data', orjson.dumps(sets_data))
 
     # Register routes
     register_routes(app)
