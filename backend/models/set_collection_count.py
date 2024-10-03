@@ -25,7 +25,7 @@ class SetCollectionCount(db.Model):
     def create_materialized_view(cls):
         db.session.execute(text('''
             CREATE MATERIALIZED VIEW IF NOT EXISTS set_collection_counts AS
-            SELECT set_code, 
+            SELECT set_code,
                    SUM(quantity_regular + quantity_foil) as collection_count
             FROM cards
             GROUP BY set_code
