@@ -9,10 +9,20 @@ import redis
 import orjson
 import os
 from models.set import Set
+from decimal import Decimal
 
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
+
+def convert_decimal_to_float(data):
+    if isinstance(data, dict):
+        return {k: convert_decimal_to_float(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_decimal_to_float(i) for i in data]
+    elif isinstance(data, Decimal):
+        return float(data)
+    return data
 
 def create_app(config_name='default'):
     app = Flask(__name__)
@@ -47,6 +57,7 @@ def create_app(config_name='default'):
             set.to_dict()
             for set, _ in sets_with_counts
         ]
+        sets_data = convert_decimal_to_float(sets_data)
         redis_client.set('sets_data', orjson.dumps(sets_data))
 
     # Register routes
@@ -61,7 +72,31 @@ def create_app(config_name='default'):
 
     return app
 
+from flask.cli import FlaskGroup
+
+cli = FlaskGroup(create_app=create_app)
+
 if __name__ == '__main__':
-    env = os.getenv('FLASK_ENV', 'development')
-    app = create_app(env)
-    app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=5000)
+    cli()
+
+"""
+To set up and run this application:
+
+1. Create a virtual environment:
+   python3 -m venv venv
+
+2. Activate the virtual environment:
+   source venv/bin/activate
+
+3. Install the required packages:
+   pip install -r requirements.txt
+
+4. Set the FLASK_APP environment variable:
+   export FLASK_APP=main.py
+
+5. Run database migrations:
+   flask db upgrade
+
+6. Run the application:
+   flask run
+"""

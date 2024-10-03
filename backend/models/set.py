@@ -3,6 +3,8 @@ from models.card import Card
 from models.set_collection_count import SetCollectionCount
 from sqlalchemy.sql import func
 from datetime import datetime
+from sqlalchemy.orm import relationship
+from sqlalchemy import ForeignKey
 
 class Set(db.Model):
     __tablename__ = 'sets'
@@ -18,10 +20,14 @@ class Set(db.Model):
     icon_svg_uri = db.Column(db.Text)
 
     # Relationships
-    cards = db.relationship('Card', back_populates='set')
-    collection_count = db.relationship('SetCollectionCount', back_populates='set', uselist=False)
+    cards = relationship('Card', back_populates='set')
+    
+    # Updated relationship with explicit foreign key handling
+    set_collection_count = relationship('SetCollectionCount', back_populates='set', uselist=False, 
+                                        primaryjoin="Set.code == foreign(SetCollectionCount.set_code)")
 
     def to_dict(self):
+        # Use set_collection_count here to avoid confusion with 'collection_count'
         collection_count = self.get_collection_count()
         return {
             'id': self.id,
@@ -38,12 +44,14 @@ class Set(db.Model):
         }
 
     def get_collection_count(self):
-        if self.collection_count:
-            return self.collection_count.collection_count
+        # Use set_collection_count instead of collection_count
+        if self.set_collection_count:
+            return self.set_collection_count.collection_count
         return 0
 
     @classmethod
     def get_sets_with_collection_counts(cls):
+        # Renaming for clarity and ensuring correct join usage
         return db.session.query(cls, SetCollectionCount.collection_count) \
             .outerjoin(SetCollectionCount, cls.code == SetCollectionCount.set_code) \
             .order_by(cls.released_at.desc()) \
@@ -51,22 +59,4 @@ class Set(db.Model):
 
     @classmethod
     def update_collection_counts(cls):
-        subquery = db.session.query(
-            Card.set_code,
-            func.sum(Card.quantity_regular + Card.quantity_foil).label('count')
-        ).group_by(Card.set_code).subquery()
-
-        sets_to_update = db.session.query(cls, subquery.c.count) \
-            .outerjoin(subquery, cls.code == subquery.c.set_code) \
-            .all()
-
-        for set, count in sets_to_update:
-            if count is None:
-                count = 0
-            if set.collection_count:
-                set.collection_count.collection_count = count
-            else:
-                new_count = SetCollectionCount(set_code=set.code, collection_count=count)
-                db.session.add(new_count)
-
-        db.session.commit()
+        SetCollectionCount.refresh()

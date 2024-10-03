@@ -72,7 +72,13 @@ def downgrade():
         batch_op.add_column(sa.Column('import_record_id', sa.VARCHAR(length=36), autoincrement=False, nullable=True))
         batch_op.create_foreign_key('cards_import_record_id_fkey', 'import_records', ['import_record_id'], ['id'])
         batch_op.create_index('ix_cards_import_record_id', ['import_record_id'], unique=False)
+        
+        # Update null set_code values to an empty string before setting NOT NULL
+        op.execute("UPDATE cards SET set_code = '' WHERE set_code IS NULL")
         batch_op.alter_column('set_code', existing_type=sa.TEXT(), nullable=False)
+        
+        # Update null oracle_id values to an empty string before setting NOT NULL
+        op.execute("UPDATE cards SET oracle_id = '' WHERE oracle_id IS NULL")
         batch_op.alter_column('oracle_id', existing_type=sa.TEXT(), nullable=False)
 
     # Revert changes to the sets table
