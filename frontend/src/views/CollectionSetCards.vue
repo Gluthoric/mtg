@@ -278,6 +278,7 @@ import { ref, onMounted, watch, computed } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 import CardListControls from "../components/CardListControls.vue";
+import { fetchSetDetails as fetchSetDetailsUtil, applyFilters as applyFiltersUtil } from "../utils/setUtils";
 
 const route = useRoute();
 const setCode = ref(route.params.setCode);
@@ -296,6 +297,9 @@ const filters = ref({
 });
 const cardsPerRow = ref(6);
 const statistics = ref(null);
+const currentPage = ref(1);
+const totalPages = ref(1);
+const itemsPerPage = 20;
 
 const navLinks = [
   { to: "/", text: "Home" },
@@ -305,24 +309,22 @@ const navLinks = [
 ];
 
 // Computed properties for set statistics
-const totalCardsInSet = computed(() => cards.value.length);
-const cardsInCollection = computed(
-  () =>
-    cards.value.filter(
-      (card) =>
-        card.quantity_collection_regular > 0 ||
-        card.quantity_collection_foil > 0,
-    ).length,
+const totalCardsInSet = computed(() => originalCards.value.length);
+const cardsInCollection = computed(() =>
+  originalCards.value.filter(
+    (card) =>
+      card.quantity_collection_regular > 0 || card.quantity_collection_foil > 0
+  ).length
 );
 const completionPercentage = computed(() =>
-  ((cardsInCollection.value / totalCardsInSet.value) * 100).toFixed(2),
+  ((cardsInCollection.value / totalCardsInSet.value) * 100).toFixed(2)
 );
 const totalValue = computed(() => {
-  return cards.value.reduce((total, card) => {
+  return originalCards.value.reduce((total, card) => {
     const regularValue =
-      (card.prices?.usd || 0) * card.quantity_collection_regular;
+      (card.prices?.usd || 0) * (card.quantity_collection_regular || 0);
     const foilValue =
-      (card.prices?.usd_foil || 0) * card.quantity_collection_foil;
+      (card.prices?.usd_foil || 0) * (card.quantity_collection_foil || 0);
     return total + regularValue + foilValue;
   }, 0);
 });
@@ -331,14 +333,12 @@ const fetchSetDetails = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const response = await axios.get(
-      `/api/collection/sets/${setCode.value}`,
-    );
-    set.value = response.data.set;
-    setName.value = response.data.set.name;
-    originalCards.value = response.data.cards;
-    statistics.value = response.data.set.statistics;
-    applyFilters(); // Apply filters after fetching the data
+    const data = await fetchSetDetailsUtil(setCode.value);
+    setName.value = data.set.name;
+    originalCards.value = data.cards;
+    statistics.value = data.set.statistics || {};
+    totalPages.value = Math.ceil(originalCards.value.length / itemsPerPage);
+    applyFilters();
   } catch (err) {
     console.error("Error fetching set details:", err);
     error.value = "Failed to load set details";
@@ -348,62 +348,40 @@ const fetchSetDetails = async () => {
 };
 
 const applyFilters = () => {
-  const filteredCards = originalCards.value.filter((card) => {
-    if (
-      filters.value.name &&
-      !card.name.toLowerCase().includes(filters.value.name.toLowerCase())
-    )
-      return false;
-    if (
-      filters.value.rarities.length &&
-      !filters.value.rarities.includes(card.rarity)
-    )
-      return false;
-    if (
-      filters.value.colors.length &&
-      !filters.value.colors.every((color) => card.colors.includes(color))
-    )
-      return false;
-    if (
-      filters.value.missing &&
-      (card.quantity_collection_regular > 0 ||
-        card.quantity_collection_foil > 0)
-    )
-      return false;
-    if (
-      filters.value.types.length &&
-      !filters.value.types.some((type) =>
-        card.type_line.toLowerCase().includes(type.toLowerCase()),
-      )
-    )
-      return false;
-    if (filters.value.keyword && !card.keywords.includes(filters.value.keyword))
-      return false;
-    return true;
-  });
-
-  cards.value = filteredCards;
+  const filteredCards = applyFiltersUtil(originalCards.value, filters.value);
+  const startIndex = (currentPage.value - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  cards.value = filteredCards.slice(startIndex, endIndex);
+  totalPages.value = Math.ceil(filteredCards.length / itemsPerPage);
 };
 
 watch(
   () => route.params.setCode,
   (newSetCode) => {
     setCode.value = newSetCode;
+    currentPage.value = 1;
     fetchSetDetails();
-  },
+  }
 );
 
 watch(
-  filters,
+  [filters, currentPage],
   () => {
     applyFilters();
   },
-  { deep: true },
+  { deep: true }
 );
 
 onMounted(() => {
   fetchSetDetails();
 });
+
+const changePage = (delta) => {
+  const newPage = currentPage.value + delta;
+  if (newPage >= 1 && newPage <= totalPages.value) {
+    currentPage.value = newPage;
+  }
+};
 
 const isMissing = (card) => {
   return card.quantity_regular + card.quantity_foil === 0;

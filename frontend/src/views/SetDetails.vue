@@ -94,8 +94,9 @@
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import axios from "axios";
+import { fetchSetDetails as fetchSetDetailsUtil, applyFilters as applyFiltersUtil } from "../utils/setUtils";
 
 export default {
   name: "SetDetails",
@@ -108,42 +109,56 @@ export default {
   setup(props) {
     const set = ref(null);
     const cards = ref([]);
+    const originalCards = ref([]);
     const filters = ref({ name: "", rarity: "" });
     const currentPage = ref(1);
     const totalPages = ref(1);
+    const itemsPerPage = 20;
+    const loading = ref(true);
+    const error = ref(null);
 
-    const fetchSet = async () => {
+    const fetchSetDetails = async () => {
+      loading.value = true;
+      error.value = null;
       try {
-        const response = await axios.get(`/api/sets/${props.setCode}`);
-        set.value = response.data;
-      } catch (error) {
-        console.error("Error fetching set details:", error);
+        const data = await fetchSetDetailsUtil(props.setCode);
+        set.value = data.set;
+        originalCards.value = data.cards;
+        totalPages.value = Math.ceil(originalCards.value.length / itemsPerPage);
+        applyFilters();
+      } catch (err) {
+        console.error("Error fetching set details:", err);
+        error.value = "Failed to load set details";
+      } finally {
+        loading.value = false;
       }
     };
 
-    const fetchCards = async () => {
-      try {
-        const response = await axios.get(`/api/sets/${props.setCode}/cards`, {
-          params: {
-            ...filters.value,
-            page: currentPage.value,
-          },
-        });
-        cards.value = response.data.cards;
-        totalPages.value = response.data.pages;
-      } catch (error) {
-        console.error("Error fetching set cards:", error);
-      }
+    const applyFilters = () => {
+      const filteredCards = applyFiltersUtil(originalCards.value, filters.value);
+      const startIndex = (currentPage.value - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      cards.value = filteredCards.slice(startIndex, endIndex);
+      totalPages.value = Math.ceil(filteredCards.length / itemsPerPage);
     };
 
     const changePage = (delta) => {
-      currentPage.value += delta;
-      fetchCards();
+      const newPage = currentPage.value + delta;
+      if (newPage >= 1 && newPage <= totalPages.value) {
+        currentPage.value = newPage;
+      }
     };
 
+    watch(
+      [filters, currentPage],
+      () => {
+        applyFilters();
+      },
+      { deep: true }
+    );
+
     onMounted(() => {
-      fetchSet();
-      fetchCards();
+      fetchSetDetails();
     });
 
     return {
@@ -152,7 +167,10 @@ export default {
       filters,
       currentPage,
       totalPages,
-      fetchCards,
+      loading,
+      error,
+      fetchSetDetails,
+      applyFilters,
       changePage,
     };
   },

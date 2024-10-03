@@ -1,0 +1,71 @@
+gluth@raspberrypi:~/db_backups $ psql -U gluth -h localhost -d mtg_collection_kiosk
+psql (15.8 (Debian 15.8-0+deb12u1))
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off)
+Type "help" for help.
+
+mtg_collection_kiosk=# SELECT * FROM pg_locks WHERE relation = 'cards'::regclass;
+ locktype | database | relation | page | tuple | virtualxid | transactionid | classid | objid | objsubid | virtualtransaction | pid | mode | granted | fastpath | waitstart
+----------+----------+----------+------+-------+------------+---------------+---------+-------+----------+--------------------+-----+------+---------+----------+-----------
+(0 rows)
+
+mtg_collection_kiosk=# SELECT id, quantity_collection_regular, quantity_collection_foil
+FROM cards
+WHERE quantity_collection_regular IS NULL OR quantity_collection_foil IS NULL
+LIMIT 10;
+ id | quantity_collection_regular | quantity_collection_foil
+----+-----------------------------+--------------------------
+(0 rows)
+
+mtg_collection_kiosk=# SELECT column_name
+FROM information_schema.columns
+WHERE table_name = 'cards'
+AND column_name IN ('quantity_collection_regular', 'quantity_collection_foil');
+         column_name
+-----------------------------
+ quantity_collection_foil
+ quantity_collection_regular
+(2 rows)
+
+mtg_collection_kiosk=# SELECT column_name
+FROM information_schema.columns
+WHERE table_name = 'cards'
+AND column_name IN ('quantity_regular', 'quantity_foil');
+ column_name
+-------------
+(0 rows)
+
+mtg_collection_kiosk=# SELECT pid, usename, application_name, state, query
+FROM pg_stat_activity
+WHERE state != 'idle';
+  pid  | usename | application_name | state  |                        query
+-------+---------+------------------+--------+-----------------------------------------------------
+ 14499 | gluth   | psql             | active | SELECT pid, usename, application_name, state, query+
+       |         |                  |        | FROM pg_stat_activity                              +
+       |         |                  |        | WHERE state != 'idle';
+(1 row)
+
+mtg_collection_kiosk=# SELECT matviewname
+FROM pg_matviews
+WHERE matviewname IN ('set_collection_counts', 'total_collection_value', 'unique_cards_count');
+      matviewname
+------------------------
+ unique_cards_count
+ total_collection_value
+ set_collection_counts
+(3 rows)
+
+mtg_collection_kiosk=# SELECT viewname, definition
+FROM pg_views
+WHERE viewname IN ('set_collection_counts', 'total_collection_value', 'unique_cards_count');
+ viewname | definition
+----------+------------
+(0 rows)
+
+
+mtg_collection_kiosk=# SELECT * FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%cards%';
+
+
+ datid  |       datname        |  pid  | leader_pid | usesysid | usename | application_name | client_addr | client_hostname | client_port |         backend_start         |          xact_start           |          query_start          |         state_change          | wait_event_type | wait_event | state  | backend_xid | backend_xmin | query_id |                                      query                                      |  backend_type
+--------+----------------------+-------+------------+----------+---------+------------------+-------------+-----------------+-------------+-------------------------------+-------------------------------+-------------------------------+-------------------------------+-----------------+------------+--------+-------------+--------------+----------+---------------------------------------------------------------------------------+----------------
+ 310329 | mtg_collection_kiosk | 14499 |            |    16388 | gluth   | psql             | ::1         |                 |       49080 | 2024-10-03 18:56:05.988809+01 | 2024-10-03 18:57:10.311173+01 | 2024-10-03 18:57:10.311173+01 | 2024-10-03 18:57:10.311175+01 |                 |            | active |             |         2007 |          | SELECT * FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%cards%'; | client backend
+(1 row)
