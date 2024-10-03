@@ -14,7 +14,6 @@ DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
 DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
 
 # Scryfall bulk data file and set code
 SCRYFALL_BULK_JSON = os.getenv('SCRYFALL_BULK_JSON', 'default_cards.json')
@@ -26,15 +25,13 @@ BATCH_SIZE = 1000
 EXCLUDED_SET_TYPES = ['promo', 'memorabilia', 'alchemy', 'arena_league', 'treasure_chest']
 
 def connect_db():
-    """Establishes a connection to the PostgreSQL database."""
+    """Establishes a connection to the local PostgreSQL database."""
     try:
         conn = psycopg2.connect(
             host=DB_HOST,
             port=DB_PORT,
             dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            sslmode='require'  # Ensure SSL connection
+            user=DB_USER
         )
         conn.autocommit = False  # Handle transactions manually
         return conn
