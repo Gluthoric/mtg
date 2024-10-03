@@ -120,7 +120,7 @@
             class="card bg-card shadow-md rounded-lg overflow-hidden relative flex flex-col"
             :class="{ 'border-2 border-destructive': isMissing(card) }"
           >
-          <div class="card-info p-2 z-10 bg-card bg-opacity-80">
+            <div class="card-info p-2 z-10 bg-card bg-opacity-80">
               <h3 class="text-base font-semibold truncate text-primary">
                 {{ card.name }}
               </h3>
@@ -331,7 +331,10 @@ const fetchSetDetails = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const response = await axios.get(`/api/collection/sets/${setCode.value}`);
+    const response = await axios.get(
+      `/api/collection/sets/${setCode.value}/details`,
+    );
+    set.value = response.data.set;
     setName.value = response.data.set.name;
     originalCards.value = response.data.cards;
     statistics.value = response.data.set.statistics;
@@ -403,7 +406,7 @@ onMounted(() => {
 });
 
 const isMissing = (card) => {
-  return card.quantity_collection_regular + card.quantity_collection_foil === 0;
+  return card.quantity_regular + card.quantity_foil === 0;
 };
 
 const getImageUrl = (card) => {

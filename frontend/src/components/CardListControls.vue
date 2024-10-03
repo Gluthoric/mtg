@@ -75,10 +75,7 @@
       </div>
 
       <!-- Keywords Filter -->
-      <div
-        class="filter-section relative"
-        ref="keywordDropdownRef"
-      >
+      <div class="filter-section relative" ref="keywordDropdownRef">
         <label class="block text-sm font-medium mb-2">Keywords</label>
         <div class="relative">
           <input
@@ -201,15 +198,15 @@ export default defineComponent({
     const filteredKeywords = ref(availableKeywords);
 
     const isRaritySelected = computed(
-      () => (rarity: string) => filters.value.rarities.includes(rarity)
+      () => (rarity: string) => filters.value.rarities.includes(rarity),
     );
 
     const isColorSelected = computed(
-      () => (color: string) => filters.value.colors.includes(color)
+      () => (color: string) => filters.value.colors.includes(color),
     );
 
     const isTypeSelected = computed(
-      () => (type: string) => filters.value.types.includes(type)
+      () => (type: string) => filters.value.types.includes(type),
     );
 
     const colorClass = (color: string) => {
@@ -266,7 +263,7 @@ export default defineComponent({
     const filterKeywords = () => {
       const search = keywordSearch.value.toLowerCase();
       filteredKeywords.value = availableKeywords.filter((kw) =>
-        kw.toLowerCase().includes(search)
+        kw.toLowerCase().includes(search),
       );
     };
 
@@ -281,7 +278,7 @@ export default defineComponent({
       (newFilters) => {
         emit("update:modelValue", newFilters);
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(cardsPerRow, (newCardsPerRow) => {

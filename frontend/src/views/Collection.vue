@@ -71,10 +71,10 @@
             </div>
             <div class="flex justify-between items-center mb-1">
               <span class="text-xs"
-                >{{ set.collection_count }} / {{ set.card_count }}</span
+                >{{ set.collection_count || 0 }} / {{ set.card_count }}</span
               >
               <span class="text-xs font-semibold"
-                >{{ Math.round(set.collection_percentage) }}%</span
+                >{{ Math.round(set.collection_percentage || 0) }}%</span
               >
             </div>
             <div

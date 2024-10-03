@@ -71,7 +71,7 @@
                   </button>
                   <input
                     :id="'regular-' + card.id"
-                    v-model.number="card.quantity_kiosk_regular"
+                    v-model.number="card.quantity_regular"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
@@ -111,7 +111,7 @@
                   </button>
                   <input
                     :id="'foil-' + card.id"
-                    v-model.number="card.quantity_kiosk_foil"
+                    v-model.number="card.quantity_foil"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-input-background text-white text-sm"

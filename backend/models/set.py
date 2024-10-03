@@ -42,6 +42,10 @@ class Set(db.Model):
     def get_collection_count(self):
         return self.set_collection_count.collection_count if self.set_collection_count else 0
 
+    @property
+    def collection_count(self):
+        return self.get_collection_count()
+
     @classmethod
     def get_sets_with_collection_counts(cls):
         return db.session.query(cls, SetCollectionCount.collection_count) \

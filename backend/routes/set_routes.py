@@ -221,6 +221,11 @@ def get_collection_set_details(set_code):
                 mimetype='application/json'
             )
 
+        # Fetch the set instance
+        set_instance = Set.query.filter_by(code=set_code).first()
+        if not set_instance:
+            return jsonify({"error": "Set not found."}), 404
+
         # Query cards with necessary attributes
         query = Card.query.options(load_only(
             Card.id,
@@ -235,15 +240,11 @@ def get_collection_set_details(set_code):
             Card.quantity_collection_foil,
             Card.frame_effects,
             Card.promo_types,
-            # Add missing attributes to prevent N+1 problem
             Card.promo,
             Card.reprint,
             Card.variation,
             Card.oversized
-        )).filter(
-            Card.set_code == set_code,
-            (Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)
-        )
+        )).filter(Card.set_code == set_code)
 
         cards = query.all()
 
@@ -252,7 +253,7 @@ def get_collection_set_details(set_code):
 
         # Build response
         response = {
-            'set_code': set_code,
+            'set': set_instance.to_dict(),
             'cards': cards_data,
             'total_cards': len(cards_data)
         }

@@ -264,7 +264,7 @@ def get_collection_sets():
                 func.coalesce(SetCollectionCount.collection_count, 0).label('collection_count'),
                 func.coalesce(value_subquery.c.total_value, 0).label('total_value')
             )
-            .outerjoin(SetCollectionCount, Set.code == SetCollectionCount.set_code)
+            .join(SetCollectionCount, Set.code == SetCollectionCount.set_code)
             .outerjoin(value_subquery, Set.code == value_subquery.c.set_code)
         )
 

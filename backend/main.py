@@ -9,6 +9,9 @@ import redis
 import orjson
 import os
 from decimal import Decimal
+from flask.cli import with_appcontext
+from models.set_collection_count import SetCollectionCount
+
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
@@ -51,11 +54,16 @@ def create_app(config_name='default'):
     app.json_encoder = orjson.dumps
     app.json_decoder = orjson.loads
 
+    # Register the custom CLI command
+    @app.cli.command("refresh-collection-counts")
+    @with_appcontext
+    def refresh_collection_counts():
+        """Refresh the set_collection_counts materialized view."""
+        SetCollectionCount.refresh()
+        print("Set collection counts refreshed successfully.")
+
     return app
 
-from flask.cli import FlaskGroup
-
-cli = FlaskGroup(create_app=create_app)
-
 if __name__ == '__main__':
-    cli()
+    app = create_app()
+    app.run()
