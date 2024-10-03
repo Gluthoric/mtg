@@ -59,4 +59,10 @@ class Set(db.Model):
 
     @classmethod
     def update_collection_counts(cls):
-        SetCollectionCount.refresh()
+        try:
+            SetCollectionCount.refresh()
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error refreshing materialized view: {e}")
+            raise e  # or handle accordingly
