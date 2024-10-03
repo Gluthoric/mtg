@@ -61,8 +61,8 @@ class Card(db.Model):
     usd_price = db.Column(db.Numeric)
     usd_foil_price = db.Column(db.Numeric)
     # New quantity fields
-    quantity_collection_regular = db.Column(db.BigInteger, default=0)
-    quantity_collection_foil = db.Column(db.BigInteger, default=0)
+    quantity_regular = db.Column(db.BigInteger, default=0)
+    quantity_foil = db.Column(db.BigInteger, default=0)
     quantity_kiosk_regular = db.Column(db.BigInteger, default=0)
     quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
 
@@ -84,8 +84,8 @@ class Card(db.Model):
             'colors': self.colors,
             'image_uris': self.image_uris if self.image_uris else {},
             'prices': self.prices,
-            'quantity_collection_regular': self.quantity_collection_regular,
-            'quantity_collection_foil': self.quantity_collection_foil,
+            'quantity_regular': self.quantity_regular,
+            'quantity_foil': self.quantity_foil,
             'quantity_kiosk_regular': self.quantity_kiosk_regular,
             'quantity_kiosk_foil': self.quantity_kiosk_foil,
             'frame_effects': self.frame_effects,

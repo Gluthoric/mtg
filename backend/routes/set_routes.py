@@ -167,14 +167,6 @@ def get_all_sets():
         logger.exception(f"Unexpected error in get_all_sets: {str(e)}")
         return jsonify({"error": "An unexpected error occurred."}), 500
 
-@set_routes.route('/sets/<string:set_code>', methods=['GET'])
-def get_set(set_code):
-    try:
-        set_instance = Set.query.filter_by(code=set_code).first_or_404()
-        return jsonify(set_instance.to_dict()), 200
-    except Exception as e:
-        logger.exception(f"Error in get_set: {str(e)}")
-        return jsonify({"error": "An error occurred while fetching the set."}), 500
 
 @set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
 def get_set_cards(set_code):

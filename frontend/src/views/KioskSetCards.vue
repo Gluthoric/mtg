@@ -65,13 +65,13 @@
                     @click="updateQuantity(card, 'regular', -1)"
                     class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Regular Quantity"
-                    :disabled="card.quantity_regular === 0"
+                    :disabled="card.quantity_kiosk_regular === 0"
                   >
                     –
                   </button>
                   <input
                     :id="'regular-' + card.id"
-                    v-model.number="card.quantity_regular"
+                    v-model.number="card.quantity_kiosk_regular"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-dark-100 text-white text-sm"
@@ -105,13 +105,13 @@
                     @click="updateQuantity(card, 'foil', -1)"
                     class="btn decrement-btn flex items-center justify-center bg-dark-300 hover:bg-dark-400"
                     aria-label="Decrement Foil Quantity"
-                    :disabled="card.quantity_foil === 0"
+                    :disabled="card.quantity_kiosk_foil === 0"
                   >
                     –
                   </button>
                   <input
                     :id="'foil-' + card.id"
-                    v-model.number="card.quantity_foil"
+                    v-model.number="card.quantity_kiosk_foil"
                     type="number"
                     min="0"
                     class="quantity-input text-center border-none outline-none bg-input-background text-white text-sm"

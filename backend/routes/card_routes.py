@@ -68,20 +68,7 @@ def convert_decimals(obj):
         return obj
 
 def serialize_cards(cards, quantity_type='collection'):
-    if quantity_type == 'collection':
-        return [{
-            **card.to_dict(),
-            'quantity_regular': card.quantity_collection_regular,
-            'quantity_foil': card.quantity_collection_foil
-        } for card in cards]
-    elif quantity_type == 'kiosk':
-        return [{
-            **card.to_dict(),
-            'quantity_regular': card.quantity_kiosk_regular,
-            'quantity_foil': card.quantity_kiosk_foil
-        } for card in cards]
-    else:
-        return [card.to_dict() for card in cards]
+    return [card.to_dict() for card in cards]
 
 @card_routes.route('/cards', methods=['GET'])
 def get_cards():
@@ -262,8 +249,8 @@ def get_collection_sets():
             db.session.query(
                 Card.set_code,
                 func.sum(
-                    (func.cast(Card.prices['usd'].astext, Float) * Card.quantity_collection_regular) +
-                    (func.cast(Card.prices['usd_foil'].astext, Float) * Card.quantity_collection_foil)
+                    (func.cast(Card.prices['usd'].astext, Float) * Card.quantity_regular) +
+                    (func.cast(Card.prices['usd_foil'].astext, Float) * Card.quantity_foil)
                 ).label('total_value')
             )
             .group_by(Card.set_code)
@@ -345,21 +332,17 @@ def update_collection(card_id):
         return jsonify({"error": "Card not found."}), 404
 
     old_set_code = card.set_code
-    card.quantity_collection_regular = quantity_regular
-    card.quantity_collection_foil = quantity_foil
+    card.quantity_regular = quantity_regular
+    card.quantity_foil = quantity_foil
 
     db.session.commit()
 
     # Invalidate specific caches
-    current_app.redis_client.delete(f"collection:*:set_code:{old_set_code}")
-    current_app.redis_client.delete(f"collection_sets:*:set_code:{old_set_code}")
+    current_app.redis_client.delete(f"collection:set:{old_set_code}")
+    current_app.redis_client.delete(f"collection_sets:{old_set_code}")
     current_app.redis_client.delete("collection_stats")
 
     card_data = card.to_dict()
-    card_data.update({
-        'quantity_regular': card.quantity_collection_regular,
-        'quantity_foil': card.quantity_collection_foil
-    })
 
     return current_app.response_class(
         response=orjson.dumps(card_data).decode(),
@@ -803,6 +786,36 @@ def get_collection_set(set_code):
         # Fetch cards for this set
         cards = Card.query.filter_by(set_code=set_code).all()
         set_data['cards'] = [card.to_dict() for card in cards]
+
+        # Calculate statistics
+        statistics = {
+            'frame_effects': {},
+            'promo_types': {},
+            'other_attributes': {
+                'promo': 0,
+                'reprint': 0,
+                'variation': 0,
+                'oversized': 0
+            }
+        }
+
+        for card in cards:
+            if card.frame_effects:
+                for effect in card.frame_effects:
+                    statistics['frame_effects'][effect] = statistics['frame_effects'].get(effect, 0) + 1
+            if card.promo_types:
+                for promo_type in card.promo_types:
+                    statistics['promo_types'][promo_type] = statistics['promo_types'].get(promo_type, 0) + 1
+            if card.promo:
+                statistics['other_attributes']['promo'] += 1
+            if card.reprint:
+                statistics['other_attributes']['reprint'] += 1
+            if card.variation:
+                statistics['other_attributes']['variation'] += 1
+            if card.oversized:
+                statistics['other_attributes']['oversized'] += 1
+
+        set_data['statistics'] = statistics
 
         return jsonify({
             "set": set_data,
