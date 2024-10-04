@@ -37,7 +37,7 @@ def get_set_cards(set_code):
             'total': len(cards_data)
         }
 
-        return jsonify(response), 200
+        return response_data, 200
     except Exception as e:
         logger.exception(f"Error in get_set_cards: {str(e)}")
         return jsonify({"error": "An error occurred while fetching the set cards."}), 500
@@ -50,9 +50,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 @cache_response()
 def get_collection_set_details(set_code):
     try:
+        logger.info(f"Fetching details for set with code: {set_code}")
         # Fetch the set instance
         set_instance = Set.query.filter_by(code=set_code).first()
         if not set_instance:
+            logger.warning(f"Set with code {set_code} not found")
             return jsonify({"error": "Set not found."}), 404
 
         # Query cards with necessary attributes
@@ -90,18 +92,20 @@ def get_collection_set_details(set_code):
         # Convert any Decimal objects to float
         response = convert_decimals(response)
 
-        return jsonify(response), 200
+        return response_data, 200
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
         return jsonify({"error": error_message}), 500
+
+
 @set_routes.route('/<string:set_code>', methods=['GET'])
 @cache_response()
 def get_set(set_code):
     try:
         set_instance = Set.query.filter_by(code=set_code).first()
         if not set_instance:
-            return jsonify({"error": "Set not found."}), 404
+            return {"error": "Set not found."}, 404
 
         set_data = set_instance.to_dict()
 
@@ -109,13 +113,14 @@ def get_set(set_code):
         cards = Card.query.filter_by(set_code=set_code).all()
         set_data['cards'] = [card.to_dict() for card in cards]
 
-        return jsonify(set_data), 200
+        return set_data  # Return data directly
     except Exception as e:
         error_message = f"An error occurred while fetching the set: {str(e)}"
         logger.exception(error_message)
-        return jsonify({"error": error_message}), 500
+        return {"error": error_message}, 500
 
 @set_routes.route('/api/sets/<string:set_code>', methods=['GET'])
 @cache_response()
 def get_set_api(set_code):
-    return get_set(set_code)
+    response = get_set(set_code)
+    return response[0], response[1]

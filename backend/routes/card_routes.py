@@ -205,7 +205,7 @@ def get_set_cards(set_code):
             'total': len(cards_data)
         }
 
-        return jsonify(response), 200
+        return response_data, 200
     except Exception as e:
         logger.exception(f"Error in get_set_cards: {str(e)}")
         return jsonify({"error": "An error occurred while fetching the set cards."}), 500

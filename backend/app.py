@@ -6,6 +6,7 @@ from flask.cli import with_appcontext
 from config import config
 from database import db
 from routes import register_routes
+from routes.card_routes import card_routes
 from models.set_collection_count import SetCollectionCount
 from errors import handle_error
 import redis
@@ -40,6 +41,9 @@ def create_app(config_name='default'):
 
     # Register routes
     register_routes(app)
+    app.register_blueprint(card_routes, url_prefix='/api')
+    from routes.set_routes import set_routes
+    app.register_blueprint(set_routes, url_prefix='/api/sets')
 
     # Use orjson for JSON serialization
     app.json_encoder = orjson.dumps

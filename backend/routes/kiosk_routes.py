@@ -105,7 +105,7 @@ def get_kiosk_sets():
 
         response = convert_decimals(response)
 
-        return jsonify(response), 200
+        return response_data, 200
     except Exception as e:
         return handle_error(500, f"An unexpected error occurred while fetching kiosk stats: {str(e)}", "Internal Server Error")
 
