@@ -44,20 +44,18 @@ def get_cards():
 
     cards = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return jsonify({
+    response = {
         'cards': [card.to_dict() for card in cards.items],
         'total': cards.total,
         'pages': cards.pages,
         'current_page': page
-    }), 200
+    }
+
+    return response, 200  # Let the decorator handle serialization and caching
 
 @card_routes.route('/cards/<string:card_id>', methods=['GET'])
+@cache_response()
 def get_card(card_id):
-    # First, check if card is in cache
-    cached_card = current_app.redis_client.get(f"card:{card_id}")
-    if cached_card:
-        return jsonify(orjson.loads(cached_card)), 200
-
     # Fetch card from database, with optimization to load only the required fields
     card = Card.query.options(
         load_only(
@@ -89,15 +87,12 @@ def get_card(card_id):
     ).filter_by(id=card_id).first()
 
     if not card:
-        return jsonify({"error": "Card not found."}), 404
+        return {"error": "Card not found."}, 404
 
     # Serialize card data
-    serialized_card = orjson.dumps(card.to_dict()).decode()
+    card_data = card.to_dict()
 
-    # Store serialized card in cache for 5 minutes
-    current_app.redis_client.setex(f"card:{card_id}", 300, serialized_card)
-
-    return jsonify(card.to_dict()), 200
+    return card_data, 200  # Let the decorator handle serialization and caching
 
 @card_routes.route('/cards/bulk', methods=['POST'])
 def get_bulk_cards():
@@ -205,10 +200,10 @@ def get_set_cards(set_code):
             'total': len(cards_data)
         }
 
-        return response_data, 200
+        return response, 200  # Return data directly
     except Exception as e:
         logger.exception(f"Error in get_set_cards: {str(e)}")
-        return jsonify({"error": "An error occurred while fetching the set cards."}), 500
+        return {"error": "An error occurred while fetching the set cards."}, 500
 
 @card_routes.route('/cache_stats', methods=['GET'])
 def get_cache_stats():

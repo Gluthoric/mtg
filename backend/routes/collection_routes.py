@@ -38,7 +38,7 @@ def get_collection():
         'current_page': page
     }
 
-    return result, 200  # Let the decorator handle serialization and caching
+    return result, 200
 
 @collection_routes.route('/collection/sets', methods=['GET'])
 @cache_response()
