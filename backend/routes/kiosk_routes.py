@@ -2,10 +2,13 @@ from flask import Blueprint, jsonify, request, current_app
 from models.card import Card
 from models.set import Set
 from database import db
-from sqlalchemy import func, distinct, text
+from sqlalchemy import func, distinct, text, Float
 from utils import safe_float, convert_decimals, cache_response, serialize_cards
 from errors import handle_error
 from schemas import UpdateCardSchema
+import logging
+
+logger = logging.getLogger(__name__)
 
 kiosk_routes = Blueprint('kiosk_routes', __name__)
 
@@ -14,6 +17,16 @@ kiosk_routes = Blueprint('kiosk_routes', __name__)
 def get_kiosk():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+
+    cache_key = f"kiosk:page:{page}:per_page:{per_page}"
+    cached_data = current_app.redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data.decode(),
+            status=200,
+            mimetype='application/json'
+        )
 
     kiosk = Card.query.filter((Card.quantity_kiosk_regular > 0) | (Card.quantity_kiosk_foil > 0)).paginate(page=page, per_page=per_page, error_out=False)
 
@@ -24,7 +37,14 @@ def get_kiosk():
         'current_page': page
     }
 
-    return jsonify(result), 200
+    serialized_data = current_app.json.dumps(result)
+    current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
+
+    return current_app.response_class(
+        response=serialized_data,
+        status=200,
+        mimetype='application/json'
+    )
 
 @kiosk_routes.route('/kiosk/sets', methods=['GET'])
 @cache_response()
@@ -87,7 +107,7 @@ def get_kiosk_sets():
 
         return jsonify(response), 200
     except Exception as e:
-        return handle_error(500, f"An unexpected error occurred: {str(e)}")
+        return handle_error(500, f"An unexpected error occurred while fetching kiosk stats: {str(e)}", "Internal Server Error")
 
 @kiosk_routes.route('/kiosk/sets/<string:set_code>/cards', methods=['GET'])
 @cache_response()
@@ -129,7 +149,7 @@ def update_kiosk(card_id):
     schema = UpdateCardSchema()
     errors = schema.validate(request.json)
     if errors:
-        return handle_error(400, str(errors))
+        return handle_error(400, f"Validation error: {str(errors)}", "Bad Request")
 
     data = schema.load(request.json)
     quantity_regular = data['quantity_regular']
@@ -137,7 +157,7 @@ def update_kiosk(card_id):
 
     card = Card.query.get(card_id)
     if not card:
-        return handle_error(404, "Card not found.")
+        return handle_error(404, f"Card with id {card_id} not found.", "Not Found")
 
     card.quantity_kiosk_regular = quantity_regular
     card.quantity_kiosk_foil = quantity_foil

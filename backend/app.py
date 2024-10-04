@@ -63,9 +63,12 @@ def create_app(config_name='default'):
     app.json_decoder = orjson.loads
 
     # Register error handlers
-    app.register_error_handler(400, lambda e: handle_error(400, str(e)))
-    app.register_error_handler(404, lambda e: handle_error(404, 'Resource not found'))
-    app.register_error_handler(500, lambda e: handle_error(500, 'Internal server error'))
+    register_error_handlers(app)
+
+def register_error_handlers(app):
+    app.register_error_handler(400, lambda e: handle_error(400, str(e), 'Bad Request'))
+    app.register_error_handler(404, lambda e: handle_error(404, str(e), 'Resource not found'))
+    app.register_error_handler(500, lambda e: handle_error(500, str(e), 'Internal server error'))
 
     # Register the custom CLI command
     @app.cli.command("refresh-collection-counts")

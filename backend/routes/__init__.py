@@ -1,16 +1,19 @@
 from flask import Blueprint, send_from_directory, current_app
-from .card_routes import card_routes
-from .set_routes import set_routes
 import os
-
+from .card_routes import card_routes
+from .collection_routes import collection_routes
+from .kiosk_routes import kiosk_routes
+from .set_routes import set_routes
 from .import_routes import import_routes
 
 def register_routes(app):
-    app.register_blueprint(import_routes)
     api = Blueprint('api', __name__, url_prefix='/api')
 
     api.register_blueprint(card_routes)
+    api.register_blueprint(collection_routes)
+    api.register_blueprint(kiosk_routes)
     api.register_blueprint(set_routes)
+    api.register_blueprint(import_routes)
 
     app.register_blueprint(api)
 
@@ -26,11 +29,3 @@ def register_routes(app):
     @app.errorhandler(404)
     def not_found(error):
         return send_from_directory(current_app.static_folder, 'index.html')
-from .card_routes import card_routes
-from .collection_routes import collection_routes
-from .kiosk_routes import kiosk_routes
-
-def register_routes(app):
-    app.register_blueprint(card_routes)
-    app.register_blueprint(collection_routes)
-    app.register_blueprint(kiosk_routes)
