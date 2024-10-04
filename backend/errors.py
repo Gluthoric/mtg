@@ -4,6 +4,8 @@ from typing import Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+from flask import request
+
 def handle_error(status_code: int, message: str, error_type: str) -> Tuple[Dict[str, Any], int]:
     """
     Create a JSON response for errors and log the error.
@@ -18,6 +20,8 @@ def handle_error(status_code: int, message: str, error_type: str) -> Tuple[Dict[
     """
     error_details = f"{error_type}: {message}"
     logger.error(f"Error {status_code}: {error_details}")
+    logger.error(f"Request: {request.method} {request.url}")
+    logger.error(f"Headers: {dict(request.headers)}")
     return {'error': error_details, 'status': status_code}, status_code
 
 class APIError(Exception):

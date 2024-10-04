@@ -38,7 +38,7 @@ def get_collection():
     if set_code:
         query = query.filter(Card.set_code == set_code)
 
-    query = query.filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0))
+    query = query.filter((Card.quantity_regular > 0) | (Card.quantity_foil > 0))
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -97,8 +97,8 @@ def get_collection_sets():
             db.session.query(
                 Card.set_code,
                 func.sum(
-                    (func.cast(Card.prices['usd'].astext, Float) * Card.quantity_collection_regular) +
-                    (func.cast(Card.prices['usd_foil'].astext, Float) * Card.quantity_collection_foil)
+                    (func.cast(Card.prices['usd'].astext, Float) * Card.quantity_regular) +
+                    (func.cast(Card.prices['usd_foil'].astext, Float) * Card.quantity_foil)
                 ).label('total_value')
             )
             .group_by(Card.set_code)
@@ -144,8 +144,7 @@ def get_collection_sets():
             set_data['total_value'] = round(total_value, 2)
             sets_list.append(set_data)
 
-        # Build response
-        response = {
+        response_data = {
             'sets': sets_list,
             'total': paginated_sets.total,
             'pages': paginated_sets.pages,
@@ -153,10 +152,10 @@ def get_collection_sets():
         }
 
         # Convert any Decimal objects to float
-        response = convert_decimals(response)
+        response_data = convert_decimals(response_data)
 
         logger.info(f"Returning response with {len(sets_list)} sets")
-        return jsonify(response), 200
+        return jsonify(response_data)
     except Exception as e:
         error_message = f"An unexpected error occurred in get_collection_sets: {str(e)}"
         logger.exception(error_message)
@@ -178,8 +177,8 @@ def update_collection(card_id):
         return jsonify({"error": "Card not found."}), 404
 
     old_set_code = card.set_code
-    card.quantity_collection_regular = quantity_regular
-    card.quantity_collection_foil = quantity_foil
+    card.quantity_regular = quantity_regular
+    card.quantity_foil = quantity_foil
 
     db.session.commit()
 

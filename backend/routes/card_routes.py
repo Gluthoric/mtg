@@ -1,11 +1,12 @@
 from flask import Blueprint, jsonify, request, current_app
 from models.card import Card
 from sqlalchemy import or_
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import load_only, joinedload
 import orjson
 import logging
 from utils import cache_response
 from errors import handle_error, APIError
+from schemas import CardSearchSchema
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +74,8 @@ def get_card(card_id):
             Card.cmc,
             Card.oracle_text,
             Card.colors,
-            Card.quantity_collection_regular,
-            Card.quantity_collection_foil,
+            Card.quantity_regular,
+            Card.quantity_foil,
             Card.quantity_kiosk_regular,
             Card.quantity_kiosk_foil,
             Card.frame_effects,
@@ -183,6 +184,31 @@ def search_cards():
         'pages': cards.pages,
         'current_page': page
     }), 200
+
+@card_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
+@cache_response()
+def get_set_cards(set_code):
+    try:
+        # Eagerly load related 'set' data to optimize queries
+        query = Card.query.options(
+            joinedload(Card.set)
+        ).filter(Card.set_code == set_code)
+
+        # Fetch all cards for the set without pagination
+        cards = query.all()
+
+        # Serialize card data
+        cards_data = [card.to_dict() for card in cards]
+
+        response = {
+            'cards': cards_data,
+            'total': len(cards_data)
+        }
+
+        return jsonify(response), 200
+    except Exception as e:
+        logger.exception(f"Error in get_set_cards: {str(e)}")
+        return jsonify({"error": "An error occurred while fetching the set cards."}), 500
 
 @card_routes.route('/cache_stats', methods=['GET'])
 def get_cache_stats():

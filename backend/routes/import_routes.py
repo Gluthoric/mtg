@@ -170,8 +170,8 @@ def process_collection_csv(df):
 
         updates.append({
             'id': scryfall_id,
-            'quantity_collection_foil': db.func.coalesce(Card.quantity_collection_foil, 0) + (quantity if foil else 0),
-            'quantity_collection_regular': db.func.coalesce(Card.quantity_collection_regular, 0) + (quantity if not foil else 0)
+            'quantity_foil': db.func.coalesce(Card.quantity_foil, 0) + (quantity if foil else 0),
+            'quantity_regular': db.func.coalesce(Card.quantity_regular, 0) + (quantity if not foil else 0)
         })
 
     return updates

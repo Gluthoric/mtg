@@ -63,8 +63,8 @@ class Card(db.Model):
     promo_types = db.Column(JSONB)
     usd_price = db.Column(db.Numeric)
     usd_foil_price = db.Column(db.Numeric)
-    quantity_collection_regular = db.Column(db.BigInteger, default=0)
-    quantity_collection_foil = db.Column(db.BigInteger, default=0)
+    quantity_regular = db.Column(db.BigInteger, default=0)
+    quantity_foil = db.Column(db.BigInteger, default=0)
     quantity_kiosk_regular = db.Column(db.BigInteger, default=0)
     quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
 
@@ -73,7 +73,7 @@ class Card(db.Model):
 
     # Additional indexes
     __table_args__ = (
-        Index('idx_card_collection_quantities', 'quantity_collection_regular', 'quantity_collection_foil'),
+        Index('idx_card_collection_quantities', 'quantity_regular', 'quantity_foil'),
         Index('idx_card_kiosk_quantities', 'quantity_kiosk_regular', 'quantity_kiosk_foil'),
     )
 
@@ -100,10 +100,14 @@ class Card(db.Model):
             'variation': self.variation,
             'oversized': self.oversized,
             'keywords': self.keywords,
+            'full_art': self.full_art,
+            'textless': self.textless,
+            'booster': self.booster,
+            'story_spotlight': self.story_spotlight,
         }
         if quantity_type == 'collection':
-            data['quantity_regular'] = self.quantity_collection_regular
-            data['quantity_foil'] = self.quantity_collection_foil
+            data['quantity_regular'] = self.quantity_regular
+            data['quantity_foil'] = self.quantity_foil
         elif quantity_type == 'kiosk':
             data['quantity_regular'] = self.quantity_kiosk_regular
             data['quantity_foil'] = self.quantity_kiosk_foil

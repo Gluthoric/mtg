@@ -49,15 +49,6 @@ def convert_decimals(obj: Any) -> Union[float, Dict, List, Any]:
         return obj
 
 def cache_response(timeout: int = 300):
-    """
-    Decorator to cache the response of a route.
-    
-    Args:
-        timeout (int): The cache timeout in seconds. Defaults to 300.
-    
-    Returns:
-        Callable: The decorated function.
-    """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -75,16 +66,29 @@ def cache_response(timeout: int = 300):
 
             logger.info(f"Cache miss for key: {cache_key}")
             start_time = time()
-            response = func(*args, **kwargs)
-            end_time = time()
-            
-            redis_client.setex(cache_key, timeout, response.get_data())
-            logger.info(f"Cached response for key: {cache_key} with timeout: {timeout}")
-            
-            # Log response time
-            logger.info(f"Response time for {func.__name__}: {end_time - start_time:.4f} seconds")
-            
-            return response
+            try:
+                response = func(*args, **kwargs)
+                end_time = time()
+                
+                if isinstance(response, tuple):
+                    data, status_code = response
+                else:
+                    data, status_code = response.get_json(), response.status_code
+
+                if 200 <= status_code < 300:
+                    # Convert data to string if it's not already
+                    if not isinstance(data, (str, bytes)):
+                        data = orjson.dumps(data).decode('utf-8')
+                    redis_client.setex(cache_key, timeout, data)
+                    logger.info(f"Cached response for key: {cache_key} with timeout: {timeout}")
+                
+                # Log response time
+                logger.info(f"Response time for {func.__name__}: {end_time - start_time:.4f} seconds")
+                
+                return response
+            except Exception as e:
+                logger.exception(f"Error in {func.__name__}: {str(e)}")
+                raise
         return wrapper
     return decorator
 

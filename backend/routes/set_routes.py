@@ -11,19 +11,10 @@ from decimal import Decimal
 import orjson
 import logging
 from datetime import datetime
+from utils import cache_response, convert_decimals
 
 set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
-
-def convert_decimals(obj):
-    if isinstance(obj, list):
-        return [convert_decimals(item) for item in obj]
-    elif isinstance(obj, dict):
-        return {k: convert_decimals(v) for k, v in obj.items()}
-    elif isinstance(obj, Decimal):
-        return float(obj)
-    else:
-        return obj
 
 
 
@@ -54,20 +45,11 @@ def get_set_cards(set_code):
 from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-@set_routes.route('/<string:set_code>', methods=['GET'])
+
+@set_routes.route('/<string:set_code>/details', methods=['GET'])
+@cache_response()
 def get_collection_set_details(set_code):
     try:
-        # Construct cache key
-        cache_key = f"set_details:{set_code}"
-        cached_data = current_app.redis_client.get(cache_key)
-
-        if cached_data:
-            return current_app.response_class(
-                response=cached_data.decode(),
-                status=200,
-                mimetype='application/json'
-            )
-
         # Fetch the set instance
         set_instance = Set.query.filter_by(code=set_code).first()
         if not set_instance:
@@ -108,15 +90,32 @@ def get_collection_set_details(set_code):
         # Convert any Decimal objects to float
         response = convert_decimals(response)
 
-        serialized_data = orjson.dumps(response).decode()
-        current_app.redis_client.setex(cache_key, 300, serialized_data)  # Cache for 5 minutes
-
-        return current_app.response_class(
-            response=serialized_data,
-            status=200,
-            mimetype='application/json'
-        )
+        return jsonify(response), 200
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
         return jsonify({"error": error_message}), 500
+@set_routes.route('/<string:set_code>', methods=['GET'])
+@cache_response()
+def get_set(set_code):
+    try:
+        set_instance = Set.query.filter_by(code=set_code).first()
+        if not set_instance:
+            return jsonify({"error": "Set not found."}), 404
+
+        set_data = set_instance.to_dict()
+
+        # Fetch cards for this set
+        cards = Card.query.filter_by(set_code=set_code).all()
+        set_data['cards'] = [card.to_dict() for card in cards]
+
+        return jsonify(set_data), 200
+    except Exception as e:
+        error_message = f"An error occurred while fetching the set: {str(e)}"
+        logger.exception(error_message)
+        return jsonify({"error": error_message}), 500
+
+@set_routes.route('/api/sets/<string:set_code>', methods=['GET'])
+@cache_response()
+def get_set_api(set_code):
+    return get_set(set_code)
