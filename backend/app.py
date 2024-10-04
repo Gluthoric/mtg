@@ -1,25 +1,15 @@
 import logging
 from flask import Flask
-from routes import register_routes
-
-def create_app(config_name='default'):
-    app = Flask(__name__)
-    # ... (other configurations)
-    
-    register_routes(app)
-    
-    # ... (rest of the setup)
-    return app
 from flask_cors import CORS
 from flask_migrate import Migrate
+from flask.cli import with_appcontext
 from config import config
 from database import db
 from routes import register_routes
-import redis
-import orjson
-from flask.cli import with_appcontext
 from models.set_collection_count import SetCollectionCount
 from errors import handle_error
+import redis
+import orjson
 
 def create_app(config_name='default'):
     # Initialize Flask app
@@ -30,6 +20,7 @@ def create_app(config_name='default'):
     app.logger.setLevel(logging.WARNING)
     logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
+    # Load configuration
     app.config.from_object(config[config_name])
 
     # Initialize extensions
@@ -57,11 +48,6 @@ def create_app(config_name='default'):
     # Register error handlers
     register_error_handlers(app)
 
-def register_error_handlers(app):
-    app.register_error_handler(400, lambda e: handle_error(400, str(e), 'Bad Request'))
-    app.register_error_handler(404, lambda e: handle_error(404, str(e), 'Resource not found'))
-    app.register_error_handler(500, lambda e: handle_error(500, str(e), 'Internal server error'))
-
     # Register the custom CLI command
     @app.cli.command("refresh-collection-counts")
     @with_appcontext
@@ -71,6 +57,11 @@ def register_error_handlers(app):
         print("Set collection counts refreshed successfully.")
 
     return app
+
+def register_error_handlers(app):
+    app.register_error_handler(400, lambda e: handle_error(400, str(e), 'Bad Request'))
+    app.register_error_handler(404, lambda e: handle_error(404, str(e), 'Resource not found'))
+    app.register_error_handler(500, lambda e: handle_error(500, str(e), 'Internal server error'))
 
 if __name__ == '__main__':
     app = create_app()
