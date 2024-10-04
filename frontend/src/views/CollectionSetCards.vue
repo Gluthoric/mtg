@@ -332,10 +332,13 @@ const fetchSetDetails = async () => {
   error.value = null;
   try {
     const response = await fetchSetDetailsUtil(setCode.value);
+    console.log("API response:", JSON.stringify(response, null, 2)); // Stringify the entire response
     if (response.set && response.cards) {
       setName.value = response.set.name;
       originalCards.value = response.cards;
       statistics.value = response.set.statistics || {};
+      console.log("Statistics value:", JSON.stringify(statistics.value, null, 2)); // Stringify statistics
+      console.log("Statistics keys:", Object.keys(statistics.value)); // Log keys of statistics object
       applyFilters();
     } else {
       throw new Error("Invalid response format");
@@ -370,6 +373,7 @@ watch(
 );
 
 onMounted(() => {
+  console.log("Component mounted"); // Debug: Log when the component is mounted
   fetchSetDetails();
 });
 
