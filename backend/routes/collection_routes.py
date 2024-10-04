@@ -22,17 +22,6 @@ def get_collection():
     per_page = request.args.get('per_page', 50, type=int)
     set_code = request.args.get('set_code', '', type=str)
 
-    cache_key = f"collection:page:{page}:per_page:{per_page}:set_code:{set_code}"
-
-    cached_data = current_app.redis_client.get(cache_key)
-
-    if cached_data:
-        return current_app.response_class(
-            response=cached_data.decode(),
-            status=200,
-            mimetype='application/json'
-        )
-
     query = Card.query
 
     if set_code:
@@ -49,17 +38,7 @@ def get_collection():
         'current_page': page
     }
 
-    serialized_data = current_app.json.dumps(result)
-
-    # Dynamically set cache expiration based on data size
-    cache_expiration = min(300, max(60, len(serialized_data) // 1000))  # Between 1-5 minutes based on size
-    current_app.redis_client.setex(cache_key, cache_expiration, serialized_data)
-
-    return current_app.response_class(
-        response=serialized_data,
-        status=200,
-        mimetype='application/json'
-    )
+    return result, 200  # Let the decorator handle serialization and caching
 
 @collection_routes.route('/collection/sets', methods=['GET'])
 @cache_response()
@@ -81,7 +60,7 @@ def get_collection_sets():
         if sort_by not in valid_sort_fields:
             error_message = f"Invalid sort_by field: {sort_by}"
             logger.error(f"get_collection_sets: {error_message}")
-            return jsonify({"error": error_message}), 400
+            return {"error": error_message}, 400
 
         # Determine sort column
         if sort_by == 'collection_count':
@@ -144,7 +123,7 @@ def get_collection_sets():
             set_data['total_value'] = round(total_value, 2)
             sets_list.append(set_data)
 
-        response_data = {
+        response = {
             'sets': sets_list,
             'total': paginated_sets.total,
             'pages': paginated_sets.pages,
@@ -152,14 +131,14 @@ def get_collection_sets():
         }
 
         # Convert any Decimal objects to float
-        response_data = convert_decimals(response_data)
+        response = convert_decimals(response)
 
         logger.info(f"Returning response with {len(sets_list)} sets")
-        return jsonify(response_data)
+        return response, 200  # Return data directly
     except Exception as e:
         error_message = f"An unexpected error occurred in get_collection_sets: {str(e)}"
         logger.exception(error_message)
-        return jsonify({"error": "An internal server error occurred. Please try again later."}), 500
+        return {"error": "An internal server error occurred. Please try again later."}, 500
 
 @collection_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
@@ -272,7 +251,7 @@ def get_collection_set(set_code):
         # Fetch the set instance
         set_instance = Set.query.filter_by(code=set_code).first()
         if not set_instance:
-            return jsonify({"error": "Set not found."}), 404
+            return {"error": "Set not found."}, 404
 
         # Serialize set data
         set_data = set_instance.to_dict()
@@ -324,11 +303,13 @@ def get_collection_set(set_code):
         set_data['total_value'] = round(total_value, 2)
         set_data['statistics'] = statistics
 
-        return jsonify({
+        response = {
             "set": set_data,
             "cards": set_data['cards']
-        }), 200
+        }
+
+        return response, 200  # Return data directly
     except Exception as e:
         error_message = f"An error occurred while fetching the set: {str(e)}"
         logger.exception(error_message)
-        return jsonify({"error": error_message}), 500
+        return {"error": error_message}, 500
