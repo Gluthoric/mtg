@@ -64,16 +64,17 @@ class Card(db.Model):
     promo_types = db.Column(JSONB)
     usd_price = db.Column(db.Numeric)
     usd_foil_price = db.Column(db.Numeric)
-    quantity_regular = db.Column(db.BigInteger, default=0)
-    quantity_foil = db.Column(db.BigInteger, default=0)
+    quantity_collection_regular = db.Column(db.BigInteger, default=0)
+    quantity_collection_foil = db.Column(db.BigInteger, default=0)
     quantity_kiosk_regular = db.Column(db.BigInteger, default=0)
     quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
 
     # Relationships
     set = db.relationship('Set', back_populates='cards')
 
-    def to_dict(self):
-        return {
+    def to_dict(self, quantity_type='collection'):
+        """Serialize the card object to a dictionary."""
+        data = {
             'id': self.id,
             'name': self.name,
             'set_name': self.set_name,
@@ -85,20 +86,26 @@ class Card(db.Model):
             'cmc': self.cmc,
             'oracle_text': self.oracle_text,
             'colors': self.colors,
-            'image_uris': self.image_uris if self.image_uris else {},
+            'image_uris': self.image_uris,
             'prices': self.prices,
-            'quantity_regular': self.quantity_regular,
-            'quantity_foil': self.quantity_foil,
-            'quantity_kiosk_regular': self.quantity_kiosk_regular,
-            'quantity_kiosk_foil': self.quantity_kiosk_foil,
             'frame_effects': self.frame_effects,
             'promo_types': self.promo_types,
             'promo': self.promo,
             'reprint': self.reprint,
             'variation': self.variation,
             'oversized': self.oversized,
-            'keywords': self.keywords
+            'keywords': self.keywords,
         }
+        if quantity_type == 'collection':
+            data['quantity_regular'] = self.quantity_collection_regular
+            data['quantity_foil'] = self.quantity_collection_foil
+        elif quantity_type == 'kiosk':
+            data['quantity_regular'] = self.quantity_kiosk_regular
+            data['quantity_foil'] = self.quantity_kiosk_foil
+        else:
+            data['quantity_regular'] = 0
+            data['quantity_foil'] = 0
+        return data
 
 @event.listens_for(Session, 'after_flush')
 def after_flush(session, flush_context):

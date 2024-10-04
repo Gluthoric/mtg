@@ -15,6 +15,7 @@ import orjson
 import os
 from flask.cli import with_appcontext
 from models.set_collection_count import SetCollectionCount
+from errors import handle_error
 
 # Import utility functions
 # convert_decimals: Converts Decimal objects to float in data structures
@@ -72,9 +73,6 @@ def create_app(config_name='default'):
         print("Set collection counts refreshed successfully.")
 
     return app
-
-def handle_error(error_code, error_message):
-    return {'error': error_message}, error_code
 
 if __name__ == '__main__':
     app = create_app()

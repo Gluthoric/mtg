@@ -14,6 +14,8 @@ from database import db
 import orjson
 from decimal import Decimal
 from collections import defaultdict
+from schemas import UpdateCardSchema
+from stats import get_stats
 
 card_routes = Blueprint('card_routes', __name__)
 
@@ -455,17 +457,22 @@ def get_collection_sets():
 
 @card_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
-    data = request.json
-    quantity_regular = data.get('quantity_regular', 0)
-    quantity_foil = data.get('quantity_foil', 0)
+    schema = UpdateCardSchema()
+    errors = schema.validate(request.json)
+    if errors:
+        return jsonify({"error": errors}), 400
+
+    data = schema.load(request.json)
+    quantity_regular = data['quantity_regular']
+    quantity_foil = data['quantity_foil']
 
     card = Card.query.get(card_id)
     if not card:
         return jsonify({"error": "Card not found."}), 404
 
     old_set_code = card.set_code
-    card.quantity_regular = quantity_regular
-    card.quantity_foil = quantity_foil
+    card.quantity_collection_regular = quantity_regular
+    card.quantity_collection_foil = quantity_foil
 
     db.session.commit()
 
@@ -484,46 +491,7 @@ def update_collection(card_id):
 
 @card_routes.route('/collection/stats', methods=['GET'])
 def get_collection_stats():
-    cache_key = "collection_stats"
-    cached_data = current_app.redis_client.get(cache_key)
-
-    if cached_data:
-        return current_app.response_class(
-            response=cached_data.decode(),
-            status=200,
-            mimetype='application/json'
-        )
-
-    try:
-        total_cards = db.session.query(func.sum(Card.quantity_collection_regular + Card.quantity_collection_foil)).scalar() or 0
-        unique_cards = Card.query.filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0)).count()
-
-        total_value_query = text("""
-            SELECT SUM(
-                (CAST(COALESCE(NULLIF((prices::json->>'usd'), ''), '0') AS FLOAT) * quantity_collection_regular) +
-                (CAST(COALESCE(NULLIF((prices::json->>'usd_foil'), ''), '0') AS FLOAT) * quantity_collection_foil)
-            )
-            FROM cards
-            WHERE quantity_collection_regular > 0 OR quantity_collection_foil > 0
-        """)
-        total_value = db.session.execute(total_value_query).scalar() or 0
-
-        result = {
-            'total_cards': int(total_cards),
-            'unique_cards': unique_cards,
-            'total_value': round(total_value, 2)
-        }
-
-        serialized_data = orjson.dumps(result).decode()
-        current_app.redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
-
-        return current_app.response_class(
-            response=serialized_data,
-            status=200,
-            mimetype='application/json'
-        )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return get_stats('quantity_collection_regular', 'quantity_collection_foil', 'collection_stats')
 
 @card_routes.route('/collection/sets/<string:set_code>/cards', methods=['GET'])
 def get_collection_set_cards(set_code):

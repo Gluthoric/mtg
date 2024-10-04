@@ -175,6 +175,11 @@ def serialize_cards(cards, quantity_type='collection'):
     return [card.to_dict(quantity_type=quantity_type) for card in cards]
 ```
 ``` # .env
+errors.py
+Schemas.py
+stats.py
+card.py
+card_routes.py
 DATABASE_URI=postgresql://gluth:Caprisun1!@192.168.1.126:5432/mtg_collection_kiosk
 SECRET_KEY=you-will-never-guess
 FLASK_APP=main.py
