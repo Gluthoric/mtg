@@ -13,20 +13,17 @@ from routes.cache_routes import cache_bp
 import redis
 import orjson
 import os
-from decimal import Decimal
 from flask.cli import with_appcontext
 from models.set_collection_count import SetCollectionCount
 
-logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+# Import utility functions
+# convert_decimals: Converts Decimal objects to float in data structures
+# safe_float: Safely converts values to float
+# cache_response: Decorator for caching route responses
+# serialize_cards: Serializes a list of card objects
+from utils import convert_decimals, safe_float, cache_response, serialize_cards
 
-def convert_decimal_to_float(data):
-    if isinstance(data, dict):
-        return {k: convert_decimal_to_float(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [convert_decimal_to_float(i) for i in data]
-    elif isinstance(data, Decimal):
-        return float(data)
-    return data
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 def create_app(config_name='default'):
     # Initialize Flask app
