@@ -5,31 +5,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    # The base configuration class that other environments will inherit from
-    SQLALCHEMY_DATABASE_URI = 'postgresql://gluth:Caprisun1!@192.168.1.126:5432/mtg_collection_kiosk'
+    # Database configuration
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Security
     SECRET_KEY = os.getenv('SECRET_KEY')
 
-class DevelopmentConfig(Config):
-    # Development-specific settings
-    DEBUG = True
-    SQLALCHEMY_ECHO = True
+    # Redis configuration
+    REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+    REDIS_DB = int(os.getenv('REDIS_DB', 0))
 
-class TestingConfig(Config):
-    # Testing-specific settings
-    TESTING = True
-    DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.getenv('TEST_DATABASE_URI')
+    # Debug settings
+    DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
+    SQLALCHEMY_ECHO = DEBUG
 
-class ProductionConfig(Config):
-    # Production-specific settings
-    DEBUG = False
-    SQLALCHEMY_ECHO = False
-
-# Map configuration names to their corresponding config classes
+# Use a single configuration for all environments
 config = {
-    'development': DevelopmentConfig,
-    'testing': TestingConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
+    'default': Config
 }

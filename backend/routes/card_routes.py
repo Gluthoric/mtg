@@ -3,8 +3,8 @@ import logging
 from flask import Blueprint, jsonify, request, current_app
 import time
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import joinedload, load_only, subqueryload, aliased
-from sqlalchemy import func, case, or_, distinct, Float
+from sqlalchemy.orm import load_only, joinedload, subqueryload, aliased
+from sqlalchemy import func, case, or_, distinct, Float, cast
 from sqlalchemy.sql import asc, desc, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.card import Card
@@ -13,6 +13,7 @@ from models.set_collection_count import SetCollectionCount
 from database import db
 import orjson
 from decimal import Decimal
+from collections import defaultdict
 
 card_routes = Blueprint('card_routes', __name__)
 
@@ -101,15 +102,154 @@ def get_cards():
 
 @card_routes.route('/cards/<string:card_id>', methods=['GET'])
 def get_card(card_id):
-    card = Card.query.options(load_only(
-        Card.id, Card.name, Card.set_name, Card.set_code, Card.collector_number,
-        Card.type_line, Card.rarity, Card.mana_cost, Card.cmc, Card.oracle_text,
-        Card.colors, Card.image_uris, Card.prices, Card.quantity_regular,
-        Card.quantity_foil, Card.quantity_kiosk_regular, Card.quantity_kiosk_foil,
-        Card.frame_effects, Card.promo_types, Card.promo, Card.reprint, Card.variation,
-        Card.oversized, Card.keywords
-    )).get_or_404(card_id)
+    # First, check if card is in cache
+    cached_card = current_app.redis_client.get(f"card:{card_id}")
+    if cached_card:
+        return jsonify(orjson.loads(cached_card)), 200
+
+    # Fetch card from database, with optimization to load only the required fields
+    card = Card.query.options(
+        load_only(
+            Card.id,
+            Card.name,
+            Card.image_uris,
+            Card.collector_number,
+            Card.prices,
+            Card.rarity,
+            Card.set_name,
+            Card.set_code,
+            Card.type_line,
+            Card.mana_cost,
+            Card.cmc,
+            Card.oracle_text,
+            Card.colors,
+            Card.quantity_collection_regular,
+            Card.quantity_collection_foil,
+            Card.quantity_kiosk_regular,
+            Card.quantity_kiosk_foil,
+            Card.frame_effects,
+            Card.promo_types,
+            Card.promo,
+            Card.reprint,
+            Card.variation,
+            Card.oversized,
+            Card.keywords
+        )
+    ).filter_by(id=card_id).first()
+
+    if not card:
+        return jsonify({"error": "Card not found."}), 404
+
+    # Serialize card data
+    serialized_card = orjson.dumps(card.to_dict()).decode()
+
+    # Store serialized card in cache for 5 minutes
+    current_app.redis_client.setex(f"card:{card_id}", 300, serialized_card)
+
     return jsonify(card.to_dict()), 200
+
+@card_routes.route('/cards/bulk', methods=['POST'])
+def get_bulk_cards():
+    data = request.json
+    card_ids = data.get('card_ids', [])
+    if not card_ids:
+        return jsonify({"error": "No card IDs provided."}), 400
+
+    # Check if cards are already in cache
+    cards_data = []
+    card_ids_to_query = []
+    for card_id in card_ids:
+        cached_card = current_app.redis_client.get(f"card:{card_id}")
+        if cached_card:
+            cards_data.append(orjson.loads(cached_card))
+        else:
+            card_ids_to_query.append(card_id)
+
+    # Fetch cards from database that were not in cache
+    if card_ids_to_query:
+        cards = Card.query.options(
+            load_only(
+                Card.id,
+                Card.name,
+                Card.image_uris,
+                Card.collector_number,
+                Card.prices,
+                Card.rarity,
+                Card.set_name,
+                Card.set_code,
+                Card.type_line,
+                Card.mana_cost,
+                Card.cmc,
+                Card.oracle_text,
+                Card.colors,
+                Card.quantity_collection_regular,
+                Card.quantity_collection_foil,
+                Card.quantity_kiosk_regular,
+                Card.quantity_kiosk_foil,
+                Card.frame_effects,
+                Card.promo_types,
+                Card.promo,
+                Card.reprint,
+                Card.variation,
+                Card.oversized,
+                Card.keywords
+            )
+        ).filter(Card.id.in_(card_ids_to_query)).all()
+
+        for card in cards:
+            serialized_card = orjson.dumps(card.to_dict()).decode()
+            # Cache each card for 5 minutes
+            current_app.redis_client.setex(f"card:{card.id}", 300, serialized_card)
+            cards_data.append(card.to_dict())
+
+    return jsonify({"cards": cards_data}), 200
+
+@card_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
+def get_set_cards(set_code):
+    # Construct cache key
+    cache_key = f"set_cards:{set_code}"
+    cached_data = current_app.redis_client.get(cache_key)
+    if cached_data:
+        return jsonify(orjson.loads(cached_data)), 200
+
+    # Fetch all cards for the set, loading only necessary fields
+    cards = Card.query.options(
+        load_only(
+            Card.id,
+            Card.name,
+            Card.image_uris,
+            Card.collector_number,
+            Card.prices,
+            Card.rarity,
+            Card.set_name,
+            Card.set_code,
+            Card.type_line,
+            Card.mana_cost,
+            Card.cmc,
+            Card.oracle_text,
+            Card.colors,
+            Card.quantity_collection_regular,
+            Card.quantity_collection_foil,
+            Card.quantity_kiosk_regular,
+            Card.quantity_kiosk_foil,
+            Card.frame_effects,
+            Card.promo_types,
+            Card.promo,
+            Card.reprint,
+            Card.variation,
+            Card.oversized,
+            Card.keywords
+        )
+    ).filter(Card.set_code == set_code).all()
+
+    # Serialize cards data
+    cards_data = [card.to_dict() for card in cards]
+    serialized_data = orjson.dumps(cards_data).decode()
+
+    # Store serialized set cards in cache for 5 minutes
+    current_app.redis_client.setex(cache_key, 300, serialized_data)
+
+    return jsonify({"cards": cards_data}), 200
 
 @card_routes.route('/cards/search', methods=['GET'])
 def search_cards():
@@ -191,14 +331,6 @@ def get_collection():
         status=200,
         mimetype='application/json'
     )
-
-
-from collections import defaultdict
-
-from collections import defaultdict
-from sqlalchemy import func, cast, Float
-from sqlalchemy.orm import joinedload, subqueryload
-from sqlalchemy.sql import asc, desc
 
 @card_routes.route('/collection/sets', methods=['GET'])
 def get_collection_sets():
@@ -490,7 +622,6 @@ def get_collection_set_cards(set_code):
         logger.exception(error_message)
         return jsonify({"error": error_message}), 500
 
-
 # Kiosk Routes
 
 @card_routes.route('/kiosk', methods=['GET'])
@@ -525,7 +656,6 @@ def get_kiosk():
         status=200,
         mimetype='application/json'
     )
-
 
 @card_routes.route('/kiosk/sets', methods=['GET'])
 def get_kiosk_sets():
@@ -794,7 +924,7 @@ def get_collection_set(set_code):
 
         for card in cards:
             collection_count += card.quantity_regular + card.quantity_foil
-            
+
             # Calculate card value
             regular_value = float(card.prices.get('usd', 0) or 0) * card.quantity_regular
             foil_value = float(card.prices.get('usd_foil', 0) or 0) * card.quantity_foil

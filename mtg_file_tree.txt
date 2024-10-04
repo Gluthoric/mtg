@@ -1,0 +1,71 @@
+/home/gluth/mtg
+│
+├── .gitignore
+├── database_info.txt
+├── export_commits.sh
+│
+├── backend/
+│   ├── config.py
+│   ├── database_information.txt
+│   ├── database.py
+│   ├── main.py
+│   ├── requirements.txt
+│   │
+│   ├── migrations/
+│   │   ├── alembic.ini
+│   │   ├── env.py
+│   │   ├── README
+│   │   ├── script.py.mako
+│   │   │
+│   │   └── versions/
+│   │       └── 1967a8be30f3_initial_schema_after_manual_updates.py
+│   │
+│   ├── models/
+│   │   ├── card.py
+│   │   ├── import_record.py
+│   │   ├── set_collection_count.py
+│   │   └── set.py
+│   │
+│   └── routes/
+│       ├── __init__.py
+│       ├── card_routes.py
+│       ├── import_routes.py
+│       └── set_routes.py
+│
+└── frontend/
+    ├── .eslintrc.js
+    ├── .gitignore
+    ├── index.html
+    ├── package-lock.json
+    ├── package.json
+    ├── README.md
+    ├── tailwind.config.js
+    ├── vite.config.js
+    │
+    └── src/
+        ├── App.vue
+        ├── main.js
+        │
+        ├── assets/
+        │   └── main.css
+        │
+        ├── components/
+        │   ├── CardListControls.vue
+        │   ├── Header.vue
+        │   └── SetListControls.vue
+        │
+        ├── router/
+        │   └── index.js
+        │
+        ├── utils/
+        │   └── setUtils.js
+        │
+        └── views/
+            ├── Collection.vue
+            ├── CollectionSetCards.vue
+            ├── Home.vue
+            ├── Import.vue
+            ├── Kiosk.vue
+            ├── KioskSetCards.vue
+            ├── SetDetails.vue
+            └── Sets.vue
