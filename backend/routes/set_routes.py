@@ -111,9 +111,14 @@ def get_set(set_code):
 
         # Fetch cards for this set
         cards = Card.query.filter_by(set_code=set_code).all()
-        set_data['cards'] = [card.to_dict() for card in cards]
+        cards_data = [card.to_dict() for card in cards]
 
-        return set_data  # Return data directly
+        response = {
+            "set": set_data,
+            "cards": cards_data
+        }
+
+        return response  # Return data directly
     except Exception as e:
         error_message = f"An error occurred while fetching the set: {str(e)}"
         logger.exception(error_message)

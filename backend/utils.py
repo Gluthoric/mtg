@@ -68,6 +68,8 @@ def cache_response(timeout: int = 300):
 
                 # Only cache successful responses
                 if 200 <= status_code < 300:
+                    # Apply convert_decimals here
+                    data = convert_decimals(data)
                     data_serialized = orjson.dumps(data).decode('utf-8')
                     redis_client.setex(cache_key, timeout, data_serialized)
                     logger.info(f"Cached response for key: {cache_key} with timeout: {timeout}")

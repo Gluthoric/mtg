@@ -331,11 +331,15 @@ const fetchSetDetails = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const data = await fetchSetDetailsUtil(setCode.value);
-    setName.value = data.set.name;
-    originalCards.value = data.cards;
-    statistics.value = data.set.statistics || {};
-    applyFilters();
+    const response = await fetchSetDetailsUtil(setCode.value);
+    if (response.set && response.cards) {
+      setName.value = response.set.name;
+      originalCards.value = response.cards;
+      statistics.value = response.set.statistics || {};
+      applyFilters();
+    } else {
+      throw new Error("Invalid response format");
+    }
   } catch (err) {
     console.error("Error fetching set details:", err);
     error.value = "Failed to load set details";
