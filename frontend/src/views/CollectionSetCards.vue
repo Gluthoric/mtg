@@ -163,13 +163,13 @@
                       @click="decrement(card, 'regular')"
                       class="btn decrement-btn flex items-center justify-center bg-secondary hover:bg-secondary-hover"
                       aria-label="Decrement Regular Quantity"
-                      :disabled="card.quantity_collection_regular === 0"
+                      :disabled="card.quantity_regular === 0"
                     >
                       –
                     </button>
                     <input
                       :id="'regular-' + card.id"
-                      v-model.number="card.quantity_collection_regular"
+                      v-model.number="card.quantity_regular"
                       type="number"
                       min="0"
                       class="quantity-input text-center border-none outline-none bg-input text-foreground text-sm"
@@ -209,7 +209,7 @@
                     </button>
                     <input
                       :id="'foil-' + card.id"
-                      v-model.number="card.quantity_collection_foil"
+                      v-model.number="card.quantity_foil"
                       type="number"
                       min="0"
                       class="quantity-input text-center border-none outline-none bg-input text-foreground text-sm"
@@ -313,7 +313,7 @@ const totalCardsInSet = computed(() => originalCards.value.length);
 const cardsInCollection = computed(() =>
   originalCards.value.filter(
     (card) =>
-      card.quantity_collection_regular > 0 || card.quantity_collection_foil > 0
+      card.quantity_regular > 0 || card.quantity_foil > 0
   ).length
 );
 const completionPercentage = computed(() =>
@@ -322,9 +322,9 @@ const completionPercentage = computed(() =>
 const totalValue = computed(() => {
   return originalCards.value.reduce((total, card) => {
     const regularValue =
-      (card.prices?.usd || 0) * (card.quantity_collection_regular || 0);
+      (card.prices?.usd || 0) * (card.quantity_regular || 0);
     const foilValue =
-      (card.prices?.usd_foil || 0) * (card.quantity_collection_foil || 0);
+      (card.prices?.usd_foil || 0) * (card.quantity_foil || 0);
     return total + regularValue + foilValue;
   }, 0);
 });
@@ -434,10 +434,10 @@ const handleImageError = (event, card) => {
 const updateQuantity = async (card, type, delta = 0) => {
   let newQuantity;
   if (type === "regular") {
-    newQuantity = card.quantity_collection_regular + delta;
+    newQuantity = card.quantity_regular + delta;
     if (newQuantity < 0) return;
   } else if (type === "foil") {
-    newQuantity = card.quantity_collection_foil + delta;
+    newQuantity = card.quantity_foil + delta;
     if (newQuantity < 0) return;
   } else {
     return;
@@ -448,10 +448,10 @@ const updateQuantity = async (card, type, delta = 0) => {
       type === "regular"
         ? {
             quantity_regular: newQuantity,
-            quantity_foil: card.quantity_collection_foil,
+            quantity_foil: card.quantity_foil,
           }
         : {
-            quantity_regular: card.quantity_collection_regular,
+            quantity_regular: card.quantity_regular,
             quantity_foil: newQuantity,
           };
     const response = await axios.put(`/api/collection/${card.id}`, payload);
@@ -478,14 +478,14 @@ const decrement = (card, type) => {
 
 const onInput = (card, type) => {
   if (type === "regular") {
-    card.quantity_collection_regular = Math.max(
+    card.quantity_regular = Math.max(
       0,
-      parseInt(card.quantity_collection_regular) || 0,
+      parseInt(card.quantity_regular) || 0,
     );
   } else if (type === "foil") {
-    card.quantity_collection_foil = Math.max(
+    card.quantity_foil = Math.max(
       0,
-      parseInt(card.quantity_collection_foil) || 0,
+      parseInt(card.quantity_foil) || 0,
     );
   }
   // Immediately update the backend

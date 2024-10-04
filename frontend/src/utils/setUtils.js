@@ -26,7 +26,7 @@ export const applyFilters = (cards, filters) => {
       return false;
     if (
       filters.missing &&
-      (card.quantity_collection_regular > 0 || card.quantity_collection_foil > 0)
+      (card.quantity_regular > 0 || card.quantity_foil > 0)
     )
       return false;
     if (
