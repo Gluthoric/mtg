@@ -18,19 +18,25 @@ collection_routes = Blueprint('collection_routes', __name__)
 @collection_routes.route('/collection', methods=['GET'])
 @cache_response()
 def get_collection():
+    # Get pagination parameters from the request
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     set_code = request.args.get('set_code', '', type=str)
 
+    # Base query to get cards
     query = Card.query
 
+    # Filter by set code if provided
     if set_code:
         query = query.filter(Card.set_code == set_code)
 
+    # Only include cards that have quantity greater than zero in either regular or foil
     query = query.filter((Card.quantity_regular > 0) | (Card.quantity_foil > 0))
 
+    # Paginate the results
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    # Serialize the collection to return as a response
     result = {
         'collection': serialize_cards(collection.items, quantity_type='collection'),
         'total': collection.total,
@@ -44,7 +50,7 @@ def get_collection():
 @cache_response()
 def get_collection_sets():
     try:
-        # Extract query parameters
+        # Extract query parameters from the request
         name = request.args.get('name', type=str)
         set_types = request.args.getlist('set_type[]')
         page = request.args.get('page', 1, type=int)
@@ -52,26 +58,26 @@ def get_collection_sets():
         sort_by = request.args.get('sort_by', 'released_at', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
-        # Log received parameters
+        # Log received parameters for debugging purposes
         logger.info(f"get_collection_sets: Received parameters: name={name}, set_types={set_types}, sort_by={sort_by}, sort_order={sort_order}, page={page}, per_page={per_page}")
 
-        # Define valid sort fields and prevent SQL injection
+        # Define valid sort fields to prevent SQL injection
         valid_sort_fields = {'released_at', 'name', 'collection_count', 'card_count'}
         if sort_by not in valid_sort_fields:
             error_message = f"Invalid sort_by field: {sort_by}"
             logger.error(f"get_collection_sets: {error_message}")
             return {"error": error_message}, 400
 
-        # Determine sort column
+        # Determine the sorting column based on the sort_by parameter
         if sort_by == 'collection_count':
             sort_column = SetCollectionCount.collection_count
         else:
             sort_column = getattr(Set, sort_by)
 
-        # Apply sort order
+        # Determine sort order (ascending or descending)
         order_func = desc if sort_order.lower() == 'desc' else asc
 
-        # Subquery for total value
+        # Create a subquery to calculate the total value of cards in each set
         value_subquery = (
             db.session.query(
                 Card.set_code,
@@ -84,7 +90,7 @@ def get_collection_sets():
             .subquery()
         )
 
-        # Main query
+        # Main query to get sets and their collection count and total value
         query = (
             db.session.query(
                 Set,
@@ -95,7 +101,7 @@ def get_collection_sets():
             .outerjoin(value_subquery, Set.code == value_subquery.c.set_code)
         )
 
-        # Apply filters
+        # Apply filters based on the query parameters
         if name:
             query = query.filter(Set.name.ilike(f'%{name}%'))
             logger.debug(f"get_collection_sets: Applied filter: Set.name ilike '%{name}%'")
@@ -103,18 +109,19 @@ def get_collection_sets():
             query = query.filter(Set.set_type.in_(set_types))
             logger.debug(f"get_collection_sets: Applied filter: Set.set_type IN {set_types}")
         else:
+            # Use default set types if none are provided
             default_set_types = ['core', 'expansion', 'masters', 'draft_innovation', 'funny', 'commander']
             query = query.filter(Set.set_type.in_(default_set_types))
             logger.debug("get_collection_sets: Applied filter: Using partial index for relevant set types")
 
-        # Apply sorting
+        # Apply sorting based on the sort column and order
         query = query.order_by(order_func(sort_column))
 
         # Execute the query with pagination
         paginated_sets = query.paginate(page=page, per_page=per_page, error_out=False)
         logger.info(f"get_collection_sets: Paginated sets: page={paginated_sets.page}, pages={paginated_sets.pages}, total={paginated_sets.total}")
 
-        # Process results
+        # Process results and serialize the set data
         sets_list = []
         for set_instance, collection_count, total_value in paginated_sets.items:
             set_data = set_instance.to_dict()
@@ -130,7 +137,7 @@ def get_collection_sets():
             'current_page': paginated_sets.page
         }
 
-        # Convert any Decimal objects to float
+        # Convert any Decimal objects in the response to float
         response = convert_decimals(response)
 
         logger.info(f"Returning response with {len(sets_list)} sets")
@@ -142,30 +149,36 @@ def get_collection_sets():
 
 @collection_routes.route('/collection/<string:card_id>', methods=['POST', 'PUT'])
 def update_collection(card_id):
+    # Validate request data using schema
     schema = UpdateCardSchema()
     errors = schema.validate(request.json)
     if errors:
         return jsonify({"error": errors}), 400
 
+    # Load the validated data
     data = schema.load(request.json)
     quantity_regular = data['quantity_regular']
     quantity_foil = data['quantity_foil']
 
+    # Fetch the card from the database
     card = Card.query.get(card_id)
     if not card:
         return jsonify({"error": "Card not found."}), 404
 
+    # Update the card quantities
     old_set_code = card.set_code
     card.quantity_regular = quantity_regular
     card.quantity_foil = quantity_foil
 
+    # Commit the changes to the database
     db.session.commit()
 
-    # Invalidate specific caches
+    # Invalidate specific caches to ensure data consistency
     current_app.redis_client.delete(f"collection:set:{old_set_code}")
     current_app.redis_client.delete(f"collection_sets:{old_set_code}")
     current_app.redis_client.delete("collection_stats")
 
+    # Serialize updated card data
     card_data = card.to_dict()
 
     return current_app.response_class(
@@ -177,11 +190,13 @@ def update_collection(card_id):
 @collection_routes.route('/collection/stats', methods=['GET'])
 @cache_response()
 def get_collection_stats():
+    # Return collection statistics using predefined keys
     return get_stats('quantity_collection_regular', 'quantity_collection_foil', 'collection_stats')
 
 @collection_routes.route('/collection/sets/<string:set_code>/cards', methods=['GET'])
 @cache_response()
 def get_collection_set_cards(set_code):
+    # Extract query parameters from the request
     name = request.args.get('name', '', type=str)
     rarities = request.args.getlist('rarities') + request.args.getlist('rarities[]')
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
@@ -189,13 +204,16 @@ def get_collection_set_cards(set_code):
     keyword = request.args.get('keyword', '', type=str)
 
     try:
+        # Base query to get cards from a specific set
         query = Card.query.filter(Card.set_code == set_code)
 
+        # Apply filters if provided
         if name:
             query = query.filter(Card.name.ilike(f'%{name}%'))
         if rarities:
             query = query.filter(Card.rarity.in_(rarities))
         if colors:
+            # Define valid colors and ensure there are no invalid values
             VALID_COLORS = {'W', 'U', 'B', 'R', 'G', 'C'}
             invalid_colors = set(colors) - VALID_COLORS
             if invalid_colors:
@@ -224,15 +242,20 @@ def get_collection_set_cards(set_code):
             if final_colors_filter is not None:
                 query = query.filter(final_colors_filter)
         if types:
+            # Create filters for card types
             type_filters = [Card.type_line.ilike(f'%{type_}%') for type_ in types]
             query = query.filter(or_(*type_filters))
         if keyword:
+            # Filter based on keyword presence in card keywords
             query = query.filter(Card.keywords.contains([keyword]))
 
+        # Order cards by their collector number, converting to an integer to ensure proper sorting
         query = query.order_by(func.cast(func.regexp_replace(Card.collector_number, '[^0-9]', '', 'g'), db.Integer))
 
+        # Fetch all cards matching the filters
         cards = query.all()
 
+        # Serialize the result
         result = {
             'cards': [card.to_dict() for card in cards],
             'total': len(cards),
@@ -248,7 +271,7 @@ def get_collection_set_cards(set_code):
 @cache_response()
 def get_collection_set(set_code):
     try:
-        # Fetch the set instance
+        # Fetch the set instance by set code
         set_instance = Set.query.filter_by(code=set_code).first()
         if not set_instance:
             return {"error": "Set not found."}, 404
@@ -260,7 +283,7 @@ def get_collection_set(set_code):
         cards = Card.query.filter_by(set_code=set_code).all()
         set_data['cards'] = [card.to_dict() for card in cards]
 
-        # Calculate statistics
+        # Initialize statistics dictionary
         statistics = {
             'frame_effects': {},
             'promo_types': {},
@@ -275,14 +298,16 @@ def get_collection_set(set_code):
         collection_count = 0
         total_value = 0.0
 
+        # Calculate collection statistics and card values
         for card in cards:
             collection_count += card.quantity_collection_regular + card.quantity_collection_foil
 
-            # Calculate card value
+            # Calculate total value for regular and foil cards
             regular_value = float(card.prices.get('usd', 0) or 0) * card.quantity_collection_regular
             foil_value = float(card.prices.get('usd_foil', 0) or 0) * card.quantity_collection_foil
             total_value += regular_value + foil_value
 
+            # Update statistics for frame effects, promo types, and other attributes
             if card.frame_effects:
                 for effect in card.frame_effects:
                     statistics['frame_effects'][effect] = statistics['frame_effects'].get(effect, 0) + 1
@@ -298,6 +323,7 @@ def get_collection_set(set_code):
             if card.oversized:
                 statistics['other_attributes']['oversized'] += 1
 
+        # Update set data with collection count, percentage, total value, and statistics
         set_data['collection_count'] = collection_count
         set_data['collection_percentage'] = (collection_count / set_instance.card_count) * 100 if set_instance.card_count else 0
         set_data['total_value'] = round(total_value, 2)
