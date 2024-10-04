@@ -12,7 +12,7 @@ import orjson
 import logging
 from datetime import datetime
 
-set_routes = Blueprint('set_routes', __name__, url_prefix='/api/sets')
+set_routes = Blueprint('set_routes', __name__)
 logger = logging.getLogger(__name__)
 
 def convert_decimals(obj):
@@ -27,7 +27,7 @@ def convert_decimals(obj):
 
 
 
-@set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
+@set_routes.route('/<string:set_code>/cards', methods=['GET'])
 def get_set_cards(set_code):
     try:
         # Eagerly load related 'set' data to optimize queries
@@ -54,7 +54,7 @@ def get_set_cards(set_code):
 from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-@set_routes.route('/sets/<string:set_code>', methods=['GET'])
+@set_routes.route('/<string:set_code>', methods=['GET'])
 def get_collection_set_details(set_code):
     try:
         # Construct cache key

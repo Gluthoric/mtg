@@ -1,12 +1,13 @@
 from flask import Blueprint, send_from_directory, current_app
 import os
-from .card_routes import card_routes
-from .collection_routes import collection_routes
-from .kiosk_routes import kiosk_routes
-from .set_routes import set_routes
-from .import_routes import import_routes
 
 def register_routes(app):
+    from .card_routes import card_routes
+    from .collection_routes import collection_routes
+    from .kiosk_routes import kiosk_routes
+    from .set_routes import set_routes
+    from .import_routes import import_routes
+
     api = Blueprint('api', __name__, url_prefix='/api')
 
     api.register_blueprint(card_routes)

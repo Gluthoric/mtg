@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import event, Index
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models.set_collection_count import SetCollectionCount
 
 class Card(db.Model):
     __tablename__ = 'cards'
@@ -121,4 +120,6 @@ def after_flush(session, flush_context):
             updated_set_codes.add(instance.set_code)
 
     if updated_set_codes:
+        # Import SetCollectionCount here to avoid circular import
+        from models.set_collection_count import SetCollectionCount
         SetCollectionCount.refresh()

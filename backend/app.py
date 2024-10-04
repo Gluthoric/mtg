@@ -14,19 +14,12 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from config import config
 from database import db
-from routes.set_routes import set_routes
-from routes.cards_routes import cards_bp
-from routes.collection_routes import collection_bp
-from routes.kiosk_routes import kiosk_bp
-from routes.cache_routes import cache_bp
+from routes import register_routes
 import redis
 import orjson
 from flask.cli import with_appcontext
 from models.set_collection_count import SetCollectionCount
 from errors import handle_error
-
-# Import utility functions
-from utils import convert_decimals, safe_float, cache_response, serialize_cards
 
 def create_app(config_name='default'):
     # Initialize Flask app
@@ -44,6 +37,9 @@ def create_app(config_name='default'):
     CORS(app)
     migrate = Migrate(app, db)
 
+    # Import models here
+    from models import Card, Set, SetCollectionCount
+
     # Initialize Redis
     app.redis_client = redis.Redis(
         host=app.config['REDIS_HOST'],
@@ -51,12 +47,8 @@ def create_app(config_name='default'):
         db=app.config['REDIS_DB']
     )
 
-    # Register blueprints
-    app.register_blueprint(set_routes, url_prefix='/api/collection')
-    app.register_blueprint(cards_bp)
-    app.register_blueprint(collection_bp)
-    app.register_blueprint(kiosk_bp)
-    app.register_blueprint(cache_bp)
+    # Register routes
+    register_routes(app)
 
     # Use orjson for JSON serialization
     app.json_encoder = orjson.dumps
