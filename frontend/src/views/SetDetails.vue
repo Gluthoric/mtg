@@ -71,25 +71,6 @@
       </div>
     </div>
 
-    <div class="pagination text-center mt-8 mb-8">
-      <button
-        @click="changePage(-1)"
-        :disabled="currentPage === 1"
-        class="px-4 py-2 mr-2 bg-primary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Previous
-      </button>
-      <span class="px-4 py-2 bg-dark-100 text-white rounded-lg"
-        >Page {{ currentPage }} of {{ totalPages }}</span
-      >
-      <button
-        @click="changePage(1)"
-        :disabled="currentPage === totalPages"
-        class="px-4 py-2 ml-2 bg-primary text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Next
-      </button>
-    </div>
   </div>
 </template>
 
@@ -111,9 +92,6 @@ export default {
     const cards = ref([]);
     const originalCards = ref([]);
     const filters = ref({ name: "", rarity: "" });
-    const currentPage = ref(1);
-    const totalPages = ref(1);
-    const itemsPerPage = 20;
     const loading = ref(true);
     const error = ref(null);
 
@@ -135,19 +113,9 @@ export default {
     };
 
     const applyFilters = () => {
-      const filteredCards = applyFiltersUtil(originalCards.value, filters.value);
-      const startIndex = (currentPage.value - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      cards.value = filteredCards.slice(startIndex, endIndex);
-      totalPages.value = Math.ceil(filteredCards.length / itemsPerPage);
+      cards.value = applyFiltersUtil(originalCards.value, filters.value);
     };
 
-    const changePage = (delta) => {
-      const newPage = currentPage.value + delta;
-      if (newPage >= 1 && newPage <= totalPages.value) {
-        currentPage.value = newPage;
-      }
-    };
 
     watch(
       [filters, currentPage],

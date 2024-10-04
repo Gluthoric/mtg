@@ -263,7 +263,7 @@
 
         <!-- Handle No Cards Matching Filters -->
         <div
-          v-if="cards.length === 0"
+          v-if="sortedCards.length === 0"
           class="text-center text-muted-foreground mt-4"
         >
           No cards match the selected filters.
@@ -297,9 +297,6 @@ const filters = ref({
 });
 const cardsPerRow = ref(6);
 const statistics = ref(null);
-const currentPage = ref(1);
-const totalPages = ref(1);
-const itemsPerPage = 20;
 
 const navLinks = [
   { to: "/", text: "Home" },
@@ -337,7 +334,6 @@ const fetchSetDetails = async () => {
     setName.value = data.set.name;
     originalCards.value = data.cards;
     statistics.value = data.set.statistics || {};
-    totalPages.value = Math.ceil(originalCards.value.length / itemsPerPage);
     applyFilters();
   } catch (err) {
     console.error("Error fetching set details:", err);
@@ -348,11 +344,7 @@ const fetchSetDetails = async () => {
 };
 
 const applyFilters = () => {
-  const filteredCards = applyFiltersUtil(originalCards.value, filters.value);
-  const startIndex = (currentPage.value - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  cards.value = filteredCards.slice(startIndex, endIndex);
-  totalPages.value = Math.ceil(filteredCards.length / itemsPerPage);
+  cards.value = applyFiltersUtil(originalCards.value, filters.value);
 };
 
 watch(
@@ -365,7 +357,7 @@ watch(
 );
 
 watch(
-  [filters, currentPage],
+  filters,
   () => {
     applyFilters();
   },
@@ -376,12 +368,6 @@ onMounted(() => {
   fetchSetDetails();
 });
 
-const changePage = (delta) => {
-  const newPage = currentPage.value + delta;
-  if (newPage >= 1 && newPage <= totalPages.value) {
-    currentPage.value = newPage;
-  }
-};
 
 const isMissing = (card) => {
   return card.quantity_regular + card.quantity_foil === 0;

@@ -171,22 +171,12 @@ def get_all_sets():
 @set_routes.route('/sets/<string:set_code>/cards', methods=['GET'])
 def get_set_cards(set_code):
     try:
-        # Extract filter parameters
-        name_filter = request.args.get('name', '', type=str)
-        rarity_filter = request.args.get('rarity', '', type=str)
-
         # Eagerly load related 'set' data to optimize queries
         query = Card.query.options(
             joinedload(Card.set)
         ).filter(Card.set_code == set_code)
 
-        # Apply filters based on query parameters
-        if name_filter:
-            query = query.filter(Card.name.ilike(f'%{name_filter}%'))
-        if rarity_filter:
-            query = query.filter(Card.rarity == rarity_filter)
-
-        # Fetch all matching cards without pagination
+        # Fetch all cards for the set without pagination
         cards = query.all()
 
         # Serialize card data
@@ -194,9 +184,7 @@ def get_set_cards(set_code):
 
         response = {
             'cards': cards_data,
-            'total': len(cards_data),
-            'pages': 1,
-            'current_page': 1
+            'total': len(cards_data)
         }
 
         return jsonify(response), 200
@@ -236,8 +224,8 @@ def get_collection_set_details(set_code):
             Card.image_uris,
             Card.collector_number,
             Card.prices,
-            Card.quantity_collection_regular,
-            Card.quantity_collection_foil,
+            Card.quantity_regular,
+            Card.quantity_foil,
             Card.frame_effects,
             Card.promo_types,
             Card.promo,

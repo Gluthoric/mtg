@@ -104,8 +104,8 @@ def get_card(card_id):
     card = Card.query.options(load_only(
         Card.id, Card.name, Card.set_name, Card.set_code, Card.collector_number,
         Card.type_line, Card.rarity, Card.mana_cost, Card.cmc, Card.oracle_text,
-        Card.colors, Card.image_uris, Card.prices, Card.quantity_collection_regular,
-        Card.quantity_collection_foil, Card.quantity_kiosk_regular, Card.quantity_kiosk_foil,
+        Card.colors, Card.image_uris, Card.prices, Card.quantity_regular,
+        Card.quantity_foil, Card.quantity_kiosk_regular, Card.quantity_kiosk_foil,
         Card.frame_effects, Card.promo_types, Card.promo, Card.reprint, Card.variation,
         Card.oversized, Card.keywords
     )).get_or_404(card_id)
@@ -169,7 +169,7 @@ def get_collection():
     if set_code:
         query = query.filter(Card.set_code == set_code)
 
-    query = query.filter((Card.quantity_collection_regular > 0) | (Card.quantity_collection_foil > 0))
+    query = query.filter((Card.quantity_regular > 0) | (Card.quantity_foil > 0))
 
     collection = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -618,14 +618,12 @@ def get_kiosk_sets():
 
 @card_routes.route('/kiosk/sets/<string:set_code>/cards', methods=['GET'])
 def get_kiosk_set_cards(set_code):
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
     name_filter = request.args.get('name', '')
     rarity_filter = request.args.get('rarity', '')
     sort_by = request.args.get('sortBy', 'name')
     sort_order = request.args.get('sortOrder', 'asc')
 
-    cache_key = f"kiosk_set_cards:{set_code}:page:{page}:per_page:{per_page}:name:{name_filter}:rarity:{rarity_filter}:sort_by:{sort_by}:sort_order:{sort_order}"
+    cache_key = f"kiosk_set_cards:{set_code}:name:{name_filter}:rarity:{rarity_filter}:sort_by:{sort_by}:sort_order:{sort_order}"
     cached_data = current_app.redis_client.get(cache_key)
 
     if cached_data:
@@ -649,19 +647,15 @@ def get_kiosk_set_cards(set_code):
     else:
         query = query.order_by(getattr(Card, sort_by))
 
-    paginated_cards = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    cards_data = serialize_cards(paginated_cards.items, quantity_type='kiosk')
+    cards = query.all()
+    cards_data = serialize_cards(cards, quantity_type='kiosk')
 
     set_instance = Set.query.filter_by(code=set_code).first()
     set_name = set_instance.name if set_instance else ''
 
     result = {
         'cards': cards_data,
-        'set_name': set_name,
-        'total': paginated_cards.total,
-        'pages': paginated_cards.pages,
-        'current_page': page
+        'set_name': set_name
     }
 
     serialized_data = orjson.dumps(result).decode()
