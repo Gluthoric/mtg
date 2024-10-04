@@ -38,7 +38,7 @@ def get_set_cards(set_code):
             'total': len(cards_data)
         }
 
-        return response, 200  # Return data directly
+        return response, 200  # Correct variable name
     except Exception as e:
         logger.exception(f"Error in get_set_cards: {str(e)}")
         return {"error": "An error occurred while fetching the set cards."}, 500
@@ -93,7 +93,7 @@ def get_collection_set_details(set_code):
         # Convert any Decimal objects to float
         response = convert_decimals(response)
 
-        return response, 200  # Return data directly
+        return response, 200  # Correct variable name
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
         logger.exception(error_message)
@@ -119,7 +119,7 @@ def get_set(set_code):
             "cards": cards_data
         }
 
-        return response, 200  # Return data directly
+        return response, 200  # Return as a tuple
     except Exception as e:
         error_message = f"An error occurred while fetching the set: {str(e)}"
         logger.exception(error_message)
