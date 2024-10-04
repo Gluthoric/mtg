@@ -26,3 +26,11 @@ def register_routes(app):
     @app.errorhandler(404)
     def not_found(error):
         return send_from_directory(current_app.static_folder, 'index.html')
+from .card_routes import card_routes
+from .collection_routes import collection_routes
+from .kiosk_routes import kiosk_routes
+
+def register_routes(app):
+    app.register_blueprint(card_routes)
+    app.register_blueprint(collection_routes)
+    app.register_blueprint(kiosk_routes)

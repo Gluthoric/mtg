@@ -4,7 +4,7 @@ This module contains utility functions used throughout the application.
 It provides helpers for type conversion, caching, and serialization.
 """
 
-import time
+from typing import Any, Dict, List, Union
 from functools import wraps
 from flask import current_app, request
 from decimal import Decimal
@@ -13,14 +13,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def safe_float(value):
+def safe_float(value: Any) -> float:
     """Convert value to float safely."""
     try:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
 
-def convert_decimals(obj):
+def convert_decimals(obj: Any) -> Union[float, Dict, List, Any]:
     """Recursively convert Decimal objects to float in a data structure."""
     if isinstance(obj, list):
         return [convert_decimals(item) for item in obj]
@@ -31,12 +31,12 @@ def convert_decimals(obj):
     else:
         return obj
 
-def cache_response(timeout=300):
+def cache_response(timeout: int = 300):
     """Decorator to cache the response of a route."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key = f"{func.__name__}:{request.full_path}"
+            cache_key = f"{func.__name__}:{request.full_path}:{orjson.dumps(request.args)}"
             redis_client = current_app.redis_client
 
             cached_data = redis_client.get(cache_key)
@@ -54,6 +54,6 @@ def cache_response(timeout=300):
         return wrapper
     return decorator
 
-def serialize_cards(cards, quantity_type='collection'):
+def serialize_cards(cards: List[Any], quantity_type: str = 'collection') -> List[Dict]:
     """Serialize a list of card objects."""
     return [card.to_dict(quantity_type=quantity_type) for card in cards]

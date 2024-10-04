@@ -1,3 +1,4 @@
+from typing import Dict, Any
 from flask import current_app, jsonify
 from models.card import Card
 from sqlalchemy import func, Float
@@ -7,8 +8,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_stats(quantity_regular_field, quantity_foil_field, cache_key):
-    """Generic function to get stats for collection or kiosk."""
+def get_stats(quantity_regular_field: str, quantity_foil_field: str, cache_key: str) -> Any:
+    """
+    Generic function to get stats for collection or kiosk.
+    
+    Args:
+        quantity_regular_field (str): The field name for regular quantity.
+        quantity_foil_field (str): The field name for foil quantity.
+        cache_key (str): The cache key to use for Redis.
+    
+    Returns:
+        flask.Response: A Flask response object containing the stats.
+    """
     redis_client = current_app.redis_client
     cached_data = redis_client.get(cache_key)
 
@@ -37,7 +48,7 @@ def get_stats(quantity_regular_field, quantity_foil_field, cache_key):
         )
         total_value = total_value_query.scalar() or 0
 
-        result = {
+        result: Dict[str, Any] = {
             'total_cards': int(total_cards),
             'unique_cards': unique_cards,
             'total_value': round(total_value, 2)

@@ -7,10 +7,14 @@ load_dotenv()
 class Config:
     # Database configuration
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI')
+    if not SQLALCHEMY_DATABASE_URI:
+        raise ValueError("DATABASE_URI must be set in environment variables")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Security
     SECRET_KEY = os.getenv('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY must be set in environment variables")
 
     # Redis configuration
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')

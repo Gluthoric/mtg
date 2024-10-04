@@ -1,30 +1,471 @@
+# /home/gluth/mtg/backend/utils.py
+```
+# utils.py
+"""
+This module contains utility functions used throughout the application.
+It provides helpers for type conversion, caching, and serialization.
+"""
+
+import time
+from functools import wraps
+from flask import current_app, request
+from decimal import Decimal
+import orjson
+import logging
+
+logger = logging.getLogger(__name__)
+
+def safe_float(value):
+    """Convert value to float safely."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+def convert_decimals(obj):
+    """Recursively convert Decimal objects to float in a data structure."""
+    if isinstance(obj, list):
+        return [convert_decimals(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
+
+def cache_response(timeout=300):
+    """Decorator to cache the response of a route."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_key = f"{func.__name__}:{request.full_path}"
+            redis_client = current_app.redis_client
+
+            cached_data = redis_client.get(cache_key)
+            if cached_data:
+                logger.debug(f"Cache hit for key: {cache_key}")
+                return current_app.response_class(
+                    response=cached_data,
+                    status=200,
+                    mimetype='application/json'
+                )
+
+            response = func(*args, **kwargs)
+            redis_client.setex(cache_key, timeout, response.get_data())
+            return response
+        return wrapper
+    return decorator
+
+def serialize_cards(cards, quantity_type='collection'):
+    """Serialize a list of card objects."""
+    return [card.to_dict(quantity_type=quantity_type) for card in cards]```
+
+# /home/gluth/mtg/backend/config.py
+```
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from the .env file
+load_dotenv()
+
+class Config:
+    # Database configuration
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Security
+    SECRET_KEY = os.getenv('SECRET_KEY')
+
+    # Redis configuration
+    REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+    REDIS_DB = int(os.getenv('REDIS_DB', 0))
+
+    # Debug settings
+    DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
+    SQLALCHEMY_ECHO = DEBUG
+
+# Use a single configuration for all environments
+config = {
+    'default': Config
+}
+```
+
+# /home/gluth/mtg/backend/app.py
+```
+import logging
+from flask import Flask
+from flask_cors import CORS
+from flask_migrate import Migrate
+from config import config
+from database import db
+from routes import register_routes
+from routes.set_routes import set_routes
+from routes.cards_routes import cards_bp
+from routes.collection_routes import collection_bp
+from routes.kiosk_routes import kiosk_bp
+from routes.cache_routes import cache_bp
+import redis
+import orjson
+import os
+from flask.cli import with_appcontext
+from models.set_collection_count import SetCollectionCount
+from errors import handle_error
+
+# Import utility functions
+# convert_decimals: Converts Decimal objects to float in data structures
+# safe_float: Safely converts values to float
+# cache_response: Decorator for caching route responses
+# serialize_cards: Serializes a list of card objects
+from utils import convert_decimals, safe_float, cache_response, serialize_cards
+
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+
+def create_app(config_name='default'):
+    # Initialize Flask app
+    app = Flask(__name__)
+
+    app.logger.setLevel(logging.WARNING)
+    app.config.from_object(config[config_name])
+
+    # Initialize extensions
+    db.init_app(app)
+    CORS(app)
+    migrate = Migrate(app, db)
+
+    # Initialize Redis
+    app.redis_client = redis.Redis(
+        host=app.config['REDIS_HOST'],
+        port=app.config['REDIS_PORT'],
+        db=app.config['REDIS_DB']
+    )
+
+    # Register routes
+    register_routes(app)
+
+    # Register blueprints
+    app.register_blueprint(set_routes, url_prefix='/api/collection')
+    app.register_blueprint(cards_bp)
+    app.register_blueprint(collection_bp)
+    app.register_blueprint(kiosk_bp)
+    app.register_blueprint(cache_bp)
+
+    # Use orjson for JSON serialization
+    app.json_encoder = orjson.dumps
+    app.json_decoder = orjson.loads
+
+    # Register error handlers
+    app.register_error_handler(400, lambda e: handle_error(400, str(e)))
+    app.register_error_handler(404, lambda e: handle_error(404, 'Resource not found'))
+    app.register_error_handler(500, lambda e: handle_error(500, 'Internal server error'))
+
+    # Register the custom CLI command
+    @app.cli.command("refresh-collection-counts")
+    @with_appcontext
+    def refresh_collection_counts():
+        """Refresh the set_collection_counts materialized view."""
+        SetCollectionCount.refresh()
+        print("Set collection counts refreshed successfully.")
+
+    return app
+
+if __name__ == '__main__':
+    app = create_app()
+    app.run()
+```
+
+# /home/gluth/mtg/backend/.env
+```
+DATABASE_URI=postgresql://gluth:Caprisun1!@192.168.1.126:5432/mtg_collection_kiosk
+SECRET_KEY=you-will-never-guess
+FLASK_APP=main.py
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+# /home/gluth/mtg/backend/errors.py
+```
+from flask import jsonify
+
+def handle_error(status_code, message):
+    """Create a JSON response for errors."""
+    response = jsonify({'error': message})
+    response.status_code = status_code
+    return response
+```
+
+# /home/gluth/mtg/backend/schemas.py
+```
+from marshmallow import Schema, fields, validate
+
+class UpdateCardSchema(Schema):
+    """Schema for updating card quantities."""
+    quantity_regular = fields.Integer(required=True, validate=validate.Range(min=0))
+    quantity_foil = fields.Integer(required=True, validate=validate.Range(min=0))
+```
+
+# /home/gluth/mtg/backend/stats.py
+```
+from flask import current_app, jsonify
+from models.card import Card
+from sqlalchemy import func, Float
+from database import db
+import orjson
+import logging
+
+logger = logging.getLogger(__name__)
+
+def get_stats(quantity_regular_field, quantity_foil_field, cache_key):
+    """Generic function to get stats for collection or kiosk."""
+    redis_client = current_app.redis_client
+    cached_data = redis_client.get(cache_key)
+
+    if cached_data:
+        return current_app.response_class(
+            response=cached_data.decode(),
+            status=200,
+            mimetype='application/json'
+        )
+
+    try:
+        total_cards = db.session.query(
+            func.sum(getattr(Card, quantity_regular_field) + getattr(Card, quantity_foil_field))
+        ).scalar() or 0
+        unique_cards = Card.query.filter(
+            (getattr(Card, quantity_regular_field) > 0) | (getattr(Card, quantity_foil_field) > 0)
+        ).count()
+
+        total_value_query = db.session.query(
+            func.sum(
+                (func.cast(Card.prices['usd'].astext, Float) * getattr(Card, quantity_regular_field)) +
+                (func.cast(Card.prices['usd_foil'].astext, Float) * getattr(Card, quantity_foil_field))
+            )
+        ).filter(
+            (getattr(Card, quantity_regular_field) > 0) | (getattr(Card, quantity_foil_field) > 0)
+        )
+        total_value = total_value_query.scalar() or 0
+
+        result = {
+            'total_cards': int(total_cards),
+            'unique_cards': unique_cards,
+            'total_value': round(total_value, 2)
+        }
+
+        serialized_data = orjson.dumps(result).decode()
+        redis_client.setex(cache_key, 3600, serialized_data)  # Cache for 1 hour
+
+        return current_app.response_class(
+            response=serialized_data,
+            status=200,
+            mimetype='application/json'
+        )
+    except Exception as e:
+        logger.exception(f"Error getting stats for {cache_key}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+```
+
+# /home/gluth/mtg/backend/models/card.py
+```
+from database import db
+from sqlalchemy.dialects.postgresql import JSONB
+from datetime import datetime
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from models.set_collection_count import SetCollectionCount
+
+class Card(db.Model):
+    __tablename__ = 'cards'
+
+    id = db.Column(db.Text, primary_key=True)
+    oracle_id = db.Column(db.Text, index=True)
+    multiverse_ids = db.Column(JSONB)
+    mtgo_id = db.Column(db.BigInteger)
+    arena_id = db.Column(db.BigInteger)
+    tcgplayer_id = db.Column(db.BigInteger)
+    name = db.Column(db.Text, nullable=False, index=True)
+    lang = db.Column(db.Text)
+    released_at = db.Column(db.DateTime)
+    uri = db.Column(db.Text)
+    scryfall_uri = db.Column(db.Text)
+    layout = db.Column(db.Text)
+    highres_image = db.Column(db.Boolean)
+    image_status = db.Column(db.Text)
+    image_uris = db.Column(JSONB)
+    mana_cost = db.Column(db.Text)
+    cmc = db.Column(db.Float)
+    type_line = db.Column(db.Text, index=True)
+    oracle_text = db.Column(db.Text)
+    colors = db.Column(JSONB)
+    color_identity = db.Column(JSONB)
+    keywords = db.Column(JSONB)
+    produced_mana = db.Column(JSONB)
+    legalities = db.Column(JSONB)
+    games = db.Column(JSONB)
+    reserved = db.Column(db.Boolean)
+    foil = db.Column(db.Boolean)
+    nonfoil = db.Column(db.Boolean)
+    finishes = db.Column(JSONB)
+    oversized = db.Column(db.Boolean)
+    promo = db.Column(db.Boolean)
+    full_art = db.Column(db.Boolean)
+    textless = db.Column(db.Boolean)
+    booster = db.Column(db.Boolean)
+    story_spotlight = db.Column(db.Boolean)
+    reprint = db.Column(db.Boolean)
+    variation = db.Column(db.Boolean)
+    set_code = db.Column(db.Text, db.ForeignKey('sets.code'))
+    set_name = db.Column(db.Text)
+    collector_number = db.Column(db.Text, nullable=False)
+    digital = db.Column(db.Boolean)
+    rarity = db.Column(db.Text)
+    card_back_id = db.Column(db.Text)
+    artist = db.Column(db.Text)
+    artist_ids = db.Column(JSONB)
+    illustration_id = db.Column(db.Text)
+    border_color = db.Column(db.Text)
+    frame = db.Column(db.Text)
+    frame_effects = db.Column(JSONB)
+    prices = db.Column(JSONB)
+    related_uris = db.Column(JSONB)
+    purchase_uris = db.Column(JSONB)
+    promo_types = db.Column(JSONB)
+    usd_price = db.Column(db.Numeric)
+    usd_foil_price = db.Column(db.Numeric)
+    quantity_collection_regular = db.Column(db.BigInteger, default=0)
+    quantity_collection_foil = db.Column(db.BigInteger, default=0)
+    quantity_kiosk_regular = db.Column(db.BigInteger, default=0)
+    quantity_kiosk_foil = db.Column(db.BigInteger, default=0)
+
+    # Relationships
+    set = db.relationship('Set', back_populates='cards')
+
+    def to_dict(self, quantity_type='collection'):
+        """Serialize the card object to a dictionary."""
+        data = {
+            'id': self.id,
+            'name': self.name,
+            'set_name': self.set_name,
+            'set_code': self.set_code,
+            'collector_number': self.collector_number,
+            'type_line': self.type_line,
+            'rarity': self.rarity,
+            'mana_cost': self.mana_cost,
+            'cmc': self.cmc,
+            'oracle_text': self.oracle_text,
+            'colors': self.colors,
+            'image_uris': self.image_uris,
+            'prices': self.prices,
+            'frame_effects': self.frame_effects,
+            'promo_types': self.promo_types,
+            'promo': self.promo,
+            'reprint': self.reprint,
+            'variation': self.variation,
+            'oversized': self.oversized,
+            'keywords': self.keywords,
+        }
+        if quantity_type == 'collection':
+            data['quantity_regular'] = self.quantity_collection_regular
+            data['quantity_foil'] = self.quantity_collection_foil
+        elif quantity_type == 'kiosk':
+            data['quantity_regular'] = self.quantity_kiosk_regular
+            data['quantity_foil'] = self.quantity_kiosk_foil
+        else:
+            data['quantity_regular'] = 0
+            data['quantity_foil'] = 0
+        return data
+
+@event.listens_for(Session, 'after_flush')
+def after_flush(session, flush_context):
+    updated_set_codes = set()
+    for instance in session.new.union(session.dirty).union(session.deleted):
+        if isinstance(instance, Card):
+            updated_set_codes.add(instance.set_code)
+
+    if updated_set_codes:
+        SetCollectionCount.refresh()
+```
+
+# /home/gluth/mtg/backend/routes/card_routes.py
+```
+import pandas as pd
+import logging
 from flask import Blueprint, jsonify, request, current_app
+import time
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import load_only, joinedload, subqueryload, aliased
+from sqlalchemy import func, case, or_, distinct, Float, cast
+from sqlalchemy.sql import asc, desc, text
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models.card import Card
 from models.set import Set
 from models.set_collection_count import SetCollectionCount
 from database import db
-from sqlalchemy import func, or_, Float, distinct, text
-from sqlalchemy.sql import asc, desc
-from sqlalchemy.orm import load_only
 import orjson
-import logging
-from utils import safe_float, convert_decimals, cache_response, serialize_cards, monitor_cache
-from errors import handle_error
-from schemas import CardSearchSchema, UpdateCardSchema, SetSearchSchema
+from decimal import Decimal
+from collections import defaultdict
+from schemas import UpdateCardSchema
 from stats import get_stats
-
-logger = logging.getLogger(__name__)
 
 card_routes = Blueprint('card_routes', __name__)
 
-@card_routes.route('/cards', methods=['GET'])
-@cache_response()
-def get_cards():
-    schema = CardSearchSchema()
-    errors = schema.validate(request.args)
-    if errors:
-        return handle_error(400, str(errors))
+def get_category_case():
+    return case(
+        (Set.set_type.in_(['core', 'expansion']), 'Standard Sets'),
+        (Set.set_type.in_(['draft_innovation', 'masters']), 'Special Sets'),
+        (Set.set_type == 'funny', 'Un-Sets'),
+        (Set.set_type == 'commander', 'Commander Sets'),
+        else_='Other'
+    )
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def safe_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+def monitor_cache(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+
+        # Increment total calls
+        current_app.redis_client.incr('cache_total_calls')
+
+        # Increment hits or misses
+        if result is not None:
+            current_app.redis_client.incr('cache_hits')
+        else:
+            current_app.redis_client.incr('cache_misses')
+
+        # Record response time
+        current_app.redis_client.lpush('cache_response_times', end_time - start_time)
+        current_app.redis_client.ltrim('cache_response_times', 0, 999)  # Keep last 1000 response times
+
+        return result
+    return wrapper
+
+def convert_decimals(obj):
+    if isinstance(obj, list):
+        return [convert_decimals(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
+
+def serialize_cards(cards, quantity_type='collection'):
+    return [card.to_dict() for card in cards]
+
+@card_routes.route('/cards', methods=['GET'])
+def get_cards():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     name = request.args.get('name', '')
@@ -41,7 +482,7 @@ def get_cards():
     if rarity:
         query = query.filter(Card.rarity == rarity)
     if colors:
-        query = query.filter(Card.colors.contains(colors))
+        query = query.filter(or_(*[Card.colors.contains([color.strip()]) for color in colors]))
 
     cards = query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -876,3 +1317,4 @@ def get_collection_set(set_code):
         error_message = f"An error occurred while fetching the set: {str(e)}"
         logger.exception(error_message)
         return jsonify({"error": error_message}), 500
+```

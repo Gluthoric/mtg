@@ -1,7 +1,7 @@
 from database import db
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
-from sqlalchemy import event
+from sqlalchemy import event, Index
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models.set_collection_count import SetCollectionCount
@@ -17,7 +17,7 @@ class Card(db.Model):
     tcgplayer_id = db.Column(db.BigInteger)
     name = db.Column(db.Text, nullable=False, index=True)
     lang = db.Column(db.Text)
-    released_at = db.Column(db.DateTime)
+    released_at = db.Column(db.DateTime, index=True)
     uri = db.Column(db.Text)
     scryfall_uri = db.Column(db.Text)
     layout = db.Column(db.Text)
@@ -25,7 +25,7 @@ class Card(db.Model):
     image_status = db.Column(db.Text)
     image_uris = db.Column(JSONB)
     mana_cost = db.Column(db.Text)
-    cmc = db.Column(db.Float)
+    cmc = db.Column(db.Float, index=True)
     type_line = db.Column(db.Text, index=True)
     oracle_text = db.Column(db.Text)
     colors = db.Column(JSONB)
@@ -34,25 +34,25 @@ class Card(db.Model):
     produced_mana = db.Column(JSONB)
     legalities = db.Column(JSONB)
     games = db.Column(JSONB)
-    reserved = db.Column(db.Boolean)
+    reserved = db.Column(db.Boolean, index=True)
     foil = db.Column(db.Boolean)
     nonfoil = db.Column(db.Boolean)
     finishes = db.Column(JSONB)
     oversized = db.Column(db.Boolean)
-    promo = db.Column(db.Boolean)
+    promo = db.Column(db.Boolean, index=True)
     full_art = db.Column(db.Boolean)
     textless = db.Column(db.Boolean)
     booster = db.Column(db.Boolean)
     story_spotlight = db.Column(db.Boolean)
-    reprint = db.Column(db.Boolean)
+    reprint = db.Column(db.Boolean, index=True)
     variation = db.Column(db.Boolean)
-    set_code = db.Column(db.Text, db.ForeignKey('sets.code'))
+    set_code = db.Column(db.Text, db.ForeignKey('sets.code'), index=True)
     set_name = db.Column(db.Text)
     collector_number = db.Column(db.Text, nullable=False)
     digital = db.Column(db.Boolean)
-    rarity = db.Column(db.Text)
+    rarity = db.Column(db.Text, index=True)
     card_back_id = db.Column(db.Text)
-    artist = db.Column(db.Text)
+    artist = db.Column(db.Text, index=True)
     artist_ids = db.Column(JSONB)
     illustration_id = db.Column(db.Text)
     border_color = db.Column(db.Text)
@@ -71,6 +71,12 @@ class Card(db.Model):
 
     # Relationships
     set = db.relationship('Set', back_populates='cards')
+
+    # Additional indexes
+    __table_args__ = (
+        Index('idx_card_collection_quantities', 'quantity_collection_regular', 'quantity_collection_foil'),
+        Index('idx_card_kiosk_quantities', 'quantity_kiosk_regular', 'quantity_kiosk_foil'),
+    )
 
     def to_dict(self, quantity_type='collection'):
         """Serialize the card object to a dictionary."""

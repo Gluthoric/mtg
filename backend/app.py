@@ -1,10 +1,19 @@
 import logging
 from flask import Flask
+from routes import register_routes
+
+def create_app(config_name='default'):
+    app = Flask(__name__)
+    # ... (other configurations)
+    
+    register_routes(app)
+    
+    # ... (rest of the setup)
+    return app
 from flask_cors import CORS
 from flask_migrate import Migrate
 from config import config
 from database import db
-from routes import register_routes
 from routes.set_routes import set_routes
 from routes.cards_routes import cards_bp
 from routes.collection_routes import collection_bp
@@ -12,25 +21,22 @@ from routes.kiosk_routes import kiosk_bp
 from routes.cache_routes import cache_bp
 import redis
 import orjson
-import os
 from flask.cli import with_appcontext
 from models.set_collection_count import SetCollectionCount
 from errors import handle_error
 
 # Import utility functions
-# convert_decimals: Converts Decimal objects to float in data structures
-# safe_float: Safely converts values to float
-# cache_response: Decorator for caching route responses
-# serialize_cards: Serializes a list of card objects
 from utils import convert_decimals, safe_float, cache_response, serialize_cards
-
-logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 def create_app(config_name='default'):
     # Initialize Flask app
     app = Flask(__name__)
 
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     app.logger.setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+
     app.config.from_object(config[config_name])
 
     # Initialize extensions
@@ -44,9 +50,6 @@ def create_app(config_name='default'):
         port=app.config['REDIS_PORT'],
         db=app.config['REDIS_DB']
     )
-
-    # Register routes
-    register_routes(app)
 
     # Register blueprints
     app.register_blueprint(set_routes, url_prefix='/api/collection')
