@@ -278,7 +278,10 @@ import { ref, onMounted, watch, computed } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 import CardListControls from "../components/CardListControls.vue";
-import { fetchSetDetails as fetchSetDetailsUtil, applyFilters as applyFiltersUtil } from "../utils/setUtils";
+import {
+  fetchSetDetails as fetchSetDetailsUtil,
+  applyFilters as applyFiltersUtil,
+} from "../utils/setUtils";
 
 const route = useRoute();
 const setCode = ref(route.params.setCode);
@@ -307,21 +310,19 @@ const navLinks = [
 
 // Computed properties for set statistics
 const totalCardsInSet = computed(() => originalCards.value.length);
-const cardsInCollection = computed(() =>
-  originalCards.value.filter(
-    (card) =>
-      card.quantity_regular > 0 || card.quantity_foil > 0
-  ).length
+const cardsInCollection = computed(
+  () =>
+    originalCards.value.filter(
+      (card) => card.quantity_regular > 0 || card.quantity_foil > 0,
+    ).length,
 );
 const completionPercentage = computed(() =>
-  ((cardsInCollection.value / totalCardsInSet.value) * 100).toFixed(2)
+  ((cardsInCollection.value / totalCardsInSet.value) * 100).toFixed(2),
 );
 const totalValue = computed(() => {
   return originalCards.value.reduce((total, card) => {
-    const regularValue =
-      (card.prices?.usd || 0) * (card.quantity_regular || 0);
-    const foilValue =
-      (card.prices?.usd_foil || 0) * (card.quantity_foil || 0);
+    const regularValue = (card.prices?.usd || 0) * (card.quantity_regular || 0);
+    const foilValue = (card.prices?.usd_foil || 0) * (card.quantity_foil || 0);
     return total + regularValue + foilValue;
   }, 0);
 });
@@ -353,7 +354,7 @@ watch(
     setCode.value = newSetCode;
     currentPage.value = 1;
     fetchSetDetails();
-  }
+  },
 );
 
 watch(
@@ -361,13 +362,12 @@ watch(
   () => {
     applyFilters();
   },
-  { deep: true }
+  { deep: true },
 );
 
 onMounted(() => {
   fetchSetDetails();
 });
-
 
 const isMissing = (card) => {
   return card.quantity_regular + card.quantity_foil === 0;
@@ -464,15 +464,9 @@ const decrement = (card, type) => {
 
 const onInput = (card, type) => {
   if (type === "regular") {
-    card.quantity_regular = Math.max(
-      0,
-      parseInt(card.quantity_regular) || 0,
-    );
+    card.quantity_regular = Math.max(0, parseInt(card.quantity_regular) || 0);
   } else if (type === "foil") {
-    card.quantity_foil = Math.max(
-      0,
-      parseInt(card.quantity_foil) || 0,
-    );
+    card.quantity_foil = Math.max(0, parseInt(card.quantity_foil) || 0);
   }
   // Immediately update the backend
   updateQuantity(card, type);

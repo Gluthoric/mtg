@@ -70,14 +70,16 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script>
 import { ref, onMounted, watch, computed } from "vue";
 import axios from "axios";
-import { fetchSetDetails as fetchSetDetailsUtil, applyFilters as applyFiltersUtil } from "../utils/setUtils";
+import {
+  fetchSetDetails as fetchSetDetailsUtil,
+  applyFilters as applyFiltersUtil,
+} from "../utils/setUtils";
 
 export default {
   name: "SetDetails",
@@ -116,13 +118,12 @@ export default {
       cards.value = applyFiltersUtil(originalCards.value, filters.value);
     };
 
-
     watch(
       [filters, currentPage],
       () => {
         applyFilters();
       },
-      { deep: true }
+      { deep: true },
     );
 
     onMounted(() => {

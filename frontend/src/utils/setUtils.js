@@ -32,7 +32,7 @@ export const applyFilters = (cards, filters) => {
     if (
       filters.types.length &&
       !filters.types.some((type) =>
-        card.type_line.toLowerCase().includes(type.toLowerCase())
+        card.type_line.toLowerCase().includes(type.toLowerCase()),
       )
     )
       return false;
