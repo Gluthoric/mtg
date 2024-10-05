@@ -190,7 +190,7 @@
                       v-model.number="card.quantity_regular"
                       type="number"
                       min="0"
-                      class="quantity-input text-center border-none outline-none bg-input text-foreground text-sm"
+                      class="quantity-input text-center border-none outline-none bg-input text-black text-sm"
                       @input="onInput(card, 'regular')"
                     />
                     <button
@@ -230,7 +230,7 @@
                       v-model.number="card.quantity_foil"
                       type="number"
                       min="0"
-                      class="quantity-input text-center border-none outline-none bg-input text-foreground text-sm"
+                      class="quantity-input text-center border-none outline-none bg-input text-black text-sm"
                       @input="onInput(card, 'foil')"
                     />
                     <button
@@ -531,5 +531,16 @@ const sortedCards = computed(() => {
 
 .quantity-input {
   @apply w-12 h-8;
+}
+
+/* Remove default number input arrows */
+.quantity-input::-webkit-outer-spin-button,
+.quantity-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.quantity-input[type="number"] {
+  -moz-appearance: textfield;
 }
 </style>

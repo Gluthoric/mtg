@@ -7,6 +7,7 @@ import logging
 from utils import cache_response
 from errors import handle_error, APIError
 from schemas import CardSearchSchema
+from flasgger import swag_from
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,88 @@ def handle_api_error(error):
 
 @card_routes.route('/cards', methods=['GET'])
 @cache_response()
+@swag_from({
+    'tags': ['Cards'],
+    'summary': 'Get a list of cards',
+    'parameters': [
+        {
+            'name': 'page',
+            'in': 'query',
+            'type': 'integer',
+            'default': 1,
+            'description': 'Page number'
+        },
+        {
+            'name': 'per_page',
+            'in': 'query',
+            'type': 'integer',
+            'default': 50,
+            'description': 'Number of items per page'
+        },
+        {
+            'name': 'name',
+            'in': 'query',
+            'type': 'string',
+            'description': 'Filter cards by name'
+        },
+        {
+            'name': 'set_code',
+            'in': 'query',
+            'type': 'string',
+            'description': 'Filter cards by set code'
+        },
+        {
+            'name': 'rarity',
+            'in': 'query',
+            'type': 'string',
+            'description': 'Filter cards by rarity'
+        },
+        {
+            'name': 'colors',
+            'in': 'query',
+            'type': 'string',
+            'description': 'Filter cards by colors (comma-separated)'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Successful response',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'cards': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'string'},
+                                'name': {'type': 'string'},
+                                'set_name': {'type': 'string'},
+                                'set_code': {'type': 'string'},
+                                'collector_number': {'type': 'string'},
+                                'rarity': {'type': 'string'},
+                                'image_uris': {'type': 'object'},
+                                'prices': {'type': 'object'}
+                            }
+                        }
+                    },
+                    'total': {'type': 'integer'},
+                    'pages': {'type': 'integer'},
+                    'current_page': {'type': 'integer'}
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_cards():
     schema = CardSearchSchema()
     errors = schema.validate(request.args)
@@ -53,8 +136,79 @@ def get_cards():
 
     return response, 200  # Let the decorator handle serialization and caching
 
+@card_routes.route('/keywords', methods=['GET'])
+@cache_response()
+@swag_from({
+    'tags': ['Cards'],
+    'summary': 'Get a list of all keywords',
+    'responses': {
+        200: {
+            'description': 'Successful response',
+            'schema': {
+                'type': 'array',
+                'items': {
+                    'type': 'string'
+                }
+            }
+        }
+    }
+})
+def get_keywords():
+    # Query distinct keywords from the Card model
+    keywords = db.session.query(Card.keywords).distinct().all()
+    # Flatten the list of keywords
+    all_keywords = set(keyword for sublist in keywords for keyword in sublist[0] if sublist[0])
+    return jsonify(list(all_keywords)), 200
+
 @card_routes.route('/cards/<string:card_id>', methods=['GET'])
 @cache_response()
+@swag_from({
+    'tags': ['Cards'],
+    'summary': 'Get a specific card by ID',
+    'parameters': [
+        {
+            'name': 'card_id',
+            'in': 'path',
+            'type': 'string',
+            'required': True,
+            'description': 'Unique identifier of the card'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Successful response',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'id': {'type': 'string'},
+                    'name': {'type': 'string'},
+                    'set_name': {'type': 'string'},
+                    'set_code': {'type': 'string'},
+                    'collector_number': {'type': 'string'},
+                    'type_line': {'type': 'string'},
+                    'rarity': {'type': 'string'},
+                    'mana_cost': {'type': 'string'},
+                    'cmc': {'type': 'number'},
+                    'oracle_text': {'type': 'string'},
+                    'colors': {'type': 'array', 'items': {'type': 'string'}},
+                    'image_uris': {'type': 'object'},
+                    'prices': {'type': 'object'},
+                    'quantity_regular': {'type': 'integer'},
+                    'quantity_foil': {'type': 'integer'}
+                }
+            }
+        },
+        404: {
+            'description': 'Card not found',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_card(card_id):
     # Fetch card from database, with optimization to load only the required fields
     card = Card.query.options(

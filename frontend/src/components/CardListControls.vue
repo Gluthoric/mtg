@@ -1,5 +1,7 @@
 <template>
-  <div class="controls bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+  <div
+    class="controls bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6"
+  >
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <!-- Name Filter -->
       <div class="filter-section">
@@ -12,7 +14,10 @@
 
       <!-- Rarity Filter -->
       <div class="filter-section">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rarities</label>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >Rarities</label
+        >
         <div class="flex flex-wrap gap-2">
           <button
             v-for="rarity in availableRarities"
@@ -24,7 +29,7 @@
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600',
               'border border-gray-300 dark:border-gray-600',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400',
             ]"
           >
             {{ rarity }}
@@ -34,7 +39,10 @@
 
       <!-- Color Filter -->
       <div class="filter-section">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Colors</label>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >Colors</label
+        >
         <div class="flex flex-wrap gap-2">
           <button
             v-for="color in availableColors"
@@ -46,7 +54,7 @@
               isColorSelected(color)
                 ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-blue-400'
                 : 'opacity-70 hover:opacity-100',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400',
             ]"
           >
             <span class="sr-only">{{ getColorName(color) }}</span>
@@ -56,7 +64,10 @@
 
       <!-- Type Line Filter -->
       <div class="filter-section">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Types</label>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >Types</label
+        >
         <div class="flex flex-wrap gap-2">
           <button
             v-for="type in availableTypes"
@@ -68,7 +79,7 @@
                 ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600',
               'border border-gray-300 dark:border-gray-600',
-              'focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400'
+              'focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400',
             ]"
           >
             {{ type }}
@@ -78,7 +89,10 @@
 
       <!-- Keywords Filter -->
       <div class="filter-section relative" ref="keywordDropdownRef">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Keywords</label>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >Keywords</label
+        >
         <div class="relative">
           <input
             type="text"
@@ -106,7 +120,10 @@
 
       <!-- Cards Per Row Slider -->
       <div class="filter-section">
-        <label for="cards-per-row-slider" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label
+          for="cards-per-row-slider"
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
           Cards per row
         </label>
         <input
@@ -118,7 +135,9 @@
           step="1"
           class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
         />
-        <div class="text-sm mt-2 text-gray-600 dark:text-gray-400">{{ cardsPerRow }} cards per row</div>
+        <div class="text-sm mt-2 text-gray-600 dark:text-gray-400">
+          {{ cardsPerRow }} cards per row
+        </div>
       </div>
 
       <!-- Missing Filter Toggle -->
@@ -127,7 +146,9 @@
           <div class="relative">
             <input type="checkbox" v-model="filters.missing" class="sr-only" />
             <div class="w-10 h-6 bg-gray-200 rounded-full shadow-inner"></div>
-            <div class="dot absolute w-6 h-6 bg-white rounded-full shadow -left-1 -top-1 transition"></div>
+            <div
+              class="dot absolute w-6 h-6 bg-white rounded-full shadow -left-1 -top-1 transition"
+            ></div>
           </div>
           <div class="ml-3 text-gray-700 dark:text-gray-300 font-medium">
             Show Missing Cards
@@ -199,15 +220,15 @@ export default defineComponent({
     const filteredKeywords = ref(availableKeywords);
 
     const isRaritySelected = computed(
-      () => (rarity: string) => filters.value.rarities.includes(rarity)
+      () => (rarity: string) => filters.value.rarities.includes(rarity),
     );
 
     const isColorSelected = computed(
-      () => (color: string) => filters.value.colors.includes(color)
+      () => (color: string) => filters.value.colors.includes(color),
     );
 
     const isTypeSelected = computed(
-      () => (type: string) => filters.value.types.includes(type)
+      () => (type: string) => filters.value.types.includes(type),
     );
 
     const colorClass = (color: string) => {
@@ -264,7 +285,7 @@ export default defineComponent({
     const filterKeywords = () => {
       const search = keywordSearch.value.toLowerCase();
       filteredKeywords.value = availableKeywords.filter((kw) =>
-        kw.toLowerCase().includes(search)
+        kw.toLowerCase().includes(search),
       );
     };
 
@@ -279,7 +300,7 @@ export default defineComponent({
       (newFilters) => {
         emit("update:modelValue", newFilters);
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(cardsPerRow, (newCardsPerRow) => {
