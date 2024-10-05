@@ -1,10 +1,9 @@
 from database import db
+from sqlalchemy.orm import relationship
 from models.card import Card
 from models.set_collection_count import SetCollectionCount
 from sqlalchemy.sql import func
 from datetime import datetime
-from sqlalchemy.orm import relationship
-from sqlalchemy import ForeignKey
 
 class Set(db.Model):
     __tablename__ = 'sets'
@@ -24,6 +23,7 @@ class Set(db.Model):
     set_collection_count = relationship('SetCollectionCount', back_populates='set', uselist=False)
 
     def to_dict(self):
+        """Serialize the set object to a dictionary."""
         collection_count = self.get_collection_count()
         return {
             'id': self.id,
@@ -40,14 +40,17 @@ class Set(db.Model):
         }
 
     def get_collection_count(self):
+        """Fetch the collection count for this set."""
         return self.set_collection_count.collection_count if self.set_collection_count else 0
 
     @property
     def collection_count(self):
+        """Property to get the collection count."""
         return self.get_collection_count()
 
     @classmethod
     def get_sets_with_collection_counts(cls):
+        """Class method to get sets with collection counts."""
         return db.session.query(cls, SetCollectionCount.collection_count) \
             .outerjoin(SetCollectionCount) \
             .order_by(cls.released_at.desc()) \

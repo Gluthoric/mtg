@@ -2,9 +2,10 @@ import axios from "axios";
 
 export const fetchSetDetails = async (setCode) => {
   try {
-    const response = await axios.get(`/api/sets/${setCode}`);
-    if (!response.data.set || !response.data.cards) {
-      throw new Error("Invalid response format");
+    const response = await axios.get(`/api/collection/sets/${setCode}`);
+    console.log("API response:", response.data); // Add this line for debugging
+    if (!response.data) {
+      throw new Error("No data received from the server");
     }
     return response.data;
   } catch (error) {

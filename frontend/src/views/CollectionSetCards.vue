@@ -57,7 +57,7 @@
           </div>
         </div>
 
-        <!-- New Statistics Sections -->
+        <!-- Detailed Statistics -->
         <div
           v-if="statistics"
           class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
@@ -67,7 +67,10 @@
             <h2 class="text-xl font-semibold text-primary mb-2">
               Frame Effects
             </h2>
-            <ul class="space-y-1">
+            <ul
+              v-if="Object.keys(statistics.frame_effects).length"
+              class="space-y-1"
+            >
               <li
                 v-for="(count, effect) in statistics.frame_effects"
                 :key="effect"
@@ -77,12 +80,18 @@
                 <span class="font-semibold">{{ count }}</span>
               </li>
             </ul>
+            <p v-else class="text-muted-foreground">
+              No frame effects in this set
+            </p>
           </div>
 
           <!-- Promo Types -->
           <div class="bg-card p-4 rounded-lg">
             <h2 class="text-xl font-semibold text-primary mb-2">Promo Types</h2>
-            <ul class="space-y-1">
+            <ul
+              v-if="Object.keys(statistics.promo_types).length"
+              class="space-y-1"
+            >
               <li
                 v-for="(count, promo) in statistics.promo_types"
                 :key="promo"
@@ -92,6 +101,9 @@
                 <span class="font-semibold">{{ count }}</span>
               </li>
             </ul>
+            <p v-else class="text-muted-foreground">
+              No promo types in this set
+            </p>
           </div>
 
           <!-- Other Attributes -->
@@ -99,7 +111,10 @@
             <h2 class="text-xl font-semibold text-primary mb-2">
               Other Attributes
             </h2>
-            <ul class="space-y-1">
+            <ul
+              v-if="Object.keys(statistics.other_attributes).length"
+              class="space-y-1"
+            >
               <li
                 v-for="(count, attribute) in statistics.other_attributes"
                 :key="attribute"
@@ -109,6 +124,9 @@
                 <span class="font-semibold">{{ count }}</span>
               </li>
             </ul>
+            <p v-else class="text-muted-foreground">
+              No other attributes in this set
+            </p>
           </div>
         </div>
 
@@ -332,13 +350,16 @@ const fetchSetDetails = async () => {
   error.value = null;
   try {
     const response = await fetchSetDetailsUtil(setCode.value);
-    console.log("API response:", JSON.stringify(response, null, 2)); // Stringify the entire response
-    if (response.set && response.cards) {
-      setName.value = response.set.name;
-      originalCards.value = response.cards;
-      statistics.value = response.set.statistics || {};
-      console.log("Statistics value:", JSON.stringify(statistics.value, null, 2)); // Stringify statistics
-      console.log("Statistics keys:", Object.keys(statistics.value)); // Log keys of statistics object
+    console.log("API response:", JSON.stringify(response, null, 2));
+    if (response) {
+      setName.value = response.set?.name || "";
+      originalCards.value = response.cards || [];
+      statistics.value = response.set?.statistics || {};
+      console.log(
+        "Statistics value:",
+        JSON.stringify(statistics.value, null, 2),
+      );
+      console.log("Statistics keys:", Object.keys(statistics.value));
       applyFilters();
     } else {
       throw new Error("Invalid response format");
@@ -359,7 +380,6 @@ watch(
   () => route.params.setCode,
   (newSetCode) => {
     setCode.value = newSetCode;
-    currentPage.value = 1;
     fetchSetDetails();
   },
 );
@@ -373,7 +393,7 @@ watch(
 );
 
 onMounted(() => {
-  console.log("Component mounted"); // Debug: Log when the component is mounted
+  console.log("Component mounted");
   fetchSetDetails();
 });
 

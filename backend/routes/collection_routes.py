@@ -268,7 +268,7 @@ def get_collection_set_cards(set_code):
         return jsonify({"error": error_message}), 500
 
 @collection_routes.route('/collection/sets/<string:set_code>', methods=['GET'])
-@cache_response()
+# @cache_response()
 def get_collection_set(set_code):
     try:
         # Fetch the set instance by set code
@@ -300,11 +300,11 @@ def get_collection_set(set_code):
 
         # Calculate collection statistics and card values
         for card in cards:
-            collection_count += card.quantity_collection_regular + card.quantity_collection_foil
+            collection_count += card.quantity_regular + card.quantity_foil
 
             # Calculate total value for regular and foil cards
-            regular_value = float(card.prices.get('usd', 0) or 0) * card.quantity_collection_regular
-            foil_value = float(card.prices.get('usd_foil', 0) or 0) * card.quantity_collection_foil
+            regular_value = float(card.prices.get('usd', 0) or 0) * card.quantity_regular
+            foil_value = float(card.prices.get('usd_foil', 0) or 0) * card.quantity_foil
             total_value += regular_value + foil_value
 
             # Update statistics for frame effects, promo types, and other attributes
@@ -328,6 +328,9 @@ def get_collection_set(set_code):
         set_data['collection_percentage'] = (collection_count / set_instance.card_count) * 100 if set_instance.card_count else 0
         set_data['total_value'] = round(total_value, 2)
         set_data['statistics'] = statistics
+
+        # Log the statistics for debugging
+        print(f"Statistics for set {set_code}: {statistics}")
 
         response = {
             "set": set_data,

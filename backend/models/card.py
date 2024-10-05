@@ -1,9 +1,8 @@
 from database import db
 from sqlalchemy.dialects.postgresql import JSONB
-from datetime import datetime
-from sqlalchemy import event, Index
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import event, Index, func
+from sqlalchemy.orm import relationship, Session
+from sqlalchemy import text
 
 class Card(db.Model):
     __tablename__ = 'cards'
@@ -116,6 +115,7 @@ class Card(db.Model):
             data['quantity_foil'] = 0
         return data
 
+# Event listener to refresh set collection counts after a flush
 @event.listens_for(Session, 'after_flush')
 def after_flush(session, flush_context):
     updated_set_codes = set()
@@ -124,6 +124,5 @@ def after_flush(session, flush_context):
             updated_set_codes.add(instance.set_code)
 
     if updated_set_codes:
-        # Import SetCollectionCount here to avoid circular import
         from models.set_collection_count import SetCollectionCount
-        SetCollectionCount.refresh()
+        SetCollectionCount.refresh(updated_set_codes)
