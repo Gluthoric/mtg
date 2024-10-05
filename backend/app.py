@@ -1,5 +1,5 @@
 import logging
-from flask import Flask
+from flask import Flask, current_app
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask.cli import with_appcontext
@@ -59,6 +59,16 @@ def create_app(config_name='default'):
         """Refresh the set_collection_counts materialized view."""
         SetCollectionCount.refresh()
         print("Set collection counts refreshed successfully.")
+
+    # Add a route to list all available routes
+    @app.route('/routes', methods=['GET'])
+    def list_routes():
+        output = []
+        for rule in current_app.url_map.iter_rules():
+            methods = ','.join(sorted(rule.methods))
+            route = f"{rule.endpoint}: {rule.rule} [{methods}]"
+            output.append(route)
+        return '\n'.join(output), 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
     return app
 

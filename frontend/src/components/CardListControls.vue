@@ -1,29 +1,30 @@
 <template>
-  <div class="controls bg-secondary p-4 rounded-lg shadow-md mb-4">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  <div class="controls bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <!-- Name Filter -->
       <div class="filter-section">
         <input
           v-model="filters.name"
           placeholder="Search by name"
-          class="w-full p-2 border rounded-md bg-input-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full p-3 border border-gray-300 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
       </div>
 
       <!-- Rarity Filter -->
       <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Rarities</label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rarities</label>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="rarity in availableRarities"
             :key="rarity"
             @click="toggleRarity(rarity)"
             :class="[
-              'px-3 py-1 rounded-full capitalize text-sm',
+              'px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200',
               isRaritySelected(rarity)
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary-foreground text-secondary hover:bg-secondary-hover',
-              'hover:text-secondary-foreground transition-colors duration-200',
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600',
+              'border border-gray-300 dark:border-gray-600',
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
             ]"
           >
             {{ rarity }}
@@ -33,19 +34,19 @@
 
       <!-- Color Filter -->
       <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Colors</label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Colors</label>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="color in availableColors"
             :key="color"
             @click="toggleColor(color)"
             :class="[
-              'w-8 h-8 rounded-full flex items-center justify-center',
+              'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200',
               colorClass(color),
               isColorSelected(color)
-                ? 'ring-2 ring-offset-2 ring-primary'
-                : 'opacity-50 hover:opacity-75',
-              'hover:opacity-100 transition-opacity duration-200',
+                ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-blue-400'
+                : 'opacity-70 hover:opacity-100',
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
             ]"
           >
             <span class="sr-only">{{ getColorName(color) }}</span>
@@ -55,18 +56,19 @@
 
       <!-- Type Line Filter -->
       <div class="filter-section">
-        <label class="block text-sm font-medium mb-2">Types</label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Types</label>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="type in availableTypes"
             :key="type"
             @click="toggleType(type)"
             :class="[
-              'px-3 py-1 rounded-full capitalize text-sm',
+              'px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200',
               isTypeSelected(type)
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary-foreground text-secondary hover:bg-secondary-hover',
-              'hover:bg-primary hover:text-primary-foreground transition-colors duration-200',
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600',
+              'border border-gray-300 dark:border-gray-600',
+              'focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400'
             ]"
           >
             {{ type }}
@@ -76,7 +78,7 @@
 
       <!-- Keywords Filter -->
       <div class="filter-section relative" ref="keywordDropdownRef">
-        <label class="block text-sm font-medium mb-2">Keywords</label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Keywords</label>
         <div class="relative">
           <input
             type="text"
@@ -84,17 +86,17 @@
             @focus="showKeywordDropdown = true"
             @input="filterKeywords"
             placeholder="Select keyword"
-            class="w-full p-2 border rounded-md bg-input-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            class="w-full p-3 border border-gray-300 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
           <ul
             v-if="showKeywordDropdown"
-            class="absolute z-10 bg-background text-foreground w-full mt-1 max-h-40 overflow-auto border rounded-md"
+            class="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg"
           >
             <li
               v-for="keyword in filteredKeywords"
               :key="keyword"
               @click="selectKeyword(keyword)"
-              class="px-4 py-2 hover:bg-secondary cursor-pointer"
+              class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-gray-700 dark:text-gray-300"
             >
               {{ keyword }}
             </li>
@@ -104,9 +106,9 @@
 
       <!-- Cards Per Row Slider -->
       <div class="filter-section">
-        <label for="cards-per-row-slider" class="block text-sm font-medium mb-2"
-          >Cards per row</label
-        >
+        <label for="cards-per-row-slider" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Cards per row
+        </label>
         <input
           id="cards-per-row-slider"
           type="range"
@@ -114,22 +116,21 @@
           min="5"
           max="12"
           step="1"
-          class="w-full"
+          class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
         />
-        <div class="text-sm mt-1">{{ cardsPerRow }} cards per row</div>
+        <div class="text-sm mt-2 text-gray-600 dark:text-gray-400">{{ cardsPerRow }} cards per row</div>
       </div>
 
       <!-- Missing Filter Toggle -->
       <div class="filter-section flex items-center">
-        <label class="flex items-center relative">
-          <span class="mr-2 text-sm font-medium">Show Missing Cards</span>
-          <div class="toggle-slot">
-            <div class="toggle-button"></div>
-            <input
-              type="checkbox"
-              v-model="filters.missing"
-              class="toggle-checkbox"
-            />
+        <label class="flex items-center cursor-pointer">
+          <div class="relative">
+            <input type="checkbox" v-model="filters.missing" class="sr-only" />
+            <div class="w-10 h-6 bg-gray-200 rounded-full shadow-inner"></div>
+            <div class="dot absolute w-6 h-6 bg-white rounded-full shadow -left-1 -top-1 transition"></div>
+          </div>
+          <div class="ml-3 text-gray-700 dark:text-gray-300 font-medium">
+            Show Missing Cards
           </div>
         </label>
       </div>
@@ -198,15 +199,15 @@ export default defineComponent({
     const filteredKeywords = ref(availableKeywords);
 
     const isRaritySelected = computed(
-      () => (rarity: string) => filters.value.rarities.includes(rarity),
+      () => (rarity: string) => filters.value.rarities.includes(rarity)
     );
 
     const isColorSelected = computed(
-      () => (color: string) => filters.value.colors.includes(color),
+      () => (color: string) => filters.value.colors.includes(color)
     );
 
     const isTypeSelected = computed(
-      () => (type: string) => filters.value.types.includes(type),
+      () => (type: string) => filters.value.types.includes(type)
     );
 
     const colorClass = (color: string) => {
@@ -263,7 +264,7 @@ export default defineComponent({
     const filterKeywords = () => {
       const search = keywordSearch.value.toLowerCase();
       filteredKeywords.value = availableKeywords.filter((kw) =>
-        kw.toLowerCase().includes(search),
+        kw.toLowerCase().includes(search)
       );
     };
 
@@ -278,7 +279,7 @@ export default defineComponent({
       (newFilters) => {
         emit("update:modelValue", newFilters);
       },
-      { deep: true },
+      { deep: true }
     );
 
     watch(cardsPerRow, (newCardsPerRow) => {
@@ -316,46 +317,26 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.toggle-checkbox {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 40px;
-  height: 20px;
-  opacity: 0;
-  cursor: pointer;
-  margin: 0;
-  padding: 0;
-}
-.toggle-slot {
-  position: relative;
-  width: 40px;
-  height: 20px;
-  border-radius: 10px;
-  background-color: #ccc;
-  transition: background-color 0.3s ease;
-}
-.toggle-button {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background-color: white;
-  transition: transform 0.3s ease;
-}
-.toggle-checkbox:checked + .toggle-button {
-  transform: translateX(20px);
-}
-.toggle-checkbox:checked ~ .toggle-slot {
-  background-color: #4299e1;
+input:checked ~ .dot {
+  transform: translateX(100%);
+  background-color: #48bb78;
 }
 
 input[type="range"]::-webkit-slider-thumb {
-  background: #4299e1;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #48bb78;
+  cursor: pointer;
+  border-radius: 50%;
 }
+
 input[type="range"]::-moz-range-thumb {
-  background: #4299e1;
+  width: 20px;
+  height: 20px;
+  background: #48bb78;
+  cursor: pointer;
+  border-radius: 50%;
 }
 </style>

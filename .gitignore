@@ -112,3 +112,6 @@ notes/scryfall_default_cards.json
 !.aider.conf
 .aider*
 mtg_card_importer/default_cards.json
+
+# Swagger folder
+swagger/
