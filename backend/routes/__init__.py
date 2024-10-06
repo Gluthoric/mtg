@@ -7,6 +7,7 @@ def register_routes(app):
     from .kiosk_routes import kiosk_routes
     from .set_routes import set_routes
     from .import_routes import import_routes
+    from .consolidated_routes import consolidated_routes
 
     api = Blueprint('api', __name__, url_prefix='/api')
 
@@ -15,6 +16,7 @@ def register_routes(app):
     api.register_blueprint(kiosk_routes)
     api.register_blueprint(set_routes)
     api.register_blueprint(import_routes)
+    api.register_blueprint(consolidated_routes, url_prefix='/v2')
 
     app.register_blueprint(api)
 
