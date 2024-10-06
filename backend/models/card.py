@@ -115,14 +115,4 @@ class Card(db.Model):
             data['quantity_foil'] = 0
         return data
 
-# Event listener to refresh set collection counts after a flush
-@event.listens_for(Session, 'after_flush')
-def after_flush(session, flush_context):
-    updated_set_codes = set()
-    for instance in session.new.union(session.dirty).union(session.deleted):
-        if isinstance(instance, Card):
-            updated_set_codes.add(instance.set_code)
-
-    if updated_set_codes:
-        from models.set_collection_count import SetCollectionCount
-        SetCollectionCount.refresh(updated_set_codes)
+# Remove the event listener

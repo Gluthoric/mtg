@@ -170,22 +170,31 @@ def update_collection(card_id):
     card.quantity_regular = quantity_regular
     card.quantity_foil = quantity_foil
 
-    # Commit the changes to the database
-    db.session.commit()
+    try:
+        # Commit the changes to the database
+        db.session.commit()
 
-    # Invalidate specific caches to ensure data consistency
-    current_app.redis_client.delete(f"collection:set:{old_set_code}")
-    current_app.redis_client.delete(f"collection_sets:{old_set_code}")
-    current_app.redis_client.delete("collection_stats")
+        # Refresh the set collection counts
+        from models.set_collection_count import SetCollectionCount
+        SetCollectionCount.refresh()
 
-    # Serialize updated card data
-    card_data = card.to_dict()
+        # Invalidate specific caches to ensure data consistency
+        current_app.redis_client.delete(f"collection:set:{old_set_code}")
+        current_app.redis_client.delete(f"collection_sets:{old_set_code}")
+        current_app.redis_client.delete("collection_stats")
 
-    return current_app.response_class(
-        response=current_app.json.dumps(card_data),
-        status=200,
-        mimetype='application/json'
-    )
+        # Serialize updated card data
+        card_data = card.to_dict()
+
+        return current_app.response_class(
+            response=current_app.json.dumps(card_data),
+            status=200,
+            mimetype='application/json'
+        )
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating collection: {str(e)}")
+        return jsonify({"error": "An error occurred while updating the collection."}), 500
 
 @collection_routes.route('/collection/stats', methods=['GET'])
 @cache_response()
@@ -202,6 +211,9 @@ def get_collection_set_cards(set_code):
     colors = request.args.getlist('colors') + request.args.getlist('colors[]')
     types = request.args.getlist('types') + request.args.getlist('types[]')
     keyword = request.args.get('keyword', '', type=str)
+    missing = request.args.get('missing', 'false', type=str).lower() == 'true'
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
 
     try:
         # Base query to get cards from a specific set
@@ -248,17 +260,21 @@ def get_collection_set_cards(set_code):
         if keyword:
             # Filter based on keyword presence in card keywords
             query = query.filter(Card.keywords.contains([keyword]))
+        if missing:
+            query = query.filter((Card.quantity_regular == 0) & (Card.quantity_foil == 0))
 
         # Order cards by their collector number, converting to an integer to ensure proper sorting
         query = query.order_by(func.cast(func.regexp_replace(Card.collector_number, '[^0-9]', '', 'g'), db.Integer))
 
-        # Fetch all cards matching the filters
-        cards = query.all()
+        # Paginate the results
+        paginated_cards = query.paginate(page=page, per_page=per_page, error_out=False)
 
         # Serialize the result
         result = {
-            'cards': [card.to_dict() for card in cards],
-            'total': len(cards),
+            'cards': [card.to_dict() for card in paginated_cards.items],
+            'total': paginated_cards.total,
+            'pages': paginated_cards.pages,
+            'current_page': paginated_cards.page
         }
 
         return jsonify(result), 200
